@@ -1,0 +1,81 @@
+.meeting-heading-button {
+  margin-left: 2em;
+}
+
+.meeting-avl-button {
+  min-width: 12em;
+}
+
+.weeklyview__bodycell {
+  border-right: 1px solid lightgray;
+  border-bottom: 1px solid lightgray;
+}
+
+.weeklyview__bodycell:hover {
+  cursor: pointer;
+  border: 2px dashed black;
+}
+
+.weeklyview-grid {
+  text-align: right;
+}
+
+.weeklyview-grid > div {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
+.weeklyview__hourcell {
+  align-items: right;
+  padding-right: 0.5em;
+}
+
+.weeklyview__colheadercell {
+  align-items: center;
+}
+
+.weeklyview-grid__monthtext {
+  grid-column: 2 / -1;
+  text-align: left;
+  font-size: 1.4em;
+  height: 2em;
+}
+
+.respondents-container {
+  margin-top: 4em;
+  margin-left: 2em;
+  min-width: 10em;
+}
+
+.respondents-container ul {
+  margin: 0;
+  padding: 0;
+}
+
+.respondents-container li {
+  list-style-type: none;
+  margin: 1em 0;
+}
+
+.respondents-container li.unavailable {
+  color: lightgray;
+  text-decoration: line-through;
+}
+
+.respondents-container li:hover {
+  color: forestgreen;
+  cursor: pointer;
+}
+
+.meeting-days-arrow {
+  position: absolute;
+  top: 50%;
+  font-size: 2em;
+  color: lightgray;
+}
+
+.meeting-days-arrow:hover {
+  cursor: pointer;
+  color: black;
+}

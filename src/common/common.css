@@ -1,0 +1,10 @@
+.form-text-input {
+  border: none;
+  border-bottom: 1px solid lightgray;
+  padding-bottom: 1em;
+}
+
+.form-text-input:focus {
+  outline: none;
+  border-bottom: 1px solid forestgreen;
+}

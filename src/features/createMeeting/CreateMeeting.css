@@ -1,0 +1,13 @@
+.create-meeting-page > div {
+  margin-bottom: 4em;
+}
+
+.meeting-name-container {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+}
+
+.create-meeting-question {
+  font-size: 1.3em;
+}

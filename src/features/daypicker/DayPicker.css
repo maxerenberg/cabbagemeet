@@ -1,0 +1,62 @@
+.daypicker-main-row {
+  display: flex;
+  flex: row wrap;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 1.5em;
+  margin-bottom: 2em;
+}
+
+.daypicker-calendar {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+}
+
+.daypicker-calendar__cell {
+  height: 5em;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+
+.daypicker-calendar__cell__button {
+  width: 3em;
+  height: 3em;
+  border-radius: 50%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+
+.daypicker-calendar__cell__button:hover {
+  cursor: pointer;
+}
+
+.daypicker-calendar__cell__button.selected {
+  background-color: forestgreen;
+  color: white;
+}
+
+.daypicker-calendar__cell__button.unselected:hover {
+  background-color: lightgray;
+}
+
+.daypicker-calendar__cell__button.disabled {
+  color: lightgray;
+}
+
+.daypicker-calendar__cell__button.disabled:hover {
+  cursor: not-allowed;
+}
+
+.daypicker-calendar-arrow {
+  font-size: 1.2em;
+  color: lightgray;
+}
+
+.daypicker-calendar-arrow:hover {
+  cursor: pointer;
+  color: black;
+}

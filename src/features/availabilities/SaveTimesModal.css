@@ -1,0 +1,43 @@
+.saveTimesModal {
+  position: fixed;
+  top: 0;
+  left: 0;
+  z-index: 1;
+  width: 100vw;
+  height: 100vh;
+  background-color: rgba(255, 255, 255, 0.7);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.saveTimesModal--content {
+  position: absolute;
+  border: 1px solid forestgreen;
+  border-radius: 10px;
+  background-color: white;
+  min-height: 80%;
+  min-width: 80%;
+  padding: 4rem 4rem;
+  display: flex;
+  flex-flow: column nowrap;
+  justify-content: space-between;
+}
+
+.saveTimesModal--content > div:not(:first-child) {
+  margin-top: 2em;
+}
+
+.saveTimesModal--input {
+  margin-top: 1em;
+  width: 100%;
+}
+
+.already-have-account {
+  font-size: 0.9em;
+}
+
+.already-have-account:hover {
+  color: forestgreen;
+  cursor: pointer;
+}
