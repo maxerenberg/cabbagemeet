@@ -131,8 +131,10 @@ export const createMeeting = createAsyncThunk<
 );
 
 function mergeSelectedDateTimes(selectedDateTimes: DateTimes, dateTimes: DateTimes): DateTimes {
-  const inFirstButNotInSecond = (first: DateTimes, second: DateTimes) => {
-    const newDateTimes: DateTimes = {};
+  // If A and B are sets of datetimes, we want
+  // (A - B) U (B - A)
+  const newDateTimes: DateTimes = {};
+  const getFirstMinusSecond = (first: DateTimes, second: DateTimes) => {
     for (const [date, times] of Object.entries(first)) {
       for (const time of times) {
         if (second[date]?.includes(time)) continue;
@@ -142,12 +144,10 @@ function mergeSelectedDateTimes(selectedDateTimes: DateTimes, dateTimes: DateTim
         newDateTimes[date].push(time);
       }
     }
-    return newDateTimes;
   }
-  return {
-    ...inFirstButNotInSecond(selectedDateTimes, dateTimes),
-    ...inFirstButNotInSecond(dateTimes, selectedDateTimes),
-  };
+  getFirstMinusSecond(selectedDateTimes, dateTimes);
+  getFirstMinusSecond(dateTimes, selectedDateTimes);
+  return newDateTimes;
 }
 
 export const submitAvailabilities = createAsyncThunk<

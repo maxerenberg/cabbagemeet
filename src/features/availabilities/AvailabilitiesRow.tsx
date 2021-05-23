@@ -1,4 +1,4 @@
-import React, { useCallback } from 'react';
+import React, { useCallback, useContext } from 'react';
 import { unwrapResult } from '@reduxjs/toolkit';
 import type { SelModeType } from './types';
 import { getUserFromSelMode } from './types';
@@ -6,7 +6,7 @@ import type { DateTimes} from '../../common/types';
 import { useAppDispatch, useAppSelector } from '../../app/hooks';
 import { resetSubmitAvailabilitiesStatus, submitAvailabilities } from '../daypicker/meetingTimesSlice';
 import { SaveTimesModal } from './SaveTimesModal';
-import { useToast } from '../toast/Toast';
+import { toastContext } from '../toast/Toast';
 
 const AvailabilitiesRow = React.memo(function AvailabilitiesRow({
   selMode, setSelMode, selectedDateTimes, setSelectedDateTimes,
@@ -19,7 +19,7 @@ const AvailabilitiesRow = React.memo(function AvailabilitiesRow({
   const dispatch = useAppDispatch();
   const submitAvailabilitiesStatus = useAppSelector(
     state => state.meetingTimes.submitAvailabilitiesStatus);
-  const { toast, showToast } = useToast();
+  const { toast, showToast } = useContext(toastContext);
   const selectedUser = getUserFromSelMode(selMode);
   let avlBtnText = '';
   let onAvlBtnClick: React.MouseEventHandler | undefined;

@@ -7,6 +7,7 @@ import { Provider } from 'react-redux';
 import * as serviceWorker from './serviceWorker';
 import { addDay } from './features/daypicker/meetingTimesSlice';
 import { getDateString } from './features/daypicker/dateUtils';
+import { ToastProvider } from './features/toast/Toast';
 
 // Select today's date by default
 store.dispatch(addDay(getDateString(new Date())));
@@ -14,7 +15,9 @@ store.dispatch(addDay(getDateString(new Date())));
 ReactDOM.render(
   <React.StrictMode>
     <Provider store={store}>
-      <App />
+      <ToastProvider>
+        <App />
+      </ToastProvider>
     </Provider>
   </React.StrictMode>,
   document.getElementById('root')

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { addDay, removeDay } from './meetingTimesSlice';
 import { daysOfWeek, getMonthAbbr } from './dateUtils';
 import './DayPicker.css';

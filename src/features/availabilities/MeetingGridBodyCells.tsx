@@ -1,9 +1,9 @@
-import React, { useMemo } from 'react';
+import React, { useContext, useMemo } from 'react';
 import { PeopleDateTimes, DateTimes, Style } from '../../common/types';
 import type { SelModeType, DateTime } from './types';
 import { getUserFromSelMode } from './types';
 import { range } from '../daypicker/dateUtils';
-import { ToastMessageProps } from '../toast/Toast';
+import { toastContext } from '../toast/Toast';
 
 const green = [0x22, 0x8B, 0x22];  // 'forestgreen'
 const blue = [0, 0xFF, 0xFF];  // 'aqua'
@@ -14,13 +14,12 @@ function rgbToStr(rgb: number[]) {
 
 const MeetingGridBodyCells = React.memo(function MeetingGridBodyCells({
   numRows, numCols, startHour, dateStrings, availabilities, setHoverDateTime,
-  hoverUser, selMode, selectedDateTimes, setSelectedDateTimes, showToast,
+  hoverUser, selMode, selectedDateTimes, setSelectedDateTimes,
 }: {
   numRows: number, numCols: number, startHour: number, dateStrings: string[],
   availabilities: PeopleDateTimes, setHoverDateTime: (dateTime: DateTime | null) => void,
   hoverUser: string | null, selMode: SelModeType, selectedDateTimes: DateTimes,
   setSelectedDateTimes: (dateTimes: DateTimes) => void,
-  showToast: (props: ToastMessageProps) => void,
 }) {
   type DayTimePeople = {
     [day: string]: {
@@ -44,6 +43,7 @@ const MeetingGridBodyCells = React.memo(function MeetingGridBodyCells({
   }, [dateStringsSet, availabilities]);
   const totalPeople = Object.keys(availabilities).length;
   const selectedUser = getUserFromSelMode(selMode);
+  const { showToast } = useContext(toastContext);
   return (
     <React.Fragment>
       {

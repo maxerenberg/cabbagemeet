@@ -9,7 +9,6 @@ import type { Style, DateTimes, PeopleDateTimes } from '../../common/types';
 import type { SelModeType, DateTime } from './types';
 import { getUserFromSelMode } from './types';
 import './Meeting.css';
-import { useToast } from '../toast/Toast';
 
 export default function Meeting() {
   const match: { params: { id: string } } = useRouteMatch();
@@ -90,7 +89,6 @@ const WeeklyViewTimePicker = React.memo(function WeeklyViewTimePicker({
   );
   const [hoverDateTime, setHoverDateTime] = useState<DateTime | null>(null);
   const [hoverUser, setHoverUser] = useState<string | null>(null);
-  const { toast, showToast } = useToast();
   if (startHour == null || endHour == null || dates === null) return null;
   const numCols = numDaysDisplayed + 1;
   const numRows = (endHour - startHour) * 2;
@@ -111,7 +109,7 @@ const WeeklyViewTimePicker = React.memo(function WeeklyViewTimePicker({
           numRows={numRows} numCols={numCols} startHour={startHour}
           dateStrings={datesDisplayed} availabilities={availabilities}
           setHoverDateTime={setHoverDateTime} hoverUser={hoverUser}
-          selMode={selMode} showToast={showToast}
+          selMode={selMode}
           selectedDateTimes={selectedDateTimes} setSelectedDateTimes={setSelectedDateTimes}
         />
       </div>
@@ -122,7 +120,6 @@ const WeeklyViewTimePicker = React.memo(function WeeklyViewTimePicker({
         selMode={selMode} setSelMode={setSelMode}
         setSelectedDateTimes={setSelectedDateTimes}
       />
-      {toast}
     </div>
   );
 });

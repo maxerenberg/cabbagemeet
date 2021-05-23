@@ -15,7 +15,11 @@
 
 .toast.show {
   visibility: visible;
-  animation: fadein 0.5s, fadeout 0.5s 2.5s;
+  animation: fadein 0.5s;
+}
+
+.toast.hide {
+  animation: fadeout 0.5s;
 }
 
 @keyframes fadein {
@@ -24,6 +28,6 @@
 }
 
 @keyframes fadeout {
-  from {bottom: 2em; opacity: 1;}
-  to {bottom: 0; opacity: 0;}
+  from {bottom: 2em; opacity: 1; visibility: visible;}
+  to {bottom: 0; opacity: 0; visibility: hidden;}
 }

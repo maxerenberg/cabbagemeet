@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useContext } from 'react';
 import {
   BrowserRouter as Router,
   Link,
@@ -10,8 +10,11 @@ import DayPicker from './features/daypicker/DayPicker';
 import CreateMeetingPage from './features/createMeeting/CreateMeeting';
 import Meeting from './features/availabilities/Meeting';
 import './App.css';
+import { toastContext } from './features/toast/Toast';
 
 function App() {
+  // use one Toast for the whole app
+  const { toast } = useContext(toastContext);
   return (
     <Router>
       <div className="App">
@@ -33,6 +36,7 @@ function App() {
           </Switch>
         </main>
       </div>
+      {toast}
     </Router>
   );
 }
