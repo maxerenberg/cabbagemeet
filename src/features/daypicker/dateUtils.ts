@@ -47,7 +47,7 @@ export function getDayOfWeekAbbr(date: Date) {
 }
 
 export function range(n: number) {
-  return [...Array(n).keys()];
+  return Array.from(Array(n).keys());
 }
 
 export const daysOfWeek = [

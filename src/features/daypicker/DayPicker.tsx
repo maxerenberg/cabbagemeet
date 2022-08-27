@@ -3,16 +3,16 @@ import { addDay, removeDay } from './meetingTimesSlice';
 import { daysOfWeek, getMonthAbbr } from './dateUtils';
 import './DayPicker.css';
 import { getDateString, range } from './dateUtils';
-import { useHistory } from 'react-router';
+import { useNavigate } from 'react-router-dom';
 import { useAppSelector, useAppDispatch } from '../../app/hooks';
 
 export default function DayPicker() {
-  const history = useHistory();
+  const navigate = useNavigate();
   return (
     <div>
       <section className="daypicker-main-row">
         <p>On which days would you like to meet?</p>
-        <button onClick={() => history.push("/create")}>Let's meet</button>
+        <button onClick={() => navigate("/create")}>Let's meet</button>
       </section>
       <section className="daypicker-calendar-container">
         <DayPickerCalendar />

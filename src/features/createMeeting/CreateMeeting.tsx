@@ -2,7 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { createMeeting, resetCreateMeetingStatus } from '../daypicker/meetingTimesSlice';
 import './CreateMeeting.css';
 import '../../common/common.css';
-import { useHistory } from 'react-router';
+import { useNavigate } from 'react-router-dom';
 import { range, to12HourClock } from '../daypicker/dateUtils';
 import { useAppDispatch, useAppSelector } from '../../app/hooks';
 import { unwrapResult } from '@reduxjs/toolkit';
@@ -15,7 +15,7 @@ export default function CreateMeetingPage() {
   const dispatch = useAppDispatch();
   const createMeetingStatus = useAppSelector(state => state.meetingTimes.createMeetingStatus);
   const error = useAppSelector(state => state.meetingTimes.error);
-  const history = useHistory();
+  const navigate = useNavigate();
 
   if (createMeetingStatus === 'succeeded') {
     // we're about to switch to a different URL
@@ -38,7 +38,7 @@ export default function CreateMeetingPage() {
       const payload = unwrapResult(resultAction);
       const meetingID = payload.id;
       dispatch(resetCreateMeetingStatus());
-      history.push('/m/' + meetingID);
+      navigate('/m/' + meetingID);
     } catch (err) {
       console.error(err);
     }

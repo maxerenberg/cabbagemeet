@@ -1,10 +1,11 @@
 import React, { useContext } from 'react';
 import {
-  BrowserRouter as Router,
+  BrowserRouter,
   Link,
   NavLink,
+  Outlet,
   Route,
-  Switch,
+  Routes,
 } from 'react-router-dom';
 import DayPicker from './features/daypicker/DayPicker';
 import CreateMeetingPage from './features/createMeeting/CreateMeeting';
@@ -16,28 +17,32 @@ function App() {
   // use one Toast for the whole app
   const { toast } = useContext(toastContext);
   return (
-    <Router>
-      <div className="App">
-        <header className="App-header">
-          <div>
-            <Link to="/" style={{textDecoration: 'none', color: 'black'}}>Logo</Link>
-          </div>
-          <div>
-            <HeaderLinks />
-          </div>
-        </header>
-        <main className="App-main">
-          <Switch>
-            <Route exact path="/create" component={CreateMeetingPage} />
-            <Route exact path="/m/:id">
-              <Meeting />
-            </Route>
-            <Route exact path="/" component={DayPicker} />
-          </Switch>
-        </main>
-      </div>
-      {toast}
-    </Router>
+    <BrowserRouter>
+      <Routes>
+        <Route path="/" element={
+          <>
+            <div className="App">
+              <header className="App-header">
+                <div>
+                  <Link to="/" style={{textDecoration: 'none', color: 'black'}}>Logo</Link>
+                </div>
+                <div>
+                  <HeaderLinks />
+                </div>
+              </header>
+              <main className="App-main">
+                <Outlet />
+              </main>
+            </div>
+            {toast}
+          </>
+        }>
+          <Route index element={<DayPicker />} />
+          <Route path="/create" element={<CreateMeetingPage />} />
+          <Route path="/m/:id" element={<Meeting />} />
+        </Route>
+      </Routes>
+    </BrowserRouter>
   );
 }
 
@@ -61,20 +66,19 @@ function HeaderLinks() {
     },
   ];
   return (
-    <React.Fragment>
+    <>
       {
         links.map(lnk => (
           <NavLink
             to={lnk.to}
             key={lnk.to}
-            className="header-link"
-            activeClassName="header-link_active"
+            className={({ isActive }) => isActive ? "header-link_active" : "header-link"}
           >
             {lnk.desc}
           </NavLink>
         ))
       }
-    </React.Fragment>
+    </>
   );
 }
 

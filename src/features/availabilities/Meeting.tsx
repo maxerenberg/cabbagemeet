@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { useAppDispatch, useAppSelector } from '../../app/hooks';
-import { useRouteMatch } from 'react-router';
+import { useParams } from 'react-router-dom';
 import { getDateFromString, getDayOfWeekAbbr, getMonthAbbrFromDate } from '../daypicker/dateUtils';
 import { fetchMeeting } from '../daypicker/meetingTimesSlice';
 import AvailabilitiesRow from './AvailabilitiesRow';
@@ -11,7 +11,7 @@ import { getUserFromSelMode } from './types';
 import './Meeting.css';
 
 export default function Meeting() {
-  const match: { params: { id: string } } = useRouteMatch();
+  const params = useParams();
   const name = useAppSelector(state => state.meetingTimes.name);
   const fetchMeetingStatus = useAppSelector(state => state.meetingTimes.fetchMeetingStatus);
   const error = useAppSelector(state => state.meetingTimes.error);
@@ -19,7 +19,7 @@ export default function Meeting() {
   const [selectedDateTimes, setSelectedDateTimes] = useState({});
   const dispatch = useAppDispatch();
   if (name === null && fetchMeetingStatus === 'idle') {
-    dispatch(fetchMeeting(match.params.id));
+    dispatch(fetchMeeting(params.id!));
     return null;
   }
   if (fetchMeetingStatus === 'failed') {

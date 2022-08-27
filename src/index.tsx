@@ -1,5 +1,5 @@
 import React from 'react';
-import ReactDOM from 'react-dom';
+import { createRoot } from 'react-dom/client';
 import './index.css';
 import App from './App';
 import { store } from './app/store';
@@ -12,15 +12,16 @@ import { ToastProvider } from './features/toast/Toast';
 // Select today's date by default
 store.dispatch(addDay(getDateString(new Date())));
 
-ReactDOM.render(
+const container = document.getElementById('root');
+const root = createRoot(container!);
+root.render(
   <React.StrictMode>
     <Provider store={store}>
       <ToastProvider>
         <App />
       </ToastProvider>
     </Provider>
-  </React.StrictMode>,
-  document.getElementById('root')
+  </React.StrictMode>
 );
 
 // If you want your app to work offline and load faster, you can change
