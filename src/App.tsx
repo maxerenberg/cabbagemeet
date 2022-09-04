@@ -7,10 +7,11 @@ import {
   Route,
   Routes,
 } from 'react-router-dom';
-import DayPicker from './features/daypicker/DayPicker';
-import CreateMeetingPage from './features/createMeeting/CreateMeeting';
-import Meeting from './features/availabilities/Meeting';
 import './App.css';
+import 'common/common.css';
+import DayPicker from 'components/DayPicker/DayPicker';
+import MeetingForm from 'components/MeetingForm';
+import Meeting from './components/availabilities/Meeting';
 import { toastContext } from './features/toast/Toast';
 
 function App() {
@@ -38,9 +39,10 @@ function App() {
           </>
         }>
           <Route index element={<DayPicker />} />
-          <Route path="/create" element={<CreateMeetingPage />} />
-          <Route path="/m/:id" element={<Meeting />} />
+          <Route path="create" element={<MeetingForm />} />
+          <Route path="m/:id" element={<Meeting />} />
         </Route>
+        {/* TODO: use custom 404 page */}
       </Routes>
     </BrowserRouter>
   );

@@ -52,8 +52,9 @@
 }
 
 .daypicker-calendar-arrow {
-  font-size: 1.2em;
-  color: lightgray;
+  font-size: 1.5em;
+  color: gray;
+  margin: -0.12em 1em 0;
 }
 
 .daypicker-calendar-arrow:hover {

@@ -1,6 +1,6 @@
-import { nanoid } from "@reduxjs/toolkit";
-import { getDateString } from "../features/daypicker/dateUtils";
-import { DateTimes, PeopleDateTimes } from '../common/types';
+import { nanoid } from '@reduxjs/toolkit';
+import { getDateString } from 'utils/dates';
+import { PeopleDateTimesFlat } from 'common/types';
 
 export type ServerMeeting = {
   id: string,
@@ -9,7 +9,7 @@ export type ServerMeeting = {
   startTime: number,
   endTime: number,
   dates: string[],
-  availabilities: PeopleDateTimes,
+  availabilities: PeopleDateTimesFlat,
 };
 
 export type ServerSimpleResponse = {
@@ -48,34 +48,36 @@ class Client {
           id,
           name: 'some-name',
           about: 'some-description',
-          dates: [dateString1, dateString2],
+          /*dates: [dateString1, dateString2],
           availabilities: {
-            'bob': {
-              [dateString1]: [
-                13, 13.5, 15, 16, 16.5,
-              ],
-              [dateString2]: [
-                  18, 18.5, 20.5,
-              ],
-            },
-            'alice': {
-              [dateString1]: [
-                13.5, 15.5, 16.5, 17,
-              ],
-            },
+            'bob': [
+              ...['13:00', '13:30', '15:00', '16:00', '16:30'].map(t => `${dateString1}T${t}:00Z`),
+              ...['18:00', '18:30', '20:30'].map(t => `${dateString2}T${t}:00Z`),
+            ],
+            'alice': [
+              ...['13:30', '15:30', '16:30', '17:00'].map(t => `${dateString1}T${t}:00Z`),
+            ],
           },
           startTime: 13,
-          endTime: 21,
+          endTime: 21,*/
+          dates: [dateString1],
+          availabilities: {
+            'bob': [`${dateString2}T02:00:00Z`, `${dateString2}T02:30:00Z`],
+          },
+          startTime: 23,
+          endTime: 6,
         });
       }, 1000);
     });
   }
-  submitAvailabilities(user: string, dateTimes: DateTimes): Promise<ServerSimpleResponse> {
-    return new Promise(resolve => {
+  submitAvailabilities(user: string, dateTimes: string[]): Promise<ServerSimpleResponse> {
+    return new Promise((resolve, reject) => {
       setTimeout(() => {
-        resolve({
-          status: 'OK',
-        });
+        if (true) {
+          resolve({status: 'OK'});  
+        } else {
+          reject(new Error('boom!'));
+        }
       }, 1000);
     });
   }
