@@ -1,5 +1,6 @@
 // change this as desired for testing etc.
 export const today = new Date();
+export const todayString = getDateString(today);
 
 /**
  * Returns date in YYYY-MM-DD format
@@ -81,7 +82,7 @@ export function getUTCOffsetHours() {
   return -(today.getTimezoneOffset() / 60);
 }
 
-export function addDaysToDateString(dateString: string, numDays: number) {
+export function addDaysToDateString(dateString: string, numDays: number): string {
   const date = getDateFromString(dateString);
   date.setDate(date.getDate() + numDays);
   return getDateString(date);
@@ -91,15 +92,15 @@ export function addDaysToDateString(dateString: string, numDays: number) {
  * Returns the three-letter abbreviation of the given month
  * @param month the month index. Must be in [0, 12)
  */
-export function getMonthAbbr(month: number): string {
-  return getMonthAbbrFromDate(new Date(1, month));
+export function getMonthAbbr(monthIdx: number): string {
+  return months[monthIdx].substring(0, 3).toUpperCase();
 }
 
 /**
  * Returns the three-letter abbreviation of the month of the given date
  */
 export function getMonthAbbrFromDate(date: Date): string {
-  return months[date.getMonth()].substring(0, 4).toUpperCase();
+  return getMonthAbbr(date.getMonth());
 }
 
 export function getDayOfWeekAbbr(date: Date) {

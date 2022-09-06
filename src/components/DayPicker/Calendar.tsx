@@ -1,71 +1,71 @@
 import React, { useState } from 'react';
 import { range } from 'utils/arrays'
-import { daysOfWeek, getDateString, today } from 'utils/dates';
-import MonthTitle from './MonthTitle';
+import {
+  addDaysToDateString,
+  daysOfWeek,
+  today,
+  todayString,
+ } from 'utils/dates';
 import CalendarCell from './CalendarCell';
-import { selectSelectedDates } from 'slices/selectedDates';
-import { useAppSelector } from 'app/hooks';
 
-function Calendar() {
-  const selectedDates = useAppSelector(selectSelectedDates);
-  const [monthIdx, setMonthIdx] = useState(today.getMonth());
-  const month = monthIdx + 1;
-  const [year, setYear] = useState(today.getFullYear());
-  const firstDayOfMonth = new Date(year, monthIdx, 1);
-  // Go to the 0th day of the next month, which is actually
-  // the last day of this month
-  const lastDayOfMonth = new Date(year, monthIdx + 1, 0);
-  const numDaysInMonth = lastDayOfMonth.getDate();
+export default function Calendar() {
+  const [page, setPage] = useState(0);
+  const firstDateInGridForPage0 = addDaysToDateString(todayString, -today.getDay());
+  const firstDateInGrid = addDaysToDateString(firstDateInGridForPage0, 28 * page);
   
-  const lessThanTodayInCurrentMonth = (day: number) => (
-    monthIdx === today.getMonth()
-    && year === today.getFullYear()
-    && day < today.getDate()
-  );
-  const monthCells = range(1, numDaysInMonth + 1).map((day) => (
+  const monthCells = range(28).map((cellIdx) => (
     <CalendarCell
-      year={year}
-      month={month}
-      day={day}
-      isDisabled={lessThanTodayInCurrentMonth(day)}
-      isSelected={!!selectedDates[getDateString(year, month, day)]}
-      key={day}
+      cellIdx={cellIdx}
+      firstDateInGrid={firstDateInGrid}
+      key={cellIdx}
     />
   ));
-  
-  const numEmptyCellsBeforeFirstDay = firstDayOfMonth.getDay();
-  const numEmptyCellsAfterLastDay = 6 - lastDayOfMonth.getDay();
-  const emptyCellsBeforeFirstDay = range(numEmptyCellsBeforeFirstDay).map((i) => (
-    <CalendarCell key={1 - numEmptyCellsBeforeFirstDay + i} isEmpty />
-  ));
-  const emptyCellsAfterLastDay = range(numEmptyCellsAfterLastDay).map((i) => (
-    <CalendarCell key={numDaysInMonth + 1 + i} isEmpty />
-  ));
+
+  const leftArrow = (
+    <div className="daypicker-calendar-arrow">
+      <span
+        className="daypicker-calendar-arrow__inner"
+        style={{visibility: page > 0 ? 'visible' : 'hidden'}}
+        onClick={() => setPage(page - 1)}
+      >
+        &lt;
+      </span>
+    </div>
+  );
+  const rightArrow = (
+    <div className="daypicker-calendar-arrow">
+      <span
+        className="daypicker-calendar-arrow__inner"
+        onClick={() => setPage(page + 1)}
+      >
+        &gt;
+      </span>
+    </div>
+  );
+
   return (
-    <div>
-      <MonthTitle
-        year={year}
-        monthIdx={monthIdx}
-        today={today}
-        setYear={setYear}
-        setMonthIdx={setMonthIdx}
-      />
+    <div style={{display: 'flex', flexFlow: 'row nowrap'}}>
+      {leftArrow}
       <div className="daypicker-calendar">
         <DayOfWeekRow />
-        {emptyCellsBeforeFirstDay}
         {monthCells}
-        {emptyCellsAfterLastDay}
       </div>
+      {rightArrow}
     </div>
   );
 };
-export default React.memo(Calendar);
 
 const DayOfWeekRow = React.memo(function DayOfWeekRow() {
   return (
     <>
       {daysOfWeek.map(day => (
-        <div key={day} style={{textAlign: 'center'}}>{day}</div>
+        <div key={day} style={{
+          textAlign: 'center',
+          paddingBottom: '0.4rem',
+          borderBottom: '1px solid lightgray',
+        }}>
+          {day}
+        </div>
       ))}
     </>
   );

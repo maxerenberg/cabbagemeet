@@ -8,6 +8,17 @@
 
 .weeklyview__bodycell {
   border-right: 1px solid lightgray;
+}
+
+.weeklyview__bodycell_firstrow {
+  border-top: 1px solid lightgray;
+}
+
+.weeklyview__bodycell_firstcol {
+  border-left: 1px solid lightgray;
+}
+
+.weeklyview__bodycell_oddrow {
   border-bottom: 1px solid lightgray;
 }
 
@@ -27,7 +38,6 @@
 }
 
 .weeklyview__hourcell {
-  align-items: right;
   padding-right: 0.5em;
 }
 
@@ -36,10 +46,11 @@
 }
 
 .weeklyview-grid__monthtext {
-  grid-column: 2 / -1;
+  grid-area: m;
   text-align: left;
   font-size: 1.4em;
   height: 2em;
+  margin-bottom: 1em;
 }
 
 .respondents-container {
@@ -69,10 +80,10 @@
 }
 
 .meeting-days-arrow {
-  position: absolute;
-  top: 50%;
   font-size: 2em;
   color: lightgray;
+  display: flex;
+  align-items: center;
 }
 
 .meeting-days-arrow:hover {

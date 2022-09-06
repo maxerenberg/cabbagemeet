@@ -8,6 +8,7 @@
 }
 
 .daypicker-calendar {
+  flex-grow: 1;
   display: grid;
   grid-template-columns: repeat(7, 1fr);
 }
@@ -52,12 +53,16 @@
 }
 
 .daypicker-calendar-arrow {
-  font-size: 1.5em;
-  color: gray;
-  margin: -0.12em 1em 0;
+  display: flex;
+  align-items: center;
+  font-size: 2em;
 }
 
-.daypicker-calendar-arrow:hover {
+.daypicker-calendar-arrow__inner {
+  color: gray;
+}
+
+.daypicker-calendar-arrow__inner:hover {
   cursor: pointer;
   color: black;
 }

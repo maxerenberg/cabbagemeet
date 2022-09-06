@@ -1,5 +1,6 @@
 import { nanoid } from '@reduxjs/toolkit';
-import { getDateString } from 'utils/dates';
+import { range } from 'utils/arrays';
+import { getDateString, addDaysToDateString } from 'utils/dates';
 import { PeopleDateTimesFlat } from 'common/types';
 
 export type ServerMeeting = {
@@ -40,8 +41,7 @@ class Client {
   getMeeting(id: string): Promise<ServerMeeting> {
     const d = new Date();
     const dateString1 = getDateString(d);
-    d.setDate(d.getDate() + 1);
-    const dateString2 = getDateString(d);
+    const dateString2 = addDaysToDateString(dateString1, 1);
     return new Promise(resolve => {
       setTimeout(() => {
         resolve({
@@ -60,7 +60,9 @@ class Client {
           },
           startTime: 13,
           endTime: 21,*/
-          dates: [dateString1],
+          dates: [dateString1].concat(
+            ...range(9).map(i => addDaysToDateString(dateString1, 30+i))
+          ),
           availabilities: {
             'bob': [`${dateString2}T02:00:00Z`, `${dateString2}T02:30:00Z`],
           },

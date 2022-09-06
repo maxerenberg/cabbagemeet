@@ -2,7 +2,6 @@ import React from 'react';
 import { useAppDispatch, useAppSelector } from 'app/hooks';
 import { useParams } from 'react-router-dom';
 import { fetchMeeting } from 'slices/meetingTimes';
-import AvailabilitiesRow from './AvailabilitiesRow';
 import WeeklyViewTimePicker from './WeeklyTimeViewPicker';
 import './Meeting.css';
 
@@ -11,9 +10,14 @@ export default function Meeting() {
   const name = useAppSelector(state => state.meetingTimes.name);
   const fetchMeetingStatus = useAppSelector(state => state.meetingTimes.fetchMeetingStatus);
   const error = useAppSelector(state => state.meetingTimes.error);
-  const appDispatch = useAppDispatch();
+  const dispatch = useAppDispatch();
+  
   if (name === null && fetchMeetingStatus === 'idle') {
-    appDispatch(fetchMeeting(params.id!));
+    dispatch(fetchMeeting(params.id!));
+    // TODO: show spinner
+    return null;
+  }
+  if (fetchMeetingStatus === 'loading') {
     // TODO: show spinner
     return null;
   }
@@ -25,7 +29,6 @@ export default function Meeting() {
     <div className="meeting-container">
       <MeetingTitleRow />
       <MeetingAboutRow />
-      <AvailabilitiesRow />
       <WeeklyViewTimePicker />
     </div>
   );

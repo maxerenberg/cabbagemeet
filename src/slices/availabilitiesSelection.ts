@@ -90,7 +90,7 @@ export const availabilitiesSelectionSlice = createSlice({
         dateTimes: {},
       };
     },
-    cancel: (state) => {
+    reset: (state) => {
       return {selMode: {type: 'none'}, dateTimes: {}};
     },
     addDateTime: (state, { payload: dateTime }: PayloadAction<string>) => {
@@ -136,7 +136,7 @@ export const {
   selectOther,
   goBackToEditingOther,
   cancelEditingOther,
-  cancel: cancelSelection,
+  reset: resetSelection,
   addDateTime,
   removeDateTime,
 } = availabilitiesSelectionSlice.actions;

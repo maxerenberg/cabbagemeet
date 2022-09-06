@@ -2,7 +2,7 @@ import React, { useState, useCallback, useContext } from 'react';
 import { SerializedError } from '@reduxjs/toolkit';
 import {
   selectSelModeAndDateTimes,
-  cancelSelection,
+  resetSelection,
   editSelf,
   goBackToEditingOther,
   editOther,
@@ -13,7 +13,13 @@ import SaveTimesModal from './SaveTimesModal';
 import { toastContext } from 'features/toast/Toast';
 import { assertIsNever } from 'utils/misc';
 
-function AvailabilitiesRow() {
+function AvailabilitiesRow({
+  moreDaysToRight,
+  pageDispatch,
+}: {
+  moreDaysToRight: boolean,
+  pageDispatch: React.Dispatch<'inc' | 'dec'>,
+}) {
   const selMode = useAppSelector(state => selectSelModeAndDateTimes(state).selMode);
   const dispatch = useAppDispatch();
   const { toast, showToast } = useContext(toastContext);
@@ -21,17 +27,24 @@ function AvailabilitiesRow() {
   let avlBtnText = 'internal error';
   let onAvlBtnClick: React.MouseEventHandler | undefined;
   let avlBtnDisabled = false;
-  const onCancelBtnClick = () => dispatch(cancelSelection());
+  const onCancelBtnClick = () => dispatch(resetSelection());
 
   if (selMode.type === 'none') {
     avlBtnText = 'Add availability';
     onAvlBtnClick = () => dispatch(editSelf());
   } else if (selMode.type === 'editingSelf') {
     avlBtnText = 'Continue';
-    onAvlBtnClick = () => setShouldShowModal(true);
+    onAvlBtnClick = () => {
+      if (moreDaysToRight) pageDispatch('inc');
+      else setShouldShowModal(true);
+    };
   } else if (selMode.type === 'editingOther') {
     avlBtnText = 'Save';
     onAvlBtnClick = async () => {
+      if (moreDaysToRight) {
+        pageDispatch('inc');
+        return;
+      }
       try {
         await dispatch(submitOther());
       } catch (anyError: any) {
@@ -48,7 +61,7 @@ function AvailabilitiesRow() {
         msg: `${selMode.otherUser}'s availabilities successfully updated`,
         msgType: 'success',
       });
-      dispatch(cancelSelection());
+      dispatch(resetSelection());
     }
   } else if (selMode.type === 'selectedOther') {
     avlBtnText = `Edit ${selMode.otherUser}'s availability`;
@@ -70,7 +83,7 @@ function AvailabilitiesRow() {
   }, []);
   
   return (
-    <React.Fragment>
+    <>
       <div style={{
         display: 'flex',
         alignItems: 'center',
@@ -98,12 +111,10 @@ function AvailabilitiesRow() {
         </div>
       </div>
       {
-        shouldShowModal && (
-          <SaveTimesModal closeModal={closeModal} />
-        )
+        shouldShowModal && <SaveTimesModal closeModal={closeModal} />
       }
       {toast}
-    </React.Fragment>
+    </>
   );
 }
 export default React.memo(AvailabilitiesRow);

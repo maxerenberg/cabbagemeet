@@ -24,7 +24,7 @@ export default function MeetingForm() {
       // If the user didn't select any dates, redirect them to the home page
       navigate('/');
     }
-  }, [navigate, visitedDayPicker]);
+  }, [navigate, visitedDayPicker, createMeetingStatus]);
 
   if (createMeetingStatus === 'succeeded') {
     // we're about to switch to a different URL
@@ -48,6 +48,7 @@ export default function MeetingForm() {
       dispatch(resetCreateMeetingStatus());
       navigate('/m/' + meetingID);
     } catch (err) {
+      // TODO: show error message to user
       console.error(err);
     }
   };

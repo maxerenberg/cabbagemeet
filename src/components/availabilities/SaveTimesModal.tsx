@@ -4,7 +4,7 @@ import { useAppDispatch, useAppSelector } from 'app/hooks';
 import {
   selectSelModeAndDateTimes,
   goBackToEditingSelf,
-  cancelSelection,
+  resetSelection,
   submitSelf,
 } from 'slices/availabilitiesSelection';
 import { toastContext } from 'features/toast/Toast';
@@ -23,6 +23,7 @@ function SaveTimesModal({
   // TODO: show spinner if waiting for server response
   const submitBtnDisabled = selMode.type === 'submittingSelf' || user === '';
   const closeBtnDisabled = selMode.type === 'submittingSelf';
+  const [errorMsg, setErrorMsg] = useState('');
   const onClose = () => {
     closeModal();
     setUser('');
@@ -39,14 +40,12 @@ function SaveTimesModal({
     }
     // automatically close the modal if the request succeeds
     onClose();
-    // reset the selection mode
-    dispatch(cancelSelection());
+    dispatch(resetSelection());
     showToast({
       msg: 'Availabilities successfully submitted',
       msgType: 'success',
     });
   };
-  const [errorMsg, setErrorMsg] = useState('');
 
   return (
     <div className="saveTimesModal">

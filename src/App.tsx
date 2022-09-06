@@ -1,7 +1,6 @@
 import React, { useContext } from 'react';
 import {
   BrowserRouter,
-  Link,
   NavLink,
   Outlet,
   Route,
@@ -25,7 +24,11 @@ function App() {
             <div className="App">
               <header className="App-header">
                 <div>
-                  <Link to="/" style={{textDecoration: 'none', color: 'black'}}>Logo</Link>
+                  {/*
+                    We use <a> instead of <Link> to force a reload of the whole page
+                    to completely reset the Redux state.
+                  */}
+                  <a href="/" style={{textDecoration: 'none', color: 'black'}}>Logo</a>
                 </div>
                 <div>
                   <HeaderLinks />
