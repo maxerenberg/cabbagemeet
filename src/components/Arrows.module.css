@@ -1,0 +1,9 @@
+svg.arrow {
+  fill: gray;
+  transform: scale(2);
+}
+
+svg.arrow:hover {
+  cursor: pointer;
+  fill: black;
+}

@@ -1,10 +1,23 @@
-.form-text-input {
-  border: none;
-  border-bottom: 1px solid lightgray;
-  padding-bottom: 1em;
+.header-link {
+  text-transform: uppercase;
+  text-decoration: none;
+  color: black;
 }
 
-.form-text-input:focus {
-  outline: none;
-  border-bottom: 1px solid forestgreen;
+/* Need extra selectors for specificity */
+.navbar-nav .nav-link.header-link:not(:first-child) {
+  padding-left: 1.5rem;
+}
+
+.header-link:hover,
+.header-link_active {
+  color: var(--custom-primary);
+}
+
+.form-text-input {
+  padding-bottom: 0.75rem;
+}
+
+body.modal-open {
+  overflow: hidden;
 }

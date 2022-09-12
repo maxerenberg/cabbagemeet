@@ -1,4 +1,5 @@
-import { useState, useContext } from 'react';
+import { useState, useEffect } from 'react';
+import Form from 'react-bootstrap/Form';
 import { SerializedError } from '@reduxjs/toolkit';
 import { useAppDispatch, useAppSelector } from 'app/hooks';
 import {
@@ -7,8 +8,7 @@ import {
   resetSelection,
   submitSelf,
 } from 'slices/availabilitiesSelection';
-import { toastContext } from 'features/toast/Toast';
-import 'common/common.css';
+import { useToast } from 'components/Toast';
 import './SaveTimesModal.css';
 
 function SaveTimesModal({
@@ -18,19 +18,23 @@ function SaveTimesModal({
 }) {
   const dispatch = useAppDispatch();
   const selMode = useAppSelector(state => selectSelModeAndDateTimes(state).selMode);
-  const { showToast } = useContext(toastContext);
-  const [user, setUser] = useState('');
-  // TODO: show spinner if waiting for server response
-  const submitBtnDisabled = selMode.type === 'submittingSelf' || user === '';
-  const closeBtnDisabled = selMode.type === 'submittingSelf';
+  const { showToast } = useToast();
+  const [name, setName] = useState('');
   const [errorMsg, setErrorMsg] = useState('');
+
+  // Set overflow:hidden on the body to prevent scrolling
+  useEffect(() => {
+    document.body.classList.add('modal-open');
+    return () => document.body.classList.remove('modal-open');
+  }, []);
+
   const onClose = () => {
     closeModal();
-    setUser('');
+    setName('');
   };
   const onSubmit = async () => {
     try {
-      await dispatch(submitSelf(user));
+      await dispatch(submitSelf(name));
     } catch (anyError: any) {
       const error = anyError as SerializedError;
       console.error('Modal: submission failed:', error.message);
@@ -44,51 +48,54 @@ function SaveTimesModal({
     showToast({
       msg: 'Availabilities successfully submitted',
       msgType: 'success',
+      autoClose: true,
     });
   };
 
+  // TODO: form validation
+
+  // TODO: show spinner if waiting for server response
+  const submitBtnDisabled = selMode.type === 'submittingSelf' || name === '';
+  const closeBtnDisabled = selMode.type === 'submittingSelf';
   return (
     <div className="saveTimesModal">
-      <div className="saveTimesModal--content">
-        <div style={{
-          display: 'flex',
-          justifyContent: 'space-between',
-        }}>
-          <div style={{
-            fontSize: '1.5em',
-          }}>
+      <Form className="saveTimesModal--content">
+        <div className="d-flex justify-content-between">
+          <div className="fs-4">
             Continue as Guest
           </div>
-          <button onClick={onClose} disabled={closeBtnDisabled}>Close</button>
+          <button
+            type="button"
+            className="btn btn-outline-primary px-3"
+            onClick={onClose}
+            disabled={closeBtnDisabled}
+          >
+            Close
+          </button>
         </div>
-        <div>
-          <label htmlFor="submitSelfName" className="form-text-label">Name</label>
-          <br />
-          <input
-            id="submitSelfName"
+        <Form.Group controlId="submitSelfName">
+          <Form.Label className="form-text-label">Name</Form.Label>
+          <Form.Control
             placeholder="What's your name?"
-            className="saveTimesModal--input form-text-input"
-            value={user}
-            onChange={(e) => setUser(e.target.value)}
+            className="form-text-input"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
           />
-        </div>
-        <div>
-          <label htmlFor="submitSelfName" className="form-text-label">Email address (optional)</label>
-          <br />
-          <input
-            id="submitSelfEmail"
+        </Form.Group>
+        <Form.Group controlId="submitSelfEmail">
+          <Form.Label className="form-text-label">Email address (optional)</Form.Label>
+          <Form.Control
             placeholder="What's your email address? (optional)"
-            className="saveTimesModal--input form-text-input"
+            className="form-text-input"
           />
-        </div>
-        <div style={{
-          display: 'flex',
-          justifyContent: 'space-between',
-        }}>
+        </Form.Group>
+        <div className="d-flex align-items-center justify-content-between">
           <div className="already-have-account">
             Already have an account?
           </div>
           <button
+            type="button"
+            className="btn btn-primary"
             onClick={onSubmit}
             disabled={submitBtnDisabled}
           >
@@ -97,12 +104,12 @@ function SaveTimesModal({
         </div>
         {
           errorMsg && (
-            <div style={{color: 'red'}}>
+            <div style={{color: 'var(--custom-danger)'}}>
               Error submitting availabilities: {errorMsg}
             </div>
           )
         }
-      </div>
+      </Form>
     </div>
   )
 }

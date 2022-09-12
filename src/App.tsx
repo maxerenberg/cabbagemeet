@@ -1,46 +1,26 @@
-import React, { useContext } from 'react';
+import Container from 'react-bootstrap/Container';
+import Offcanvas from 'react-bootstrap/Offcanvas';
+import Nav from 'react-bootstrap/Nav';
+import Navbar from 'react-bootstrap/Navbar';
+import { LinkContainer } from 'react-router-bootstrap';
 import {
   BrowserRouter,
-  NavLink,
   Outlet,
   Route,
   Routes,
 } from 'react-router-dom';
-import './App.css';
+import './App.scss';
+import './custom.css';
 import 'common/common.css';
 import DayPicker from 'components/DayPicker/DayPicker';
 import MeetingForm from 'components/MeetingForm';
 import Meeting from './components/availabilities/Meeting';
-import { toastContext } from './features/toast/Toast';
 
 function App() {
-  // use one Toast for the whole app
-  const { toast } = useContext(toastContext);
   return (
     <BrowserRouter>
       <Routes>
-        <Route path="/" element={
-          <>
-            <div className="App">
-              <header className="App-header">
-                <div>
-                  {/*
-                    We use <a> instead of <Link> to force a reload of the whole page
-                    to completely reset the Redux state.
-                  */}
-                  <a href="/" style={{textDecoration: 'none', color: 'black'}}>Logo</a>
-                </div>
-                <div>
-                  <HeaderLinks />
-                </div>
-              </header>
-              <main className="App-main">
-                <Outlet />
-              </main>
-            </div>
-            {toast}
-          </>
-        }>
+        <Route path="/" element={<AppRoot />}>
           <Route index element={<DayPicker />} />
           <Route path="create" element={<MeetingForm />} />
           <Route path="m/:id" element={<Meeting />} />
@@ -48,6 +28,42 @@ function App() {
         {/* TODO: use custom 404 page */}
       </Routes>
     </BrowserRouter>
+  );
+}
+
+function AppRoot() {
+  return (
+    <div className="App light-theme">
+      <Navbar expand="md">
+        <Container className="custom-navbar-container">
+          {/*
+            We intentionally use <a> here to force a reload of the whole page
+            to completely reset the Redux state.
+          */}
+          <Navbar.Brand href="/">Logo</Navbar.Brand>
+          <Navbar.Toggle aria-controls="app-navbar-nav" className="custom-navbar-toggle" />
+          <Navbar.Offcanvas
+            id="app-navbar-nav"
+            aria-labelledby="app-navbar-offcanvas-label"
+            placement="start"
+          >
+            <Offcanvas.Header closeButton>
+              <Offcanvas.Title id="app-navbar-offcanvas-label">
+                LOGO
+              </Offcanvas.Title>
+            </Offcanvas.Header>
+            <Offcanvas.Body>
+            <Nav className="ms-auto">
+              <HeaderLinks />
+            </Nav>
+            </Offcanvas.Body>
+          </Navbar.Offcanvas>
+        </Container>
+      </Navbar>
+      <main className="container app-main-container mt-5 mb-md-5">
+        <Outlet />
+      </main>
+    </div>
   );
 }
 
@@ -70,17 +86,20 @@ function HeaderLinks() {
       desc: "Feedback",
     },
   ];
+  // The @types/react-router-bootstrap package is wrong - className needs to be a string
+  // See https://github.com/react-bootstrap/react-router-bootstrap/blob/master/src/LinkContainer.js
+  const linkProps = {className: 'header-link', activeClassName: 'header-link_active'} as any;
   return (
     <>
       {
         links.map(lnk => (
-          <NavLink
+          <LinkContainer
             to={lnk.to}
             key={lnk.to}
-            className={({ isActive }) => isActive ? "header-link_active" : "header-link"}
+            {...linkProps}
           >
-            {lnk.desc}
-          </NavLink>
+            <Nav.Link>{lnk.desc}</Nav.Link>
+          </LinkContainer>
         ))
       }
     </>

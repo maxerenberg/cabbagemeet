@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import Form from 'react-bootstrap/Form';
 import { useNavigate } from 'react-router-dom';
 import { selectVisitedDayPicker } from 'slices/selectedDates';
 import { createMeeting, resetCreateMeetingStatus } from 'slices/meetingTimes';
@@ -24,7 +25,7 @@ export default function MeetingForm() {
       // If the user didn't select any dates, redirect them to the home page
       navigate('/');
     }
-  }, [navigate, visitedDayPicker, createMeetingStatus]);
+  }, [navigate, visitedDayPicker]);
 
   if (createMeetingStatus === 'succeeded') {
     // we're about to switch to a different URL
@@ -53,7 +54,7 @@ export default function MeetingForm() {
     }
   };
   return (
-    <div className="create-meeting-page">
+    <Form className="create-meeting-page">
       <MeetingNamePrompt
         meetingName={meetingName}
         setMeetingName={setMeetingName}
@@ -70,6 +71,6 @@ export default function MeetingForm() {
         endTime={endTime}
         setEndTime={setEndTime}
       />
-    </div>
+    </Form>
   );
 }

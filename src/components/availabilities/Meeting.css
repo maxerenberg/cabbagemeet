@@ -1,9 +1,8 @@
-.meeting-heading-button {
-  margin-left: 2em;
-}
-
-.meeting-avl-button {
-  min-width: 12em;
+/* media-breakpoint-up(md) */
+@media (min-width: 768px) {
+  .meeting-avl-button {
+    min-width: 12em;
+  }
 }
 
 .weeklyview__bodycell {
@@ -77,16 +76,4 @@
 .respondents-container li:hover {
   color: forestgreen;
   cursor: pointer;
-}
-
-.meeting-days-arrow {
-  font-size: 2em;
-  color: lightgray;
-  display: flex;
-  align-items: center;
-}
-
-.meeting-days-arrow:hover {
-  cursor: pointer;
-  color: black;
 }

@@ -13,7 +13,7 @@
 
 .saveTimesModal--content {
   position: absolute;
-  border: 1px solid forestgreen;
+  border: 1px solid var(--custom-primary);
   border-radius: 10px;
   background-color: white;
   min-height: 80%;
@@ -28,16 +28,11 @@
   margin-top: 2em;
 }
 
-.saveTimesModal--input {
-  margin-top: 1em;
-  width: 100%;
-}
-
 .already-have-account {
   font-size: 0.9em;
 }
 
 .already-have-account:hover {
-  color: forestgreen;
+  color: var(--custom-primary);
   cursor: pointer;
 }

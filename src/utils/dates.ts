@@ -1,6 +1,8 @@
 // change this as desired for testing etc.
 export const today = new Date();
 export const todayString = getDateString(today);
+// from https://stackoverflow.com/a/34405528
+export const tzAbbr = today.toLocaleTimeString('en-us', {timeZoneName: 'short'}).split(' ')[2];
 
 /**
  * Returns date in YYYY-MM-DD format

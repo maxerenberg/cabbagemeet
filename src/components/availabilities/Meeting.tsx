@@ -1,6 +1,7 @@
 import React from 'react';
 import { useAppDispatch, useAppSelector } from 'app/hooks';
 import { useParams } from 'react-router-dom';
+import NonFocusButton from 'components/NonFocusButton';
 import { fetchMeeting } from 'slices/meetingTimes';
 import WeeklyViewTimePicker from './WeeklyTimeViewPicker';
 import './Meeting.css';
@@ -44,8 +45,8 @@ const MeetingTitleRow = React.memo(function MeetingTitleRow() {
     }}>
       <div style={{fontSize: '1.3em'}}>{name}</div>
       <div>
-        <button className="meeting-heading-button">Edit</button>
-        <button className="meeting-heading-button">Share</button>
+        <NonFocusButton className="btn btn-outline-secondary px-4">Edit</NonFocusButton>
+        <NonFocusButton className="btn btn-outline-primary px-4 ms-4">Share</NonFocusButton>
       </div>
     </div>
   );

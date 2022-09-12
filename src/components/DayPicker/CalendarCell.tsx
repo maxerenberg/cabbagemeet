@@ -37,11 +37,7 @@ function CalendarCell({firstDateInGrid, cellIdx}: CalendarCellProps) {
         <>
           {
             (dateString === todayString || dateString === firstDateInGrid || day === 1) ? (
-              <div style={{
-                fontSize: '0.75em',
-                textTransform: 'uppercase',
-                color: 'darkgreen',
-              }}>
+              <div className="daypicker-calendar-cell-month-indicator">
                 {getMonthAbbr(month-1)}
               </div>
             ) : (

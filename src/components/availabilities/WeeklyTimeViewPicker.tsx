@@ -1,5 +1,6 @@
 import React, { useState, useMemo, useReducer } from 'react';
 import { useAppSelector } from 'app/hooks';
+import { LeftArrow as SVGLeftArrow, RightArrow as SVGRightArrow } from 'components/Arrows';
 import { getDateFromString, getDayOfWeekAbbr, getMonthAbbrFromDate } from 'utils/dates';
 import AvailabilitiesRow from './AvailabilitiesRow';
 import MeetingGridBodyCells from './MeetingGridBodyCells';
@@ -88,7 +89,6 @@ export default function WeeklyViewTimePicker() {
   const startHour = useAppSelector(state => state.meetingTimes.startTime);
   const endHour = useAppSelector(state => state.meetingTimes.endTime);
   const dates = useAppSelector(state => state.meetingTimes.dates);
-  const availabilities = useAppSelector(state => state.meetingTimes.availabilities);
   // If the meeting data hasn't been loaded yet, then this component
   // shouldn't even be loaded
   assert(startHour !== null && endHour !== null);
@@ -112,7 +112,7 @@ export default function WeeklyViewTimePicker() {
   return (
     <>
       <AvailabilitiesRow {...{moreDaysToRight, pageDispatch}} />
-      <div style={{display: 'flex', flexWrap: 'wrap'}}>
+      <div className="d-md-flex">
         <div
           style={{
             flexGrow: 1,
@@ -136,9 +136,7 @@ export default function WeeklyViewTimePicker() {
           />
           <MeetingDaysRightArrow {...{moreDaysToRight, pageDispatch}} />
         </div>
-        <MeetingRespondents
-          hoverDateTime={hoverDateTime} setHoverUser={setHoverUser}
-        />
+        <MeetingRespondents {...{hoverDateTime, setHoverUser}} />
       </div>
     </>
   );
@@ -223,10 +221,9 @@ const MeetingDaysLeftArrow = React.memo(function MeetingDaysLeftArrow({
         visibility: moreDaysToLeft ? 'visible' : 'hidden',
         gridArea: 'l',
       }}
-      className="meeting-days-arrow"
-      onClick={onClick}
+      className="d-flex align-items-center"
     >
-      <div>&#10096;</div>
+      <SVGLeftArrow className="meeting-days-arrow me-2" onClick={onClick} />
     </div>
   );
 });
@@ -249,10 +246,9 @@ const MeetingDaysRightArrow = React.memo(function MeetingDaysRightArrow({
         visibility: moreDaysToRight ? 'visible' : 'hidden',
         gridArea: 'r',
       }}
-      className="meeting-days-arrow"
-      onClick={onClick}
+      className="d-flex align-items-center"
     >
-      <div>&#10097;</div>
+      <SVGRightArrow className="meeting-days-arrow ms-2" onClick={onClick} />
     </div>
   );
 });

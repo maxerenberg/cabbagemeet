@@ -1,13 +1,11 @@
-.create-meeting-page > div {
-  margin-bottom: 4em;
-}
-
-.meeting-name-container {
-  display: flex;
-  flex-direction: row;
-  align-items: center;
+.create-meeting-page > :is(div, fieldset):not(:first-child) {
+  margin-top: 4em;
 }
 
 .create-meeting-question {
   font-size: 1.3em;
+}
+
+.meeting-times-prompt-select {
+  width: 6em;
 }

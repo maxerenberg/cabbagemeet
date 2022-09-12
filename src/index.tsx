@@ -4,8 +4,9 @@ import './index.css';
 import App from './App';
 import { store } from 'app/store';
 import { Provider } from 'react-redux';
+import { BottomOverlayProvider } from 'components/BottomOverlay';
+import { ToastProvider } from 'components/Toast';
 import * as serviceWorker from './serviceWorker';
-import { ToastProvider } from './features/toast/Toast';
 
 const container = document.getElementById('root');
 const root = createRoot(container!);
@@ -13,7 +14,9 @@ root.render(
   <React.StrictMode>
     <Provider store={store}>
       <ToastProvider>
-        <App />
+        <BottomOverlayProvider>
+          <App />
+        </BottomOverlayProvider>
       </ToastProvider>
     </Provider>
   </React.StrictMode>

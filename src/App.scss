@@ -1,0 +1,32 @@
+@use "sass:map";
+@import "~bootstrap/scss/bootstrap";
+
+@include media-breakpoint-down(md) {
+  .container.custom-navbar-container {
+    position: relative;
+    justify-content: center;
+    
+    > .custom-navbar-toggle {
+      position: absolute;
+      left: 0;
+    }
+  }
+}
+
+@include media-breakpoint-only(sm) {
+  .app-main-container {
+    max-width: 100%;
+  }
+}
+
+@include media-breakpoint-only(md) {
+  .app-main-container {
+    max-width: max(90%, map.get($container-max-widths, "md"));
+  }
+}
+
+@include media-breakpoint-up(lg) {
+  .app-main-container {
+    max-width: map.get($container-max-widths, "lg");
+  }
+}

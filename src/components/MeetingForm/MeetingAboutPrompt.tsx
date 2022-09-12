@@ -1,4 +1,5 @@
 import React from 'react';
+import Form from 'react-bootstrap/Form';
 
 export default function MeetingAboutPrompt({
   meetingAbout,
@@ -11,9 +12,12 @@ export default function MeetingAboutPrompt({
     setMeetingAbout(e.target.value);
   };
   return (
-    <div>
-      <p className="create-meeting-question">What's your meeting about?</p>
-      <textarea
+    <Form.Group controlId="meeting-about-prompt">
+      <Form.Label className="create-meeting-question">
+        What's your meeting about?
+      </Form.Label>
+      <Form.Control
+        as="textarea"
         style={{width: '100%'}}
         rows={3}
         placeholder="Super important meeting to increase productivity"
@@ -21,7 +25,7 @@ export default function MeetingAboutPrompt({
         value={meetingAbout}
         onChange={onMeetingAboutChange}
       >
-      </textarea>
-    </div>
+      </Form.Control>
+    </Form.Group>
   );
 }

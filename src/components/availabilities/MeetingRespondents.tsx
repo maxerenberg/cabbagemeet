@@ -54,8 +54,10 @@ function MeetingRespondents({
   return (
     <div className="respondents-container">
       <div style={{
+        marginTop: '1em',
         marginBottom: '2em',
         fontSize: '1.2em',
+        width: '9em',
       }}>
         Respondents (
           {(!selectedUser && hoverDateTime) ? numPeopleForHover + '/' : ''}
@@ -67,7 +69,7 @@ function MeetingRespondents({
           people.map(name => {
             const style: Style = {};
             if (name === selectedUser) {
-              style.color = 'forestgreen';
+              style.color = 'var(--custom-primary)';
             }
             let className = '';
             if (

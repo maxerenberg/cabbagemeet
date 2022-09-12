@@ -1,0 +1,26 @@
+.overlayTopFiller {
+  width: 1px;
+  height: 6rem;
+}
+
+.overlayOuter {
+  position: fixed;
+  width: 100vw;
+  z-index: 1;
+  left: 0;
+  bottom: 0;
+}
+
+.overlay {
+  height: 4rem;
+  padding: 2rem 3rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background-color: var(--custom-primary);
+}
+
+.overlay,
+.overlay a {
+  color: var(--custom-primary-contrast);
+}

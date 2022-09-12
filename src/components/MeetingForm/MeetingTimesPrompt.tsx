@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { to12HourClock, today } from 'utils/dates';
+import Form from 'react-bootstrap/Form';
+import { to12HourClock, tzAbbr } from 'utils/dates';
 import { range } from 'utils/arrays';
 
 // startTime and endTime use a 24-hour clock
@@ -14,8 +15,6 @@ export default function MeetingTimesPrompt({
   endTime: number,
   setEndTime: (time: number) => void,
 }) {
-  // from https://stackoverflow.com/a/34405528
-  const tzAbbr = today.toLocaleTimeString('en-us', {timeZoneName: 'short'}).split(' ')[2];
   const [startTimeSuffix, setStartTimeSuffix] = useState('AM');
   const [endTimeSuffix, setEndTimeSuffix] = useState('PM');
   const onStartTimeChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
@@ -41,40 +40,40 @@ export default function MeetingTimesPrompt({
     }
   };
   return (
-    <div>
-      <p className="create-meeting-question">Between which times would you like to meet?</p>
-      <div style={{display: 'flex', alignItems: 'center'}}>
-        <select value={to12HourClock(startTime)} onChange={onStartTimeChange}>
+    <fieldset>
+      <legend className="create-meeting-question">Between which times would you like to meet?</legend>
+      <div className="d-flex align-items-center">
+        <Form.Select value={to12HourClock(startTime)} onChange={onStartTimeChange} className="meeting-times-prompt-select">
           {
             range(1, 13).map(i => (
               <option key={i}>{i}</option>
             ))
           }
-        </select>
-        <select value={startTimeSuffix} onChange={onStartTimeSuffixChange}>
+        </Form.Select>
+        <Form.Select value={startTimeSuffix} onChange={onStartTimeSuffixChange} className="meeting-times-prompt-select ms-1">
           {
             ['AM', 'PM'].map(suffix => (
               <option key={suffix}>{suffix}</option>
             ))
           }
-        </select>
-        <p style={{padding: '0 1em', margin: '0'}}>to</p>
-        <select value={to12HourClock(endTime)} onChange={onEndTimeChange}>
+        </Form.Select>
+        <p className="py-0 px-3 m-0">to</p>
+        <Form.Select value={to12HourClock(endTime)} onChange={onEndTimeChange} className="meeting-times-prompt-select">
           {
             range(1, 13).map(i => (
               <option key={i}>{i}</option>
             ))
           }
-        </select>
-        <select value={endTimeSuffix} onChange={onEndTimeSuffixChange}>
+        </Form.Select>
+        <Form.Select value={endTimeSuffix} onChange={onEndTimeSuffixChange} className="meeting-times-prompt-select ms-1">
           {
             ['AM', 'PM'].map(suffix => (
               <option key={suffix}>{suffix}</option>
             ))
           }
-        </select>
-        <p style={{padding: '0 1em', margin: '0'}}>{tzAbbr}</p>
+        </Form.Select>
+        <p className="py-0 ps-3 m-0">{tzAbbr}</p>
       </div>
-    </div>
+    </fieldset>
   );
 }

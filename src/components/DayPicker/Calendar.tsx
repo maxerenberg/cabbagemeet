@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { LeftArrow as SVGLeftArrow, RightArrow as SVGRightArrow } from 'components/Arrows';
 import { range } from 'utils/arrays'
 import {
   addDaysToDateString,
@@ -22,24 +23,16 @@ export default function Calendar() {
   ));
 
   const leftArrow = (
-    <div className="daypicker-calendar-arrow">
-      <span
-        className="daypicker-calendar-arrow__inner"
+    <div className="d-flex align-items-center ms-0 ms-md-3">
+      <SVGLeftArrow
         style={{visibility: page > 0 ? 'visible' : 'hidden'}}
         onClick={() => setPage(page - 1)}
-      >
-        &lt;
-      </span>
+      />
     </div>
   );
   const rightArrow = (
-    <div className="daypicker-calendar-arrow">
-      <span
-        className="daypicker-calendar-arrow__inner"
-        onClick={() => setPage(page + 1)}
-      >
-        &gt;
-      </span>
+    <div className="d-flex align-items-center ms-0 ms-md-3">
+      <SVGRightArrow onClick={() => setPage(page + 1)}/>
     </div>
   );
 
@@ -59,11 +52,7 @@ const DayOfWeekRow = React.memo(function DayOfWeekRow() {
   return (
     <>
       {daysOfWeek.map(day => (
-        <div key={day} style={{
-          textAlign: 'center',
-          paddingBottom: '0.4rem',
-          borderBottom: '1px solid lightgray',
-        }}>
+        <div key={day} className="daypicker-dayofweek-cell">
           {day}
         </div>
       ))}
