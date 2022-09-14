@@ -36,43 +36,44 @@ function AvailabilitiesRow({
     onRightBtnClick = () => dispatch(editSelf());
   } else if (selMode.type === 'editingSelf') {
     rightBtnText = 'Continue';
-    onRightBtnClick = () => {
-      if (moreDaysToRight) pageDispatch('inc');
-      else setShouldShowModal(true);
-    };
+    if (moreDaysToRight) {
+      onRightBtnClick = () => pageDispatch('inc');
+    } else {
+      onRightBtnClick = () => setShouldShowModal(true);
+    }
   } else if (selMode.type === 'editingOther') {
-    rightBtnText = 'Save';
-    onRightBtnClick = async () => {
-      if (moreDaysToRight) {
-        pageDispatch('inc');
-        return;
-      }
-      try {
-        await dispatch(submitOther());
-      } catch (anyError: any) {
-        const error = anyError as SerializedError;
-        console.error('AvailabilitiesRow: submission failed:', error);
+    rightBtnText = 'Next';
+    if (moreDaysToRight) {
+      onRightBtnClick = () => pageDispatch('inc');
+    } else {
+      onRightBtnClick = async () => {
+        try {
+          await dispatch(submitOther());
+        } catch (anyError: any) {
+          const error = anyError as SerializedError;
+          console.error('AvailabilitiesRow: submission failed:', error);
+          showToast({
+            msg: `Error updating ${selMode.otherUser}'s availabilities`,
+            msgType: 'failure',
+            autoClose: true,
+          });
+          dispatch(goBackToEditingOther());
+          return;
+        }
         showToast({
-          msg: `Error updating ${selMode.otherUser}'s availabilities`,
-          msgType: 'failure',
+          msg: `${selMode.otherUser}'s availabilities successfully updated`,
+          msgType: 'success',
           autoClose: true,
         });
-        dispatch(goBackToEditingOther());
-        return;
-      }
-      showToast({
-        msg: `${selMode.otherUser}'s availabilities successfully updated`,
-        msgType: 'success',
-        autoClose: true,
-      });
-      dispatch(resetSelection());
+        dispatch(resetSelection());
+      };
     }
   } else if (selMode.type === 'selectedOther') {
     rightBtnText = `Edit ${selMode.otherUser}'s availability`;
     onRightBtnClick = () => dispatch(editOther());
   } else if (selMode.type === 'submittingOther') {
     // TODO: show spinner
-    rightBtnText = 'Save';
+    rightBtnText = 'Next';
     avlBtnDisabled = true;
   } else if (selMode.type === 'submittingSelf') {
     // TODO: show spinner

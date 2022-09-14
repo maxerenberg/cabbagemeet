@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useReducer } from 'react';
+import React, { useMemo, useReducer } from 'react';
 import { useAppSelector } from 'app/hooks';
 import { LeftArrow as SVGLeftArrow, RightArrow as SVGRightArrow } from 'components/Arrows';
 import { getDateFromString, getDayOfWeekAbbr, getMonthAbbrFromDate } from 'utils/dates';
@@ -98,8 +98,6 @@ export default function WeeklyViewTimePicker() {
     () => dates.slice(page*7, page*7+numDaysDisplayed),
     [dates, page, numDaysDisplayed],
   );
-  const [hoverDateTime, setHoverDateTime] = useState<string | null>(null);
-  const [hoverUser, setHoverUser] = useState<string | null>(null);
   const numCols = numDaysDisplayed;
   // endHour can be after startHour, e.g. 10 P.M. to 2 A.M. (22 to 2)
   const numRows = 2 * (startHour < endHour ? (endHour - startHour) : (endHour + 24 - startHour));
@@ -132,11 +130,10 @@ export default function WeeklyViewTimePicker() {
           <MeetingGridBodyCells
             numRows={numRows} numCols={numCols} startHour={startHour}
             dateStrings={datesDisplayed}
-            setHoverDateTime={setHoverDateTime} hoverUser={hoverUser}
           />
           <MeetingDaysRightArrow {...{moreDaysToRight, pageDispatch}} />
         </div>
-        <MeetingRespondents {...{hoverDateTime, setHoverUser}} />
+        <MeetingRespondents />
       </div>
     </>
   );

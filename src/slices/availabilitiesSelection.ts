@@ -1,4 +1,4 @@
-import { createAsyncThunk, createSlice } from '@reduxjs/toolkit';
+import { createAsyncThunk, createSelector, createSlice } from '@reduxjs/toolkit';
 import type { PayloadAction } from '@reduxjs/toolkit';
 import client from 'app/client';
 import type { AppThunk, RootState } from 'app/store';
@@ -19,11 +19,15 @@ export type SelMode = {
 export type AvailabilitiesSelectionState = {
   selMode: SelMode;
   dateTimes: DateTimeSet;
+  hoverUser: string | null;     // can only be set if selMode.type === 'none'
+  hoverDateTime: string | null; // can only be set if selMode.type === 'none'
 };
 
 const initialState: AvailabilitiesSelectionState = {
   selMode: { type: 'none' },
   dateTimes: {},
+  hoverUser: null,
+  hoverDateTime: null,
 };
 
 export const submitAvailabilities = createAsyncThunk<
@@ -56,6 +60,8 @@ export const availabilitiesSelectionSlice = createSlice({
     editSelf: (state) => {
       assert(state.selMode.type === 'none');
       state.selMode = {type: 'editingSelf'};
+      state.hoverUser = null;
+      state.hoverDateTime = null;
     },
     goBackToEditingSelf: (state) => {
       // Should be used after an error occurs
@@ -67,14 +73,14 @@ export const availabilitiesSelectionSlice = createSlice({
     editOtherInternal: (state, action: PayloadAction<{otherUserAvailabilities: DateTimeSet}>) => {
       assert(state.selMode.type === 'selectedOther');
       const { otherUserAvailabilities } = action.payload;
-      return {
-        selMode: {type: 'editingOther', otherUser: state.selMode.otherUser},
-        dateTimes: otherUserAvailabilities,
-      };
+      state.selMode = {type: 'editingOther', otherUser: state.selMode.otherUser};
+      state.dateTimes = otherUserAvailabilities;
     },
     selectOther: (state, action: PayloadAction<{otherUser: string}>) => {
-      assert(state.selMode.type === 'none');
+      assert(state.selMode.type === 'none' || state.selMode.type === 'selectedOther');
       state.selMode = {type: 'selectedOther', otherUser: action.payload.otherUser};
+      state.hoverUser = null;
+      state.hoverDateTime = null;
     },
     goBackToEditingOther: (state) => {
       // Should be used after an error occurs
@@ -85,13 +91,11 @@ export const availabilitiesSelectionSlice = createSlice({
     },
     cancelEditingOther: (state) => {
       assert(state.selMode.type === 'editingOther');
-      return {
-        selMode: {type: 'selectedOther', otherUser: state.selMode.otherUser},
-        dateTimes: {},
-      };
+      state.selMode = {type: 'selectedOther', otherUser: state.selMode.otherUser};
+      state.dateTimes = {};
     },
     reset: (state) => {
-      return {selMode: {type: 'none'}, dateTimes: {}};
+      return initialState;
     },
     addDateTime: (state, { payload: dateTime }: PayloadAction<string>) => {
       assert(state.selMode.type === 'editingSelf' || state.selMode.type === 'editingOther');
@@ -100,6 +104,14 @@ export const availabilitiesSelectionSlice = createSlice({
     removeDateTime: (state, { payload: dateTime }: PayloadAction<string>) => {
       assert(state.selMode.type === 'editingSelf' || state.selMode.type === 'editingOther');
       delete state.dateTimes[dateTime];
+    },
+    setHoverUser: (state, { payload: hoverUser }: PayloadAction<string | null>) => {
+      assert(state.selMode.type === 'none');
+      state.hoverUser = hoverUser;
+    },
+    setHoverDateTime: (state, { payload: hoverDateTime }: PayloadAction<string | null>) => {
+      assert(state.selMode.type === 'none');
+      state.hoverDateTime = hoverDateTime;
     },
   },
   extraReducers: (builder) => {
@@ -139,6 +151,8 @@ export const {
   reset: resetSelection,
   addDateTime,
   removeDateTime,
+  setHoverUser,
+  setHoverDateTime,
 } = availabilitiesSelectionSlice.actions;
 const {
   editOtherInternal,
@@ -171,5 +185,21 @@ export const editOther =
   };
 
 export const selectSelModeAndDateTimes = (state: RootState) => state.availabilitiesSelection;
+export const selectSelMode = createSelector(
+  [selectSelModeAndDateTimes],
+  (state: AvailabilitiesSelectionState) => state.selMode
+);
+export const selectSelectedTimes = createSelector(
+  [selectSelModeAndDateTimes],
+  (state: AvailabilitiesSelectionState) => state.dateTimes
+);
+export const selectHoverUser = createSelector(
+  [selectSelModeAndDateTimes],
+  (state: AvailabilitiesSelectionState) => state.hoverUser
+);
+export const selectHoverDateTime = createSelector(
+  [selectSelModeAndDateTimes],
+  (state: AvailabilitiesSelectionState) => state.hoverDateTime
+);
 
 export default availabilitiesSelectionSlice.reducer;

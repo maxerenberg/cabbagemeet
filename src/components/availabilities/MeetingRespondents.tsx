@@ -2,7 +2,9 @@ import React, { useMemo } from 'react';
 import { useAppSelector, useAppDispatch } from 'app/hooks';
 import type { Style } from 'common/types';
 import {
-  selectSelModeAndDateTimes,
+  selectSelMode,
+  selectHoverDateTime,
+  setHoverUser,
   resetSelection,
   selectOther,
 } from 'slices/availabilitiesSelection';
@@ -13,13 +15,7 @@ type DateTimePeopleSet = {
   }
 };
 
-function MeetingRespondents({
-  hoverDateTime,
-  setHoverUser,
-}: {
-  hoverDateTime: string | null,
-  setHoverUser: (user: string | null) => void,
-}) {
+function MeetingRespondents() {
   const availabilities = useAppSelector(state => state.meetingTimes.availabilities);
   const people = Object.keys(availabilities);
   const dateTimePeople: DateTimePeopleSet = useMemo(() => {
@@ -34,15 +30,11 @@ function MeetingRespondents({
     }
     return result;
   }, [availabilities]);
-  const selMode = useAppSelector(state => selectSelModeAndDateTimes(state).selMode);
+  const selMode = useAppSelector(selectSelMode);
+  const hoverDateTime = useAppSelector(selectHoverDateTime);
   const dispatch = useAppDispatch();
 
   if (people.length === 0) return null;
-  if (selMode.type !== 'none') {
-    // If the user is editing availabilities, or has selected a user,
-    // we don't show the other respondents' availabilities
-    hoverDateTime = null;
-  }
   let selectedUser: string | undefined;
   if (selMode.type === 'selectedOther' || selMode.type === 'editingOther') {
     selectedUser = selMode.otherUser;
@@ -82,20 +74,25 @@ function MeetingRespondents({
             ) {
               className = 'unavailable';
             }
-            const onClick = () => {
-              if (name === selectedUser) {
-                dispatch(resetSelection());
-              } else {
-                dispatch(selectOther({otherUser: name}));
-              }
-            };
+            let onClick: React.MouseEventHandler | undefined;
+            if (name === selectedUser) {
+              onClick = () => dispatch(resetSelection());
+            } else {
+              onClick = () => dispatch(selectOther({otherUser: name}));
+            }
+            let onMouseEnter: React.MouseEventHandler | undefined;
+            let onMouseLeave: React.MouseEventHandler | undefined;
+            if (selMode.type === 'none') {
+              onMouseEnter = () => dispatch(setHoverUser(name));
+              onMouseLeave = () => dispatch(setHoverUser(null));
+            }
             return (
               <li
                 key={name}
                 className={className}
                 style={style}
-                onMouseEnter={() => setHoverUser(name)}
-                onMouseLeave={() => setHoverUser(null)}
+                onMouseEnter={onMouseEnter}
+                onMouseLeave={onMouseLeave}
                 onClick={onClick}
               >
                 {name}
