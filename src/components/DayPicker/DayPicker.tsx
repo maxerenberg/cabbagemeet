@@ -17,7 +17,7 @@ export default function DayPicker() {
   };
 
   return (
-    <div>
+    <>
       <section className="d-flex align-items-center justify-content-center justify-content-md-between fs-4">
         <p className="mb-0">On which days would you like to meet?</p>
         <button
@@ -41,6 +41,6 @@ export default function DayPicker() {
           Let's meet
         </button>
       </BottomOverlay>
-    </div>
+    </>
   );
 };

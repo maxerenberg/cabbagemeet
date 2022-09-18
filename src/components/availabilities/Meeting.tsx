@@ -11,7 +11,7 @@ export default function Meeting() {
   const params = useParams();
   const name = useAppSelector(state => state.meetingTimes.name);
   const fetchMeetingStatus = useAppSelector(state => state.meetingTimes.fetchMeetingStatus);
-  const error = useAppSelector(state => state.meetingTimes.error);
+  const error = useAppSelector(state => state.meetingTimes.error) ?? 'unknown';
   const dispatch = useAppDispatch();
 
   if (name === null && fetchMeetingStatus === 'idle') {
@@ -23,7 +23,15 @@ export default function Meeting() {
   }
   if (fetchMeetingStatus === 'failed') {
     console.error(error);
-    return <p>An error occurred while fetching the meeting.</p>;
+    return (
+      <div className="d-flex justify-content-center">
+        <p>
+          An error occurred while fetching the meeting:
+          <br />
+          {error}
+        </p>
+      </div>
+    );
   }
   return (
     <div className="meeting-container">

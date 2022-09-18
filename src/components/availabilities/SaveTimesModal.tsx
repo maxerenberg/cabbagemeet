@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import Form from 'react-bootstrap/Form';
 import { SerializedError } from '@reduxjs/toolkit';
 import { useAppDispatch, useAppSelector } from 'app/hooks';
+import ButtonSpinnerRight from 'components/ButtonSpinnerRight';
 import {
   selectSelModeAndDateTimes,
   goBackToEditingSelf,
@@ -54,9 +55,9 @@ function SaveTimesModal({
 
   // TODO: form validation
 
-  // TODO: show spinner if waiting for server response
   const submitBtnDisabled = selMode.type === 'submittingSelf' || name === '';
   const closeBtnDisabled = selMode.type === 'submittingSelf';
+  const submitBtnSpinner = selMode.type === 'submittingSelf' && <ButtonSpinnerRight />;
   return (
     <div className="saveTimesModal">
       <Form className="saveTimesModal--content">
@@ -100,6 +101,7 @@ function SaveTimesModal({
             disabled={submitBtnDisabled}
           >
             Submit
+            {submitBtnSpinner}
           </button>
         </div>
         {

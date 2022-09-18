@@ -8,14 +8,37 @@
   color: black;
 }
 
-/* Need extra selectors for specificity */
-.navbar-nav .nav-link.header-link:not(:first-child) {
-  padding-left: 1.5rem;
+/* media-breakpoint-up(md) */
+@media (min-width: 768px) {
+  /* Need extra selectors for specificity */
+  .navbar-nav .nav-link.header-link:not(:first-child) {
+    padding-left: 1.5rem;
+  }
 }
 
-.header-link:hover,
-.header-link_active {
-  color: var(--custom-primary);
+.navbar-nav .nav-link:is(
+  .header-link:hover,
+  .header-link_active
+ ) {
+  /* We can't use our CSS variables which we set in .App because the offcanvas
+     element isn't inside <App>. Should we store the variables under <body> instead?
+   */
+  color: forestgreen;
+}
+
+footer {
+  padding: 2rem 0;
+}
+
+footer a {
+  margin: 0 1em;
+  font-size: 0.9rem;
+  text-decoration: none;
+  color: var(--custom-secondary);
+}
+
+footer a:hover {
+  color: var(--custom-secondary-strong);
 }
 
 .form-text-input {

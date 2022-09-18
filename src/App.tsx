@@ -5,6 +5,7 @@ import Navbar from 'react-bootstrap/Navbar';
 import { LinkContainer } from 'react-router-bootstrap';
 import {
   BrowserRouter,
+  Link,
   Outlet,
   Route,
   Routes,
@@ -14,15 +15,17 @@ import './custom.css';
 import 'common/common.css';
 import { useAppSelector } from 'app/hooks';
 import DayPicker from 'components/DayPicker/DayPicker';
+import HowItWorksPage from 'components/HowItWorksPage';
 import MeetingForm from 'components/MeetingForm';
 import Meeting from './components/availabilities/Meeting';
 
-function App() {
+export default function App() {
   return (
     <BrowserRouter>
       <Routes>
         <Route path="/" element={<AppRoot />}>
           <Route index element={<DayPicker />} />
+          <Route path="how-it-works" element={<HowItWorksPage />} />
           <Route path="create" element={<MeetingForm />} />
           <Route path="m/:id" element={<Meeting />} />
         </Route>
@@ -33,10 +36,9 @@ function App() {
 }
 
 function AppRoot() {
-  const name = useAppSelector(state => state.meetingTimes.name);
   const fetchMeetingStatus = useAppSelector(state => state.meetingTimes.fetchMeetingStatus);
   let mainClassName = 'container app-main-container flex-grow-1';
-  if ((name === null && fetchMeetingStatus === 'idle') || fetchMeetingStatus === 'loading') {
+  if (fetchMeetingStatus === 'loading') {
     // vertically and horizontally align the spinner
     mainClassName += ' d-flex align-items-center justify-content-center';
   } else {
@@ -73,6 +75,7 @@ function AppRoot() {
       <main className={mainClassName}>
         <Outlet />
       </main>
+      <Footer />
     </div>
   );
 }
@@ -91,14 +94,27 @@ function HeaderLinks() {
       to: "/login",
       desc: "Login",
     },
+  ];
+  const offcanvasOnlyLinks = [
     {
-      to: "/feedback",
-      desc: "Feedback",
+      to: '/privacy',
+      desc: 'Privacy',
+    },
+    {
+      to: '/feedback',
+      desc: 'Feedback',
     },
   ];
   // The @types/react-router-bootstrap package is wrong - className needs to be a string
   // See https://github.com/react-bootstrap/react-router-bootstrap/blob/master/src/LinkContainer.js
-  const linkProps = {className: 'header-link', activeClassName: 'header-link_active'} as any;
+  const linkProps = {
+    className: 'header-link',
+    activeClassName: 'header-link_active',
+  } as any;
+  const offcanvasOnlyLinksProps = {
+    className: 'header-link d-block d-md-none',
+    activeClassName: 'header-link_active d-block d-md-none',
+  };
   return (
     <>
       {
@@ -112,8 +128,26 @@ function HeaderLinks() {
           </LinkContainer>
         ))
       }
+      {
+        offcanvasOnlyLinks.map(lnk => (
+          <LinkContainer
+            to={lnk.to}
+            key={lnk.to}
+            {...offcanvasOnlyLinksProps}
+          >
+            <Nav.Link>{lnk.desc}</Nav.Link>
+          </LinkContainer>
+        ))
+      }
     </>
   );
 }
 
-export default App;
+function Footer() {
+  return (
+    <footer className="d-none d-md-flex align-items-center justify-content-center border-top">
+      <Link to="/privacy" >Privacy</Link>
+      <Link to="/feedback">Feedback</Link>
+    </footer>
+  );
+}

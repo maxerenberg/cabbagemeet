@@ -76,7 +76,7 @@ class Client {
     return new Promise((resolve, reject) => {
       setTimeout(() => {
         if (true) {
-          resolve({status: 'OK'});  
+          resolve({status: 'OK'});
         } else {
           reject(new Error('boom!'));
         }

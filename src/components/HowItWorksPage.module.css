@@ -1,0 +1,35 @@
+.helpStepContainer > * {
+  flex: 1 0 0;
+}
+
+.imageContainer {
+  display: flex;
+  justify-content: center;
+}
+
+.imageContainer img {
+  max-height: 8rem;
+}
+
+/* media-breakpoint-down(md) */
+@media (max-width: 767.98px) {
+  .imageContainer {
+    margin: 0 1rem;
+  }
+
+  .imageContainer img {
+    max-width: 90%;
+  }
+}
+
+/* media-breakpoint-up(md) */
+@media (min-width: 768px) {
+  .imageContainer {
+    width: 50%;
+    margin-left: 1rem;
+  }
+
+  .imageContainer img {
+    max-width: 100%;
+  }
+}

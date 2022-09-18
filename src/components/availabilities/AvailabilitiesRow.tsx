@@ -1,9 +1,10 @@
 import React, { useState, useCallback } from 'react';
-import { SerializedError } from '@reduxjs/toolkit';
+import type { SerializedError } from '@reduxjs/toolkit';
 import BottomOverlay from 'components/BottomOverlay';
+import ButtonSpinnerRight from 'components/ButtonSpinnerRight';
 import NonFocusButton from 'components/NonFocusButton';
 import {
-  selectSelModeAndDateTimes,
+  selectSelMode,
   resetSelection,
   editSelf,
   goBackToEditingOther,
@@ -22,13 +23,14 @@ function AvailabilitiesRow({
   moreDaysToRight: boolean,
   pageDispatch: React.Dispatch<'inc' | 'dec'>,
 }) {
-  const selMode = useAppSelector(state => selectSelModeAndDateTimes(state).selMode);
+  const selMode = useAppSelector(selectSelMode);
   const dispatch = useAppDispatch();
   const { showToast } = useToast();
   const [shouldShowModal, setShouldShowModal] = useState(false);
+  const closeModal = useCallback(() => setShouldShowModal(false), []);
   let rightBtnText: string | undefined;
   let onRightBtnClick: React.MouseEventHandler<HTMLButtonElement> = () => {};
-  let avlBtnDisabled = false;
+  let rightBtnDisabled = false;
   const onCancelBtnClick = () => dispatch(resetSelection());
 
   if (selMode.type === 'none') {
@@ -74,7 +76,7 @@ function AvailabilitiesRow({
   } else if (selMode.type === 'submittingOther') {
     // TODO: show spinner
     rightBtnText = 'Next';
-    avlBtnDisabled = true;
+    rightBtnDisabled = true;
   } else if (selMode.type === 'submittingSelf') {
     // TODO: show spinner
     rightBtnText = 'Continue';
@@ -83,9 +85,7 @@ function AvailabilitiesRow({
     assertIsNever(selMode);
   }
 
-  const closeModal = useCallback(() => {
-    setShouldShowModal(false);
-  }, []);
+  const rightBtnSpinner = rightBtnDisabled && <ButtonSpinnerRight />;
 
   return (
     <>
@@ -108,10 +108,11 @@ function AvailabilitiesRow({
           )}
           <NonFocusButton
             className="btn btn-primary ms-4 px-0 meeting-avl-button"
-            disabled={avlBtnDisabled}
+            disabled={rightBtnDisabled}
             onClick={onRightBtnClick}
           >
             {rightBtnText}
+            {rightBtnSpinner}
           </NonFocusButton>
         </div>
       </div>
@@ -126,10 +127,11 @@ function AvailabilitiesRow({
         )}
         <NonFocusButton
           className="btn btn-light ms-auto px-4 meeting-avl-button"
-          disabled={avlBtnDisabled}
+          disabled={rightBtnDisabled}
           onClick={onRightBtnClick}
         >
           {rightBtnText}
+          {rightBtnSpinner}
         </NonFocusButton>
       </BottomOverlay>
       {shouldShowModal && <SaveTimesModal closeModal={closeModal} />}

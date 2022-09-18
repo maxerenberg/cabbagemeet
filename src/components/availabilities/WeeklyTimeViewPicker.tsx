@@ -36,7 +36,7 @@ function generateGridTemplateAreas(numSchedRows: number, numSchedCols: number): 
   let e = 0;
   // counter for cells in the schedule grid
   let c = 0;
-  
+
   // First row: month title. It should start at the first column of the schedule grid.
   let row: string[] = [];
   row.push(`e${e++}`);  // for the left arrow column
