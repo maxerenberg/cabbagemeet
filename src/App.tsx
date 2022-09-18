@@ -12,6 +12,7 @@ import {
 import './App.scss';
 import './custom.css';
 import 'common/common.css';
+import { useAppSelector } from 'app/hooks';
 import DayPicker from 'components/DayPicker/DayPicker';
 import MeetingForm from 'components/MeetingForm';
 import Meeting from './components/availabilities/Meeting';
@@ -32,10 +33,19 @@ function App() {
 }
 
 function AppRoot() {
+  const name = useAppSelector(state => state.meetingTimes.name);
+  const fetchMeetingStatus = useAppSelector(state => state.meetingTimes.fetchMeetingStatus);
+  let mainClassName = 'container app-main-container flex-grow-1';
+  if ((name === null && fetchMeetingStatus === 'idle') || fetchMeetingStatus === 'loading') {
+    // vertically and horizontally align the spinner
+    mainClassName += ' d-flex align-items-center justify-content-center';
+  } else {
+    mainClassName += ' mt-5 mb-md-5';
+  }
   return (
-    <div className="App light-theme">
-      <Navbar expand="md">
-        <Container className="custom-navbar-container">
+    <div className="App light-theme d-flex flex-column">
+      <Navbar expand="md" className="mt-3">
+        <Container className="app-main-container custom-navbar-container">
           {/*
             We intentionally use <a> here to force a reload of the whole page
             to completely reset the Redux state.
@@ -60,7 +70,7 @@ function AppRoot() {
           </Navbar.Offcanvas>
         </Container>
       </Navbar>
-      <main className="container app-main-container mt-5 mb-md-5">
+      <main className={mainClassName}>
         <Outlet />
       </main>
     </div>

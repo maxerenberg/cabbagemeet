@@ -1,3 +1,7 @@
+.meeting-loading-container {
+  transform: scale(2);
+}
+
 /* media-breakpoint-up(md) */
 @media (min-width: 768px) {
   .meeting-avl-button {
@@ -6,6 +10,7 @@
 }
 
 .weeklyview__bodycell {
+  user-select: none;
   border-right: 1px solid lightgray;
 }
 

@@ -1,12 +1,6 @@
-.toast {
-  --bs-toast-max-width: 400px;
-  --bs-toast-font-size: 1rem;
-  --bs-toast-padding-x: 0.75rem;
-  --bs-toast-padding-y: 0.5rem;
-}
-
-.toast-header {
-  --bs-toast-header-color: darkslategray;
+.App {
+  --bs-primary-rgb: var(--custom-primary-rgb);
+  --bs-secondary-rgb: var(--custom-secondary-rgb);
 }
 
 /* Custom colors */

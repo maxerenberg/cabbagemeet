@@ -5,10 +5,10 @@
   .container.custom-navbar-container {
     position: relative;
     justify-content: center;
-    
+
     > .custom-navbar-toggle {
       position: absolute;
-      left: 0;
+      left: 15px;
     }
   }
 }

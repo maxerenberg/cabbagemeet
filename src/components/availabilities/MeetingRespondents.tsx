@@ -31,6 +31,7 @@ function MeetingRespondents() {
     return result;
   }, [availabilities]);
   const selMode = useAppSelector(selectSelMode);
+  // TODO: ignore hoverDateTime if selMode is not relevant
   const hoverDateTime = useAppSelector(selectHoverDateTime);
   const dispatch = useAppDispatch();
 

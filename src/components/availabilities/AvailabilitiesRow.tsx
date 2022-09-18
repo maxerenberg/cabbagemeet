@@ -80,7 +80,7 @@ function AvailabilitiesRow({
     rightBtnText = 'Continue';
   } else {
     // Make sure that we caught all the cases
-    assertIsNever(selMode.type);
+    assertIsNever(selMode);
   }
 
   const closeModal = useCallback(() => {
