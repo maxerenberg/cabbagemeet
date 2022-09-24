@@ -1,0 +1,37 @@
+.signupContainer {
+  display: flex;
+}
+
+/* media-breakpoint-down(md) */
+@media (max-width: 767.98px) {
+  .signupContainer {
+    flex-wrap: wrap;
+    /* Make sure that this is the same as the Login component */
+    max-width: 600px;
+    margin: 0 auto;
+  }
+
+  .signupForm {
+    width: 100%;
+  }
+
+  .whyShouldISignUp {
+    margin-top: 4rem;
+  }
+}
+
+/* media-breakpoint-up(md) */
+@media (min-width: 768px) {
+  .signupForm {
+    width: 50%;
+    flex-shrink: 0;
+  }
+
+  .whyShouldISignUp {
+    margin-left: 2rem;
+  }
+}
+
+.alreadyHaveAccountLink {
+  font-size: 0.9em;
+}

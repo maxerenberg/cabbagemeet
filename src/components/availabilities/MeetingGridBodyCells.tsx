@@ -135,13 +135,14 @@ function MeetingGridBodyCells({
   }, [numRows, numCols, dateStrings, startHour]);
   const selMode = useAppSelector(selectSelMode);
   const hoverUser = useAppSelector(selectHoverUser);
+  const somebodyIsHovered = hoverUser !== null;
 
   return (
     <MouseupProvider dateTimes={dateTimes}>
       {
         gridCoords.map(([colIdx, rowIdx], i) => {
           const dateTime = dateTimes[rowIdx][colIdx];
-          const hoverUserIsAvailableAtThisTime = hoverUser !== null && availabilities[hoverUser][dateTime];
+          const hoverUserIsAvailableAtThisTime = somebodyIsHovered && availabilities[hoverUser][dateTime];
           const selectedUserIsAvailableAtThisTime = selMode.type === 'selectedOther' && availabilities[selMode.otherUser][dateTime];
           const numPeopleAvailableAtThisTime = dateTimePeople[dateTime]?.length ?? 0;
           return (
@@ -150,6 +151,7 @@ function MeetingGridBodyCells({
               rowIdx,
               colIdx,
               dateTime,
+              somebodyIsHovered,
               hoverUserIsAvailableAtThisTime,
               selectedUserIsAvailableAtThisTime,
               totalPeople,
@@ -168,6 +170,7 @@ const Cell = React.memo(function Cell({
   colIdx,
   cellIdx,
   dateTime,
+  somebodyIsHovered,
   hoverUserIsAvailableAtThisTime,
   selectedUserIsAvailableAtThisTime,
   numPeopleAvailableAtThisTime,
@@ -177,6 +180,7 @@ const Cell = React.memo(function Cell({
   colIdx: number,
   cellIdx: number,
   dateTime: string,
+  somebodyIsHovered: boolean,
   hoverUserIsAvailableAtThisTime: boolean,
   selectedUserIsAvailableAtThisTime: boolean,
   numPeopleAvailableAtThisTime: number,
@@ -224,12 +228,13 @@ const Cell = React.memo(function Cell({
       rgb = 'var(--custom-primary-rgb)';
     }
   } else if (selMode.type === 'none') {
-    if (hoverUserIsAvailableAtThisTime) {
-      rgb = 'var(--custom-primary-rgb)';
+    if (somebodyIsHovered) {
+      if (hoverUserIsAvailableAtThisTime) {
+        rgb = 'var(--custom-primary-rgb)';
+      }
     } else if (numPeopleAvailableAtThisTime > 0) {
       rgb = 'var(--custom-primary-rgb)';
-      const peopleAvailable = numPeopleAvailableAtThisTime;
-      alpha = Math.round(100 * (0.2 + 0.8 * (peopleAvailable / totalPeople))) + '%';
+      alpha = Math.round(100 * (0.2 + 0.8 * (numPeopleAvailableAtThisTime / totalPeople))) + '%';
     }
   } else {
     assertIsNever(selMode);

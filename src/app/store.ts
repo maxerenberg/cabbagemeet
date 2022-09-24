@@ -1,21 +1,25 @@
 import { configureStore, ThunkAction, Action } from '@reduxjs/toolkit';
-import meetingTimesReducer from 'slices/meetingTimes';
-import selectedDatesReducer from 'slices/selectedDates';
+import authenticationReducer from 'slices/authentication';
 import availabilitiesSelectionReducer from 'slices/availabilitiesSelection';
+import meetingTimesReducer from 'slices/meetingTimes';
+import resetPasswordReducer from 'slices/resetPassword';
+import selectedDatesReducer from 'slices/selectedDates';
 
 export const store = configureStore({
   reducer: {
-    meetingTimes: meetingTimesReducer,
-    selectedDates: selectedDatesReducer,
+    authentication: authenticationReducer,
     availabilitiesSelection: availabilitiesSelectionReducer,
+    meetingTimes: meetingTimesReducer,
+    resetPassword: resetPasswordReducer,
+    selectedDates: selectedDatesReducer,
   },
 });
 
 export type RootState = ReturnType<typeof store.getState>;
 export type AppDispatch = typeof store.dispatch;
-export type AppThunk<ReturnType = void> = ThunkAction<                   
-  ReturnType,                                                    
-  RootState,                      
-  unknown,                                
-  Action<string>                                  
+export type AppThunk<ReturnType = void> = ThunkAction<
+  ReturnType,
+  RootState,
+  unknown,
+  Action<string>
 >;

@@ -90,13 +90,6 @@ function stateIsNone(state: AvailabilitiesSelectionState): state is {
   return state.selMode.type === 'none';
 }
 
-// export type AvailabilitiesSelectionState = {
-//   selMode: SelMode;
-//   dateTimes: DateTimeSet;
-//   hoverUser: string | null;     // can only be set if selMode.type === 'none'
-//   hoverDateTime: string | null; // can only be set if selMode.type === 'none'
-// };
-
 const initialState: AvailabilitiesSelectionState = {
   selMode: { type: 'none' },
   dateTimes: {},

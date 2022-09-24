@@ -15,9 +15,13 @@ import './custom.css';
 import 'common/common.css';
 import { useAppSelector } from 'app/hooks';
 import DayPicker from 'components/DayPicker/DayPicker';
+import ForgotPassword from 'components/ForgotPassword';
 import HowItWorksPage from 'components/HowItWorksPage';
+import Login from 'components/Login';
 import MeetingForm from 'components/MeetingForm';
-import Meeting from './components/availabilities/Meeting';
+import Signup from 'components/Signup';
+import Meeting from 'components/availabilities/Meeting';
+import { selectIsLoggedIn } from 'slices/authentication';
 
 export default function App() {
   return (
@@ -28,6 +32,9 @@ export default function App() {
           <Route path="how-it-works" element={<HowItWorksPage />} />
           <Route path="create" element={<MeetingForm />} />
           <Route path="m/:id" element={<Meeting />} />
+          <Route path="signup" element={<Signup />} />
+          <Route path="login" element={<Login />} />
+          <Route path="forgot-password" element={<ForgotPassword />} />
         </Route>
         {/* TODO: use custom 404 page */}
       </Routes>
@@ -51,6 +58,7 @@ function AppRoot() {
           {/*
             We intentionally use <a> here to force a reload of the whole page
             to completely reset the Redux state.
+            FIXME: reset Redux state manually
           */}
           <Navbar.Brand href="/">Logo</Navbar.Brand>
           <Navbar.Toggle aria-controls="app-navbar-nav" className="custom-navbar-toggle" />
@@ -61,7 +69,7 @@ function AppRoot() {
           >
             <Offcanvas.Header closeButton>
               <Offcanvas.Title id="app-navbar-offcanvas-label">
-                LOGO
+                <a href="/">LOGO</a>
               </Offcanvas.Title>
             </Offcanvas.Header>
             <Offcanvas.Body>
@@ -81,20 +89,20 @@ function AppRoot() {
 }
 
 function HeaderLinks() {
+  const isLoggedIn = useAppSelector(selectIsLoggedIn);
   const links = [
     {
       to: "/how-it-works",
       desc: "How it works",
     },
-    {
-      to: "/signup",
-      desc: "Sign up",
-    },
-    {
-      to: "/login",
-      desc: "Login",
-    },
   ];
+  if (isLoggedIn) {
+    links.push({to: '/me/notifications', desc: 'Notifications'});
+    links.push({to: '/me', desc: 'Profile'});
+  } else {
+    links.push({to: '/signup', desc: 'Sign up'});
+    links.push({to: '/login', desc: 'Login'});
+  }
   const offcanvasOnlyLinks = [
     {
       to: '/privacy',

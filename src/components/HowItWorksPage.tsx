@@ -2,12 +2,16 @@ import SelectedDatesPicture from 'assets/help-section-selected-dates.png';
 import SelectedTimesPicture from 'assets/help-section-selected-times.png';
 import DateCheckmarkPicture from 'assets/help-section-date-checkmark.png';
 import styles from './HowItWorksPage.module.css';
+import { Link } from 'react-router-dom';
 
 export default function HowItWorksPage() {
   return (
     <>
-      <div>
-        <h3>How it works</h3>
+      <div className="d-flex align-items-center justify-content-between">
+        <h3 className="mb-0">How it works</h3>
+        <Link to="/">
+          <button className="btn btn-outline-primary px-4">Try it out!</button>
+        </Link>
       </div>
       <InstructionStep
         stepNumber={1}

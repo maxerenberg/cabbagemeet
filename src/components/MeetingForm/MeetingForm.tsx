@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import { selectVisitedDayPicker } from 'slices/selectedDates';
 import { createMeeting, resetCreateMeetingStatus } from 'slices/meetingTimes';
 import { useAppDispatch, useAppSelector } from 'app/hooks';
+import { useToast } from 'components/Toast';
 import './MeetingForm.css';
 import MeetingNamePrompt from './MeetingNamePrompt';
 import MeetingAboutPrompt from './MeetingAboutPrompt';
@@ -19,6 +20,7 @@ export default function MeetingForm() {
   const createMeetingStatus = useAppSelector(state => state.meetingTimes.createMeetingStatus);
   const error = useAppSelector(state => state.meetingTimes.error);
   const navigate = useNavigate();
+  const { showToast } = useToast();
 
   useEffect(() => {
     if (!visitedDayPicker) {
@@ -37,7 +39,12 @@ export default function MeetingForm() {
       </div>
     );
   }
-  const onSubmit = async () => {
+  const onSubmit: React.FormEventHandler<HTMLFormElement> = async (ev) => {
+    ev.preventDefault();
+    if (meetingName === '') {
+      // TODO: use form validation to provide visual feedback
+      return;
+    }
     try {
       const payload = await dispatch(createMeeting({
         startTime,
@@ -48,18 +55,25 @@ export default function MeetingForm() {
       const meetingID = payload.id;
       dispatch(resetCreateMeetingStatus());
       navigate('/m/' + meetingID);
+      showToast({
+        msg: 'Successfully created new meeting',
+        msgType: 'success',
+        autoClose: true,
+      });
     } catch (err) {
-      // TODO: show error message to user
+      showToast({
+        msg: 'Failed to create meeting',
+        msgType: 'failure',
+        autoClose: true,
+      });
       console.error(err);
     }
   };
   return (
-    <Form className="create-meeting-page">
+    <Form className="create-meeting-page" onSubmit={onSubmit}>
       <MeetingNamePrompt
         meetingName={meetingName}
         setMeetingName={setMeetingName}
-        onSubmit={onSubmit}
-        isLoading={createMeetingStatus === 'loading'}
       />
       <MeetingAboutPrompt
         meetingAbout={meetingAbout}

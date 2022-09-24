@@ -1,8 +1,10 @@
 .toastContainer {
   position: fixed;
-  bottom: 0;
-  width: 100%;
   z-index: 2;
+  bottom: 0;
+  /* horizontally center */
+  left: 50%;
+  transform: translateX(-50%);
 }
 
 @keyframes appear {
@@ -18,9 +20,11 @@
   box-sizing: content-box;
   animation: appear 0.5s;
   background-color: white;
-  border: 1px solid gray;
+  border-width: 2px;
+  border-style: solid;
+  border-color: gray;
   border-radius: 8px;
-  padding: 0.5rem 1.5rem;
+  padding: 1rem 2rem;
   margin: 0 auto 1rem;
   display: flex;
   align-items: center;
@@ -30,12 +34,12 @@
 }
 
 .toast.error {
-  border: 1px solid red;
+  border-color: red;
 }
 
 .toastCloseBtn {
   flex-shrink: 0;
-  margin-left: 1rem;
+  margin-left: 1.5rem;
   fill: gray;
 }
 

@@ -5,7 +5,7 @@
 .header-link {
   text-transform: uppercase;
   text-decoration: none;
-  color: black;
+  color: initial;
 }
 
 /* media-breakpoint-up(md) */
@@ -24,6 +24,23 @@
      element isn't inside <App>. Should we store the variables under <body> instead?
    */
   color: forestgreen;
+}
+
+.custom-link {
+  text-decoration: none;
+  color: initial;
+}
+
+.custom-link:hover {
+  color: var(--custom-primary);
+}
+
+.custom-link.custom-link-inverted {
+  color: var(--custom-primary-contrast);
+}
+
+.custom-link.custom-link-inverted:hover {
+  color: var(--custom-primary-contrast);
 }
 
 footer {

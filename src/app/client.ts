@@ -13,8 +13,19 @@ export type ServerMeeting = {
   availabilities: PeopleDateTimesFlat,
 };
 
-export type ServerSimpleResponse = {
+export type SubmitAvailabilitiesResponse = {
   status: string,
+};
+
+export type LoginResponse = {
+  name: string;
+  userID: string;
+};
+
+export type SignupResponse = LoginResponse;
+
+export type ResetPasswordResponse = {
+  status: 'OK';
 };
 
 class Client {
@@ -38,6 +49,7 @@ class Client {
       }, 1000);
     });
   }
+
   getMeeting(id: string): Promise<ServerMeeting> {
     const d = new Date();
     const dateString1 = getDateString(d);
@@ -72,10 +84,56 @@ class Client {
       }, 1000);
     });
   }
-  submitAvailabilities(user: string, dateTimes: string[]): Promise<ServerSimpleResponse> {
+
+  submitAvailabilities(user: string, dateTimes: string[]): Promise<SubmitAvailabilitiesResponse> {
     return new Promise((resolve, reject) => {
       setTimeout(() => {
         if (true) {
+          resolve({status: 'OK'});
+        } else {
+          reject(new Error('boom!'));
+        }
+      }, 1000);
+    });
+  }
+
+  signup(name: string, email: string, password: string): Promise<SignupResponse> {
+    return new Promise((resolve, reject) => {
+      setTimeout(() => {
+        if (true) {
+          resolve({
+            name: 'John Smith',
+            userID: nanoid(),
+          });
+        } else {
+          reject(new Error('boom!'));
+        }
+      }, 1000);
+    });
+  }
+
+  login(email: string, password: string): Promise<LoginResponse> {
+    return new Promise((resolve, reject) => {
+      setTimeout(() => {
+        if (true) {
+          resolve({
+            name: 'John Smith',
+            userID: nanoid(),
+          });
+        } else {
+          reject(new Error('boom!'));
+        }
+      }, 1000);
+    });
+  }
+
+  static numPasswordResets = 0;
+
+  resetPassword(email: string): Promise<ResetPasswordResponse> {
+    Client.numPasswordResets += 1;
+    return new Promise((resolve, reject) => {
+      setTimeout(() => {
+        if (Client.numPasswordResets === 1) {
           resolve({status: 'OK'});
         } else {
           reject(new Error('boom!'));

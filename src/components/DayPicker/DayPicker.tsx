@@ -32,7 +32,7 @@ export default function DayPicker() {
         <Calendar />
       </section>
       <BottomOverlay>
-        <Link to="/how-it-works">How it works</Link>
+        <Link to="/how-it-works" className="custom-link custom-link-inverted">How it works</Link>
         <button
           className="btn btn-light px-4"
           onClick={onClick}
