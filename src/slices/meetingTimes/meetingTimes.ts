@@ -2,11 +2,12 @@ import { createAsyncThunk, createSlice } from '@reduxjs/toolkit';
 import type { PayloadAction } from '@reduxjs/toolkit';
 import client from 'app/client';
 import type { ServerMeeting } from 'app/client';
-import { selectSelectedDates } from 'slices/selectedDates';
-import { getUTCOffsetHours } from 'utils/dates';
-import type { PeopleDateTimes, RequestStatus, DateTimeSet } from 'common/types';
 import type { RootState } from 'app/store';
-import { addOffsetToDateTimes, PeopleDateTimesFlatToPeopleDateTimes } from './meetingTimes.helpers';
+import type { PeopleDateTimes, RequestStatus, DateTimeSet } from 'common/types';
+import { selectSelectedDates } from 'slices/selectedDates';
+import { arrayToObject } from 'utils/arrays';
+import { addOffsetToDateTimes, addMinutesToDateTimeString, UTCOffsetHours } from 'utils/dates';
+import { PeopleDateTimesFlatToPeopleDateTimes } from './meetingTimes.helpers';
 
 // All dates and times are stored in local time, except for the DateTime strings
 // which are stored in UTC.
@@ -20,13 +21,14 @@ type CreateMeetingInfo = {
 };
 
 type MeetingTimesState = {
-  startTime: number | null,
-  endTime: number | null,
+  startTime: number | null,  // Local time (warning: can be a decimal!)
+  endTime: number | null,    // Local time (warning: can be a decimal!)
   name: string | null,
   about: string | null,
   id: string | null,
   dates: string[],  // must be sorted at all times
   availabilities: PeopleDateTimes,
+  scheduledDateTimes?: DateTimeSet,
   fetchMeetingStatus: RequestStatus,
   createMeetingStatus: RequestStatus,
   error: string | null,
@@ -73,7 +75,7 @@ export const createMeeting = createAsyncThunk<
         endTime: localEndTime,
         dates: localDates,
       },
-      -getUTCOffsetHours()
+      -UTCOffsetHours
     );
 
     const meeting = await client.createMeeting({
@@ -112,13 +114,22 @@ export const meetingTimesSlice = createSlice({
     resetCreateMeetingStatus: (state) => {
       state.createMeetingStatus = 'idle';
     },
+    setScheduledDateTimes: (state, { payload }: PayloadAction<DateTimeSet>) => {
+      state.scheduledDateTimes = payload;
+    },
+    unsetScheduledDateTimes: (state) => {
+      state.scheduledDateTimes = undefined;
+    },
+    reset: (state) => {
+      return initialState;
+    },
   },
   extraReducers: (builder) => {
     builder
       .addCase(fetchMeeting.pending, (state) => {
         state.fetchMeetingStatus = 'loading';
       })
-      .addCase(fetchMeeting.fulfilled, (state, action) => {
+      .addCase(fetchMeeting.fulfilled, (state, { payload }) => {
         const {
           startTime: UTCStartTime,
           endTime: UTCEndTime,
@@ -127,10 +138,27 @@ export const meetingTimesSlice = createSlice({
           name,
           about,
           id,
-        } = action.payload;
+        } = payload;
+        let scheduledDateTimes: DateTimeSet | undefined;
+        if (payload.scheduledStartTime && payload.scheduledEndTime) {
+          let scheduledDateTimesFlat = [];
+          let dateTime = payload.scheduledStartTime;
+          while (dateTime !== payload.scheduledEndTime) {
+            if (scheduledDateTimesFlat.length >= 24) {
+              // sanity check just in case the server screws up...
+              console.error('Invalid scheduled times from server:', payload.scheduledStartTime, payload.scheduledEndTime);
+              break;
+            }
+            scheduledDateTimesFlat.push(dateTime);
+            dateTime = addMinutesToDateTimeString(dateTime, 30);
+          }
+          if (0 <= scheduledDateTimesFlat.length && scheduledDateTimesFlat.length < 24) {
+            scheduledDateTimes = arrayToObject(scheduledDateTimesFlat);
+          }
+        }
         const {startTime, endTime, dates} = addOffsetToDateTimes(
           { startTime: UTCStartTime, endTime: UTCEndTime, dates: UTCDates },
-          getUTCOffsetHours(),
+          UTCOffsetHours,
         );
         const availabilities = PeopleDateTimesFlatToPeopleDateTimes(availabilitiesFlat);
         dates.sort();
@@ -140,6 +168,7 @@ export const meetingTimesSlice = createSlice({
           endTime,
           dates,
           availabilities,
+          scheduledDateTimes,
           name,
           about,
           id,
@@ -154,6 +183,7 @@ export const meetingTimesSlice = createSlice({
         state.createMeetingStatus = 'loading';
       })
       .addCase(createMeeting.fulfilled, (state, action) => {
+        // TODO: there's no need to convert back from UTC again. Just use action.meta.arg
         const {
           startTime: UTCStartTime,
           endTime: UTCEndTime,
@@ -165,7 +195,7 @@ export const meetingTimesSlice = createSlice({
         } = action.payload;
         const {startTime, endTime, dates} = addOffsetToDateTimes(
           { startTime: UTCStartTime, endTime: UTCEndTime, dates: UTCDates },
-          getUTCOffsetHours(),
+          UTCOffsetHours,
         );
         const availabilities = PeopleDateTimesFlatToPeopleDateTimes(availabilitiesFlat);
         dates.sort();
@@ -193,6 +223,12 @@ export const {
   removeDay,
   setUserAvailabilities,
   resetCreateMeetingStatus,
+  setScheduledDateTimes,
+  unsetScheduledDateTimes,
+  reset: resetMeetingInfo,
 } = meetingTimesSlice.actions;
+
+export const selectScheduledDateTimes = (state: RootState) => state.meetingTimes.scheduledDateTimes || {};
+export const selectMeetingIsScheduled = (state: RootState) => state.meetingTimes.scheduledDateTimes !== undefined;
 
 export default meetingTimesSlice.reducer;

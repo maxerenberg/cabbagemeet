@@ -6,6 +6,10 @@
   font-size: 1.3em;
 }
 
+.create-meeting-button {
+  min-width: 8em;
+}
+
 .meeting-times-prompt-select {
   width: 6em;
 }

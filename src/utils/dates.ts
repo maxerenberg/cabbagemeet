@@ -3,6 +3,12 @@ export const today = new Date();
 export const todayString = getDateString(today);
 // from https://stackoverflow.com/a/34405528
 export const tzAbbr = today.toLocaleTimeString('en-us', {timeZoneName: 'short'}).split(' ')[2];
+// This is the offset from UTC time for the local time. For example, if the local
+// timezone is EDT, then this would be -4.
+// This value is not necessarily an integer, but it will be multiple of 0.5.
+// This value must be SUBTRACTED from the local time to obtain a UTC time.
+// This value must be ADDED to UTC time to obtain a local time.
+export const UTCOffsetHours = -(today.getTimezoneOffset() / 60);
 
 /**
  * Returns date in YYYY-MM-DD format
@@ -57,7 +63,7 @@ export function customToISOString(date: Date | string, hour?: number, minute?: n
   const day = date.getUTCDate();
   hour = date.getUTCHours();
   minute = date.getUTCMinutes();
-  
+
   const YYYY = String(year);
   const MM = String(month).padStart(2, '0');
   const DD = String(day).padStart(2, '0');
@@ -80,8 +86,11 @@ export function to12HourClock(n: number) {
   return (n % 12 === 0) ? 0 : (n % 12);
 }
 
-export function getUTCOffsetHours() {
-  return -(today.getTimezoneOffset() / 60);
+export function floorTowardsZero(val: number): number {
+  if (val < 0) {
+    return -Math.floor(Math.abs(val));
+  }
+  return Math.floor(val);
 }
 
 export function addDaysToDateString(dateString: string, numDays: number): string {
@@ -91,11 +100,67 @@ export function addDaysToDateString(dateString: string, numDays: number): string
 }
 
 /**
+ * Adds the specified number of minutes to the datetime string
+ * @param dateTime a UTC datetime string formatted as YYYY-MM-DDTHH:MM:ssZ
+ * @param numMinutes the number of minutes to add
+ * @returns a new datetime string
+ */
+export function addMinutesToDateTimeString(dateTime: string, numMinutes: number): string {
+  const date = new Date(dateTime);
+  date.setMinutes(date.getMinutes() + numMinutes);
+  return customToISOString(date);
+}
+
+/**
+ * Adjusts the startTime, endTime and dates by the given time zone offset.
+ * @param param0.startTime The earliest meeting starting time (hours)
+ * @param param0.endTime The latest meeting ending time (hours)
+ * @param param0.dates The eligible meeting dates
+ * @param offsetHours The offset, in hours, to add to each time
+ * @returns the new values for the arguments after the offset has been added
+ */
+ export function addOffsetToDateTimes(
+  {
+    startTime,
+    endTime,
+    dates,
+  }: {
+    startTime: number,
+    endTime: number,
+    dates: string[],
+  },
+  offsetHours: number,
+) {
+  startTime += offsetHours;
+  endTime += offsetHours;
+  if (startTime < 0) {
+    startTime += 24;
+    // Decrement each day by 1
+    dates = dates.map(date => addDaysToDateString(date, -1));
+  } else if (startTime >= 24) {
+    startTime -= 24;
+    // Increment each day by 1
+    dates = dates.map(date => addDaysToDateString(date, 1));
+  }
+  // Each date represents a day when each startTime can start.
+  // So we don't need to update the dates if the endTime is adjusted.
+  if (endTime < 0) {
+    endTime += 24;
+  } else if (endTime >= 24) {
+    endTime -= 24;
+  }
+
+  return { startTime, endTime, dates };
+}
+
+/**
  * Returns the three-letter abbreviation of the given month
  * @param month the month index. Must be in [0, 12)
+ * @param uppercase whether the returned value should be upper case (default: true)
  */
-export function getMonthAbbr(monthIdx: number): string {
-  return months[monthIdx].substring(0, 3).toUpperCase();
+export function getMonthAbbr(monthIdx: number, uppercase?: boolean): string {
+  const abbr = months[monthIdx].substring(0, 3);
+  return uppercase === false ? abbr : abbr.toUpperCase();
 }
 
 /**
@@ -109,7 +174,7 @@ export function getDayOfWeekAbbr(date: Date) {
   return daysOfWeek[date.getDay()];
 }
 
-const months = [
+export const months = [
   'January', 'February', 'March', 'April', 'May', 'June', 'July',
   'August', 'September', 'October', 'November', 'December'
 ];

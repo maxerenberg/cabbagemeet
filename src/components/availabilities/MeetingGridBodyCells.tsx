@@ -19,6 +19,9 @@ import { flatGridCoords } from 'utils/arrays';
 import { addDaysToDateString, customToISOString } from 'utils/dates';
 import { assertIsNever } from 'utils/misc';
 import { useEffect } from 'react';
+import { selectScheduledDateTimes } from 'slices/meetingTimes';
+
+// TODO: deal with decimal start/end times
 
 type DateTimePeople = {
   [dateTime: string]: string[];
@@ -53,6 +56,21 @@ function cellIsInSelectionArea(
   );
 }
 
+function cellIsInSelectionColumn(
+  rowIdx: number,
+  colIdx: number,
+  state: MouseState,
+): boolean {
+  return (state.type === 'down' || state.type === 'upCellsSelected') && (
+    (
+      (state.downCell.rowIdx <= rowIdx && rowIdx <= state.curCell.rowIdx)
+      || (state.curCell.rowIdx <= rowIdx && rowIdx <= state.downCell.rowIdx)
+    ) && (
+      state.downCell.colIdx === colIdx
+    )
+  );
+}
+
 function MouseupProvider({
   children,
   dateTimes,
@@ -60,6 +78,7 @@ function MouseupProvider({
   dateTimes: string[][],
 }>) {
   const dispatch = useAppDispatch();
+  const selMode = useAppSelector(selectSelMode);
   const mouseState = useAppSelector(selectMouseState);
 
   // The mouseup listener needs to be attached to the whole document
@@ -72,31 +91,43 @@ function MouseupProvider({
   }, [dispatch]);
 
   useEffect(() => {
-    if (mouseState === null || mouseState.type !== 'upCellsSelected') {
+    if (mouseState?.type !== 'upCellsSelected') {
       return;
     }
     const dateTimesInSelectionArea: string[] = [];
-    let rowStart = mouseState.downCell.rowIdx,
-        rowEnd = mouseState.curCell.rowIdx;
+    let rowStart = mouseState.downCell.rowIdx;
+    let rowEnd = mouseState.curCell.rowIdx;
     if (rowStart > rowEnd) {
       [rowStart, rowEnd] = [rowEnd, rowStart];
     }
-    let colStart = mouseState.downCell.colIdx,
-        colEnd = mouseState.curCell.colIdx;
-    if (colStart > colEnd) {
-      [colStart, colEnd] = [colEnd, colStart];
+    let colStart = mouseState.downCell.colIdx;
+    let colEnd = mouseState.curCell.colIdx;
+    if (selMode.type === 'editingSelf' || selMode.type === 'editingOther') {
+      if (colStart > colEnd) {
+        [colStart, colEnd] = [colEnd, colStart];
+      }
+    } else if (selMode.type === 'editingSchedule') {
+      // Scheduled cells must be in the same column because they must be
+      // chronologically contiguous
+      colEnd = colStart;
     }
     for (let rowIdx = rowStart; rowIdx <= rowEnd; rowIdx++) {
       for (let colIdx = colStart; colIdx <= colEnd; colIdx++) {
         dateTimesInSelectionArea.push(dateTimes[rowIdx][colIdx]);
       }
     }
-    if (mouseState.downCellWasOriginallySelected) {
-      dispatch(removeDateTimesAndResetMouse(dateTimesInSelectionArea));
-    } else {
+    if (selMode.type === 'editingSelf' || selMode.type === 'editingOther') {
+      if (mouseState.downCellWasOriginallySelected) {
+        dispatch(removeDateTimesAndResetMouse(dateTimesInSelectionArea));
+      } else {
+        dispatch(addDateTimesAndResetMouse(dateTimesInSelectionArea));
+      }
+    } else if (selMode.type === 'editingSchedule') {
+      // When scheduling, each new selection erases the old one because
+      // scheduled cells cannot be disjoint
       dispatch(addDateTimesAndResetMouse(dateTimesInSelectionArea));
     }
-  }, [mouseState, dispatch, dateTimes]);
+  }, [mouseState, selMode.type, dispatch, dateTimes]);
 
   return <>{children}</>;
 }
@@ -133,6 +164,7 @@ function MeetingGridBodyCells({
     }
     return rows;
   }, [numRows, numCols, dateStrings, startHour]);
+  const scheduleSet = useAppSelector(selectScheduledDateTimes);
   const selMode = useAppSelector(selectSelMode);
   const hoverUser = useAppSelector(selectHoverUser);
   const somebodyIsHovered = hoverUser !== null;
@@ -142,6 +174,7 @@ function MeetingGridBodyCells({
       {
         gridCoords.map(([colIdx, rowIdx], i) => {
           const dateTime = dateTimes[rowIdx][colIdx];
+          const isScheduled = scheduleSet[dateTime];
           const hoverUserIsAvailableAtThisTime = somebodyIsHovered && availabilities[hoverUser][dateTime];
           const selectedUserIsAvailableAtThisTime = selMode.type === 'selectedOther' && availabilities[selMode.otherUser][dateTime];
           const numPeopleAvailableAtThisTime = dateTimePeople[dateTime]?.length ?? 0;
@@ -151,6 +184,7 @@ function MeetingGridBodyCells({
               rowIdx,
               colIdx,
               dateTime,
+              isScheduled,
               somebodyIsHovered,
               hoverUserIsAvailableAtThisTime,
               selectedUserIsAvailableAtThisTime,
@@ -170,6 +204,7 @@ const Cell = React.memo(function Cell({
   colIdx,
   cellIdx,
   dateTime,
+  isScheduled,
   somebodyIsHovered,
   hoverUserIsAvailableAtThisTime,
   selectedUserIsAvailableAtThisTime,
@@ -180,6 +215,7 @@ const Cell = React.memo(function Cell({
   colIdx: number,
   cellIdx: number,
   dateTime: string,
+  isScheduled: boolean,
   somebodyIsHovered: boolean,
   hoverUserIsAvailableAtThisTime: boolean,
   selectedUserIsAvailableAtThisTime: boolean,
@@ -193,9 +229,17 @@ const Cell = React.memo(function Cell({
     const mouseState = selectMouseState(state);
     return mouseState !== null && cellIsInSelectionArea(rowIdx, colIdx, mouseState);
   });
+  const isInMouseSelectionColumn = useAppSelector((state) => {
+    const mouseState = selectMouseState(state);
+    return mouseState !== null && cellIsInSelectionColumn(rowIdx, colIdx, mouseState);
+  });
   const mouseSelectionAreaIsAddingDateTimes = useAppSelector((state) => {
     const mouseState = selectMouseState(state);
-    return mouseState?.type === 'down' && !mouseState.downCellWasOriginallySelected;
+    return (
+      mouseState !== null
+      && (mouseState.type === 'down' || mouseState.type === 'upCellsSelected')
+      && !mouseState.downCellWasOriginallySelected
+    );
   });
   const dispatch = useAppDispatch();
   const { showToast } = useToast();
@@ -214,7 +258,19 @@ const Cell = React.memo(function Cell({
       (isInMouseSelectionArea && mouseSelectionAreaIsAddingDateTimes)
       || (!isInMouseSelectionArea && isSelected)
     ) {
-      rgb = '0, 255, 255';  // aqua (TODO: define in custom.scss)
+      rgb = 'var(--custom-primary-rgb)';
+    }
+  } else if (
+    selMode.type === 'editingSchedule'
+    || selMode.type === 'submittingSchedule'
+    || selMode.type === 'submittedSchedule'
+    || selMode.type === 'rejectedSchedule'
+  ) {
+    if (isInMouseSelectionColumn || isSelected) {
+      rgb = 'var(--custom-scheduled-cell-rgb)';
+    } else if (numPeopleAvailableAtThisTime > 0) {
+      rgb = 'var(--custom-primary-rgb)';
+      alpha = Math.round(100 * (0.2 + 0.8 * (numPeopleAvailableAtThisTime / totalPeople))) + '%';
     }
   } else if (selMode.type === 'selectedOther') {
     if (selectedUserIsAvailableAtThisTime) {
@@ -227,7 +283,12 @@ const Cell = React.memo(function Cell({
     ) {
       rgb = 'var(--custom-primary-rgb)';
     }
-  } else if (selMode.type === 'none') {
+  } else if (
+    selMode.type === 'none'
+    || selMode.type === 'submittingUnschedule'
+    || selMode.type === 'submittedUnschedule'
+    || selMode.type === 'rejectedUnschedule'
+  ) {
     if (somebodyIsHovered) {
       if (hoverUserIsAvailableAtThisTime) {
         rgb = 'var(--custom-primary-rgb)';
@@ -235,6 +296,10 @@ const Cell = React.memo(function Cell({
     } else if (numPeopleAvailableAtThisTime > 0) {
       rgb = 'var(--custom-primary-rgb)';
       alpha = Math.round(100 * (0.2 + 0.8 * (numPeopleAvailableAtThisTime / totalPeople))) + '%';
+    }
+    if (isScheduled) {
+      // TODO: only partially cover the cell
+      rgb = 'var(--custom-scheduled-cell-rgb)';
     }
   } else {
     assertIsNever(selMode);
@@ -246,7 +311,7 @@ const Cell = React.memo(function Cell({
   let onMouseEnter: React.MouseEventHandler | undefined;
   let onMouseLeave: React.MouseEventHandler | undefined;
   let onMouseDown: React.MouseEventHandler | undefined;
-  if (selMode.type === 'editingSelf' || selMode.type === 'editingOther') {
+  if (selMode.type === 'editingSelf' || selMode.type === 'editingOther' || selMode.type === 'editingSchedule') {
     if (mouseStateType === 'upNoCellsSelected') {
       onMouseDown = () => dispatch(notifyMouseDown({cell: {rowIdx, colIdx}, wasOriginallySelected: isSelected}));
     } else if (mouseStateType === 'down') {

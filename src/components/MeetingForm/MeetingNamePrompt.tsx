@@ -31,7 +31,7 @@ export default function MeetingNamePrompt({
         onChange={onMeetingNameChange}
       />
       <button
-        className="btn btn-primary px-4 d-none d-md-block ms-md-4"
+        className="btn btn-primary px-4 d-none d-md-block ms-md-4 create-meeting-button"
         tabIndex={-1}
         type="submit"
         disabled={meetingName === '' || isLoading}
@@ -40,7 +40,7 @@ export default function MeetingNamePrompt({
       </button>
       <BottomOverlay>
         <button
-          className="btn btn-light px-4 ms-auto"
+          className="btn btn-light px-4 ms-auto create-meeting-button"
           tabIndex={-1}
           type="submit"
           disabled={meetingName === '' || isLoading}

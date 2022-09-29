@@ -1,7 +1,7 @@
 import React from 'react';
-import Spinner from 'react-bootstrap/Spinner';
-import { useAppDispatch, useAppSelector } from 'app/hooks';
 import { useParams } from 'react-router-dom';
+import { useAppDispatch, useAppSelector } from 'app/hooks';
+import GenericSpinner from 'components/GenericSpinner';
 import NonFocusButton from 'components/NonFocusButton';
 import { fetchMeeting } from 'slices/meetingTimes';
 import WeeklyViewTimePicker from './WeeklyTimeViewPicker';
@@ -14,12 +14,16 @@ export default function Meeting() {
   const error = useAppSelector(state => state.meetingTimes.error) ?? 'unknown';
   const dispatch = useAppDispatch();
 
+  // if (true) {
+  //   return <GenericSpinner />;
+  // }
+
   if (name === null && fetchMeetingStatus === 'idle') {
     dispatch(fetchMeeting(params.id!));
-    return <MeetingLoading />;
+    return <GenericSpinner />;
   }
   if (fetchMeetingStatus === 'loading') {
-    return <MeetingLoading />;
+    return <GenericSpinner />;
   }
   if (fetchMeetingStatus === 'failed') {
     console.error(error);
@@ -68,13 +72,3 @@ const MeetingAboutRow = React.memo(function MeetingAboutRow() {
     </div>
   );
 });
-
-function MeetingLoading() {
-  return (
-    <div className="meeting-loading-container">
-      <Spinner animation="border" role="status" variant="primary">
-        <span className="visually-hidden">Loading...</span>
-      </Spinner>
-    </div>
-  );
-}

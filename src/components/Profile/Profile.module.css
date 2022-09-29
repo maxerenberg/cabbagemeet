@@ -1,0 +1,24 @@
+.createdRespondedButton {
+  box-sizing: content-box;
+  font-size: 0.9rem;
+  width: 8em;
+}
+
+.meetingCard {
+  width: 800px;
+  max-width: 100%;
+  color: var(--custom-primary);
+  border: 1px solid var(--custom-primary);
+  transition: background-color 0.25s, color 0.25s;
+}
+
+.meetingCard:hover {
+  background-color: var(--custom-primary);
+  color: var(--custom-primary-contrast);
+}
+
+.meetingCardRight {
+  border-left-width: 1px;
+  border-left-style: solid;
+  border-left-color: inherit;
+}

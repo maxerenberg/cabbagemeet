@@ -21,6 +21,7 @@ import Login from 'components/Login';
 import MeetingForm from 'components/MeetingForm';
 import Signup from 'components/Signup';
 import Meeting from 'components/availabilities/Meeting';
+import Profile from 'components/Profile';
 import { selectIsLoggedIn } from 'slices/authentication';
 
 export default function App() {
@@ -35,6 +36,9 @@ export default function App() {
           <Route path="signup" element={<Signup />} />
           <Route path="login" element={<Login />} />
           <Route path="forgot-password" element={<ForgotPassword />} />
+          <Route path="me">
+            <Route index element={<Profile />} />
+          </Route>
         </Route>
         {/* TODO: use custom 404 page */}
       </Routes>
@@ -43,17 +47,9 @@ export default function App() {
 }
 
 function AppRoot() {
-  const fetchMeetingStatus = useAppSelector(state => state.meetingTimes.fetchMeetingStatus);
-  let mainClassName = 'container app-main-container flex-grow-1';
-  if (fetchMeetingStatus === 'loading') {
-    // vertically and horizontally align the spinner
-    mainClassName += ' d-flex align-items-center justify-content-center';
-  } else {
-    mainClassName += ' mt-5 mb-md-5';
-  }
   return (
     <div className="App light-theme d-flex flex-column">
-      <Navbar expand="md" className="mt-3">
+      <Navbar expand="md" className="mt-md-3 mb-md-5">
         <Container className="app-main-container custom-navbar-container">
           {/*
             We intentionally use <a> here to force a reload of the whole page
@@ -62,6 +58,7 @@ function AppRoot() {
           */}
           <Navbar.Brand href="/">Logo</Navbar.Brand>
           <Navbar.Toggle aria-controls="app-navbar-nav" className="custom-navbar-toggle" />
+          {/* TODO: hide offcanvas when link is clicked */}
           <Navbar.Offcanvas
             id="app-navbar-nav"
             aria-labelledby="app-navbar-offcanvas-label"
@@ -80,7 +77,7 @@ function AppRoot() {
           </Navbar.Offcanvas>
         </Container>
       </Navbar>
-      <main className={mainClassName}>
+      <main className="container app-main-container flex-grow-1 d-flex flex-column">
         <Outlet />
       </main>
       <Footer />
@@ -153,7 +150,7 @@ function HeaderLinks() {
 
 function Footer() {
   return (
-    <footer className="d-none d-md-flex align-items-center justify-content-center border-top">
+    <footer className="d-none d-md-flex align-items-center justify-content-center border-top mt-md-5">
       <Link to="/privacy" >Privacy</Link>
       <Link to="/feedback">Feedback</Link>
     </footer>

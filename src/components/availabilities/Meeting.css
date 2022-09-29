@@ -1,5 +1,5 @@
-.meeting-loading-container {
-  transform: scale(2);
+.meeting-container {
+  flex-grow: 1;
 }
 
 /* media-breakpoint-up(md) */

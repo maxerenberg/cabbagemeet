@@ -1,10 +1,11 @@
-import { createAsyncThunk, createSelector, createSlice } from '@reduxjs/toolkit';
+import { createAsyncThunk, createSelector, createSlice, SerializedError } from '@reduxjs/toolkit';
 import type { PayloadAction } from '@reduxjs/toolkit';
-import client from 'app/client';
+import client, { SubmitScheduleResponse, SubmitUnscheduleResponse } from 'app/client';
 import type { AppThunk, RootState } from 'app/store';
 import type { DateTimeSet } from 'common/types';
-import { setUserAvailabilities } from 'slices/meetingTimes';
+import { setScheduledDateTimes, setUserAvailabilities, unsetScheduledDateTimes } from 'slices/meetingTimes';
 import { assert } from 'utils/misc';
+import { addMinutesToDateTimeString } from 'utils/dates';
 
 // TODO: place these fields directly into AvailabilitiesSelectionState
 // and get rid of the type predicate functions
@@ -14,20 +15,48 @@ type SelModeEditing = {
 } | {
   type: 'editingOther';
   otherUser: string;
+} | {
+  type: 'editingSchedule';
 };
 type SelModeSelectedOther = {
   type: 'selectedOther';
   otherUser: string;
 };
-type SelModeSubmitting = {
+type SelModeSubmittingSelf = {
   type: 'submittingSelf';
   name: string;
-} | {
+};
+type SelModeSubmittingOther = {
   type: 'submittingOther';
   otherUser : string;
 };
+type SelModeSubmittingSchedule = {
+  type: 'submittingSchedule';
+};
+type SelModeSubmittingDateTimes = SelModeSubmittingSelf | SelModeSubmittingOther | SelModeSubmittingSchedule;
+type SelModeSubmittingUnschedule = {
+  type: 'submittingUnschedule';
+};
+type SelModeFulfilledDateTimes = {
+  type: 'submittedSchedule';
+};
+type SelModeFulfilledUnschedule = {
+  type: 'submittedUnschedule';
+}
+type SelModeFulfilled = SelModeFulfilledDateTimes | SelModeFulfilledUnschedule;
+type SelModeRejectedDateTimes = {
+  type: 'rejectedSchedule';
+  error: SerializedError;
+};
+type SelModeRejectedUnschedule = {
+  type: 'rejectedUnschedule';
+  error: SerializedError;
+};
+type SelModeRejected = SelModeRejectedDateTimes | SelModeRejectedUnschedule;
 
-export type SelMode = SelModeNone | SelModeEditing | SelModeSelectedOther | SelModeSubmitting;
+export type SelMode =
+  SelModeNone | SelModeEditing | SelModeSelectedOther | SelModeSubmittingDateTimes
+  | SelModeSubmittingUnschedule | SelModeFulfilled | SelModeRejected;
 
 type CellCoord = {
   rowIdx: number;
@@ -49,20 +78,36 @@ export type AvailabilitiesSelectionState = {
   hoverUser: string | null;
   hoverDateTime: string | null;
 } | {
-  selMode: SelModeEditing | SelModeSubmitting;
+  selMode: SelModeEditing
+         | SelModeSubmittingDateTimes
+         | SelModeFulfilledDateTimes
+         | SelModeRejectedDateTimes;
   dateTimes: DateTimeSet;
   mouse: MouseState;
 } | {
-  selMode: SelModeSelectedOther;
+  selMode: SelModeSubmittingUnschedule
+         | SelModeFulfilledUnschedule
+         | SelModeRejectedUnschedule
+         | SelModeSelectedOther;
 };
 
-function stateIsSubmitting(state: AvailabilitiesSelectionState): state is {
-  selMode: SelModeSubmitting,
-  dateTimes: DateTimeSet,
-  mouse: MouseState,
+function stateIsSubmittingAvailabilities(state: AvailabilitiesSelectionState): state is {
+  selMode: SelModeSubmittingSelf | SelModeSubmittingOther;
+  dateTimes: DateTimeSet;
+  mouse: MouseState;
 } {
   return state.selMode.type === 'submittingSelf'
       || state.selMode.type === 'submittingOther';
+}
+
+function stateIsSubmittingDateTimes(state: AvailabilitiesSelectionState): state is {
+  selMode: SelModeSubmittingDateTimes;
+  dateTimes: DateTimeSet;
+  mouse: MouseState;
+} {
+  return state.selMode.type === 'submittingSelf'
+      || state.selMode.type === 'submittingOther'
+      || state.selMode.type === 'submittingSchedule';
 }
 
 function stateIsEditing(state: AvailabilitiesSelectionState): state is {
@@ -71,15 +116,24 @@ function stateIsEditing(state: AvailabilitiesSelectionState): state is {
   mouse: MouseState,
 } {
   return state.selMode.type === 'editingSelf'
-      || state.selMode.type === 'editingOther';
+      || state.selMode.type === 'editingOther'
+      || state.selMode.type === 'editingSchedule';
 }
 
-function stateIsSubmittingOrEditing(state: AvailabilitiesSelectionState): state is {
-  selMode: SelModeEditing | SelModeSubmitting;
+function stateIsSubmittingOrEditingDateTimes(state: AvailabilitiesSelectionState): state is {
+  selMode: SelModeEditing | SelModeSubmittingDateTimes;
   dateTimes: DateTimeSet;
   mouse: MouseState;
 } {
-  return stateIsSubmitting(state) || stateIsEditing(state);
+  return stateIsSubmittingDateTimes(state) || stateIsEditing(state);
+}
+
+function stateIsSubmittingSchedule(state: AvailabilitiesSelectionState): state is {
+  selMode: {type: 'submittingSchedule'};
+  dateTimes: DateTimeSet;
+  mouse: MouseState;
+} {
+  return state.selMode.type === 'submittingSchedule';
 }
 
 function stateIsNone(state: AvailabilitiesSelectionState): state is {
@@ -112,7 +166,7 @@ export const submitAvailabilities = createAsyncThunk<
 
     // sanity check
     assert(startTime !== null && endTime !== null);
-    assert(stateIsSubmitting(state));
+    assert(stateIsSubmittingAvailabilities(state));
 
     const dateTimes = state.dateTimes;
     await client.submitAvailabilities(user, Object.keys(dateTimes));
@@ -120,6 +174,42 @@ export const submitAvailabilities = createAsyncThunk<
     dispatch(setUserAvailabilities({ user, dateTimes }));
     return { user, dateTimes };
   },
+);
+
+export const submitSchedule = createAsyncThunk<
+  SubmitScheduleResponse,
+  void,
+  { state: RootState }
+>(
+  'availabilitiesSelection/submitSchedule',
+  async (payload, { getState, dispatch }) => {
+    const state = getState().availabilitiesSelection;
+    assert(stateIsSubmittingSchedule(state));
+    const dateTimes = state.dateTimes;
+    const dateTimesFlat = Object.keys(dateTimes).sort();
+    if (dateTimesFlat.length === 0) {
+      throw new Error('Must select at least one time');
+    }
+    const startDateTime = dateTimesFlat[0];
+    const endDateTime = addMinutesToDateTimeString(dateTimesFlat[dateTimesFlat.length - 1], 30);
+    console.log(`startDateTime: ${startDateTime}, endDateTime: ${endDateTime}`);
+    const response = await client.submitSchedule(startDateTime, endDateTime);
+    dispatch(setScheduledDateTimes(dateTimes));
+    return response;
+  }
+);
+
+export const submitUnschedule = createAsyncThunk<
+  SubmitUnscheduleResponse,
+  void,
+  { state: RootState }
+>(
+  'availabilities/submitUnschedule',
+  async (payload, { dispatch }) => {
+    const response = await client.submitUnschedule();
+    dispatch(unsetScheduledDateTimes());
+    return response;
+  }
 );
 
 export const availabilitiesSelectionSlice = createSlice({
@@ -140,6 +230,18 @@ export const availabilitiesSelectionSlice = createSlice({
       // before we even had a chance to make the network request
       assert(state.selMode.type === 'editingSelf' || state.selMode.type === 'submittingSelf');
       state.selMode = {type: 'editingSelf'};
+    },
+    createSchedule: (state) => {
+      assert(state.selMode.type === 'none');
+      return {
+        selMode: {type: 'editingSchedule'},
+        dateTimes: {},
+        mouse: initialMouseState,
+      };
+    },
+    goBackToEditingSchedule: (state) => {
+      assert(state.selMode.type === 'rejectedSchedule');
+      state.selMode = {type: 'editingSchedule'};
     },
     editOtherInternal: (state, action: PayloadAction<{otherUserAvailabilities: DateTimeSet}>) => {
       assert(state.selMode.type === 'selectedOther');
@@ -215,6 +317,10 @@ export const availabilitiesSelectionSlice = createSlice({
         curCell: payload.cell,
         downCellWasOriginallySelected: payload.wasOriginallySelected,
       };
+      if (state.selMode.type === 'editingSchedule') {
+        state.dateTimes = {};
+        state.mouse.downCellWasOriginallySelected = false;
+      }
     },
     notifyMouseEnter: (state, { payload }: PayloadAction<{cell: CellCoord}>) => {
       assert(stateIsEditing(state));
@@ -225,13 +331,6 @@ export const availabilitiesSelectionSlice = createSlice({
   },
   extraReducers: (builder) => {
     builder
-      .addCase(submitAvailabilities.fulfilled, (state) => {
-        assert(
-          state.selMode.type === 'submittingSelf' || state.selMode.type === 'submittingOther',
-          `Expecting submittingSelf or submittingOther, got ${state.selMode.type}`
-        );
-        console.log('Submission succeeded');
-      })
       .addCase(submitAvailabilities.pending, (state, action) => {
         if (state.selMode.type === 'editingSelf') {
           state.selMode = {type: 'submittingSelf', name: action.meta.arg.user};
@@ -241,11 +340,39 @@ export const availabilitiesSelectionSlice = createSlice({
           throw new Error(`Expecting submittingSelf or submittingOther, got ${state.selMode.type}`);
         }
       })
+      .addCase(submitAvailabilities.fulfilled, (state) => {
+        assert(state.selMode.type === 'submittingSelf' || state.selMode.type === 'submittingOther');
+        console.log('Submission succeeded');
+      })
       .addCase(submitAvailabilities.rejected, (state) => {
-        assert(
-          state.selMode.type === 'submittingSelf' || state.selMode.type === 'submittingOther',
-          `Expecting submittingSelf or submittingOther, got ${state.selMode.type}`
-        );
+        assert(state.selMode.type === 'submittingSelf' || state.selMode.type === 'submittingOther');
+        console.log('Submission failed');
+      })
+      .addCase(submitSchedule.pending, (state) => {
+        assert(state.selMode.type === 'editingSchedule');
+        state.selMode = {type: 'submittingSchedule'};
+      })
+      .addCase(submitSchedule.fulfilled, (state) => {
+        assert(state.selMode.type === 'submittingSchedule');
+        state.selMode = {type: 'submittedSchedule'};
+        console.log('Submission succeeded');
+      })
+      .addCase(submitSchedule.rejected, (state, action) => {
+        assert(state.selMode.type === 'submittingSchedule');
+        state.selMode = {type: 'rejectedSchedule', error: action.error};
+        console.log('Submission failed');
+      })
+      .addCase(submitUnschedule.pending, (state) => {
+        assert(state.selMode.type === 'none');
+        state.selMode = {type: 'submittingUnschedule'};
+      })
+      .addCase(submitUnschedule.fulfilled, (state) => {
+        assert(state.selMode.type === 'submittingUnschedule');
+        state.selMode = {type: 'submittedUnschedule'};
+      })
+      .addCase(submitUnschedule.rejected, (state, action) => {
+        assert(state.selMode.type === 'submittingUnschedule');
+        state.selMode = {type: 'rejectedUnschedule', error: action.error};
         console.log('Submission failed');
       });
   },
@@ -254,6 +381,8 @@ export const availabilitiesSelectionSlice = createSlice({
 export const {
   editSelf,
   goBackToEditingSelf,
+  createSchedule,
+  goBackToEditingSchedule,
   selectOther,
   goBackToEditingOther,
   cancelEditingOther,
@@ -305,7 +434,8 @@ export const selectSelMode = createSelector(
 );
 export const selectSelectedTimes = createSelector(
   [selectSelModeAndDateTimes],
-  (state: AvailabilitiesSelectionState) => stateIsSubmittingOrEditing(state) ? state.dateTimes : {}
+  (state: AvailabilitiesSelectionState) =>
+    stateIsSubmittingOrEditingDateTimes(state) ? state.dateTimes : {}
 );
 export const selectHoverUser = createSelector(
   [selectSelModeAndDateTimes],
