@@ -88,7 +88,7 @@ function LoginForm() {
       <Form.Group controlId="login-form-password" className="mt-5">
         <div className="d-flex align-items-center justify-content-between mb-2">
           <Form.Label className="mb-0">Password</Form.Label>
-          <Link to="/forgot-password" className={`custom-link ${styles.forgotPasswordLink}`}>
+          <Link to="/forgot-password" className={`custom-link ${styles.forgotPasswordLink}`} tabIndex={-1}>
             Forgot your password?
           </Link>
         </div>

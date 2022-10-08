@@ -12,7 +12,7 @@ export default function MeetingAboutPrompt({
     setMeetingAbout(e.target.value);
   };
   return (
-    <Form.Group controlId="meeting-about-prompt">
+    <Form.Group controlId="meeting-about-prompt" className="create-meeting-form-group">
       <Form.Label className="create-meeting-question">
         What's your meeting about?
       </Form.Label>

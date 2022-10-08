@@ -1,0 +1,14 @@
+.modal {
+  min-height: initial;
+}
+
+.close_icon_button {
+  border: none;
+  background-color: initial;
+  padding: 0.5rem;
+  color: var(--custom-secondary);
+}
+
+.close_icon_button:hover {
+  color: var(--custom-primary);
+}

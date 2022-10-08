@@ -1,8 +1,8 @@
 import { useState, useEffect } from 'react';
 import Form from 'react-bootstrap/Form';
-import { SerializedError } from '@reduxjs/toolkit';
 import { useAppDispatch, useAppSelector } from 'app/hooks';
 import ButtonSpinnerRight from 'components/ButtonSpinnerRight';
+import Modal from 'components/Modal';
 import NonFocusButton from 'components/NonFocusButton';
 import {
   selectSelModeAndDateTimes,
@@ -24,43 +24,32 @@ function SaveTimesModal({
   const [name, setName] = useState('');
   const [errorMsg, setErrorMsg] = useState('');
   const [validated, setValidated] = useState(false);
+  const onClose = closeModal;
 
-  // Set overflow:hidden on the body to prevent scrolling
   useEffect(() => {
-    document.body.classList.add('modal-open');
-    return () => document.body.classList.remove('modal-open');
-  }, []);
+    if (selMode.type === 'submittedOther') {
+      showToast({
+        msg: 'Availabilities successfully submitted',
+        msgType: 'success',
+        autoClose: true,
+      });
+      dispatch(resetSelection());
+      // automatically close the modal if the request succeeds
+      onClose();
+    } else if (selMode.type === 'rejectedOther') {
+      setErrorMsg(selMode.error.message || 'error was not specified');
+      dispatch(goBackToEditingSelf());
+    }
+  }, [selMode, showToast, dispatch, onClose]);
 
-  const onClose = () => {
-    closeModal();
-    setName('');  // Do we need this??
-  };
-  const onSubmit: React.FormEventHandler<HTMLFormElement> = async (ev) => {
+  const onSubmit: React.FormEventHandler<HTMLFormElement> = (ev) => {
     ev.preventDefault();
     const form = ev.currentTarget;
     if (!form.checkValidity()) {
       setValidated(true);
       return;
     }
-
-    // TODO: handle request result in a useEffect hook instead
-    try {
-      await dispatch(submitSelf(name));
-    } catch (anyError: any) {
-      const error = anyError as SerializedError;
-      console.error('Modal: submission failed:', error.message);
-      setErrorMsg(error.message || 'error was not specified');
-      dispatch(goBackToEditingSelf());
-      return;
-    }
-    // automatically close the modal if the request succeeds
-    onClose();
-    dispatch(resetSelection());
-    showToast({
-      msg: 'Availabilities successfully submitted',
-      msgType: 'success',
-      autoClose: true,
-    });
+    dispatch(submitSelf(name));
   };
 
   const isSubmitting = selMode.type === 'submittingSelf';
@@ -68,7 +57,7 @@ function SaveTimesModal({
   const closeBtnDisabled = isSubmitting;
   const spinner = isSubmitting && <ButtonSpinnerRight />;
   return (
-    <div className="saveTimesModal">
+    <Modal>
       <Form noValidate className="saveTimesModal--content" {...{validated, onSubmit}}>
         <div className="d-flex justify-content-between">
           <div className="fs-4">
@@ -127,7 +116,7 @@ function SaveTimesModal({
           )
         }
       </Form>
-    </div>
+    </Modal>
   )
 }
 export default SaveTimesModal;

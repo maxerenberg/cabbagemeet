@@ -86,12 +86,24 @@ function pageNumberReducer(page: number, action: 'inc' | 'dec'): number {
 }
 
 export default function WeeklyViewTimePicker() {
-  const startHour = useAppSelector(state => state.meetingTimes.startTime);
-  const endHour = useAppSelector(state => state.meetingTimes.endTime);
-  const dates = useAppSelector(state => state.meetingTimes.dates);
+  const startTime = useAppSelector(state => state.meetingTimes.startTime);
+  const endTime = useAppSelector(state => state.meetingTimes.endTime);
   // If the meeting data hasn't been loaded yet, then this component
   // shouldn't even be loaded
-  assert(startHour !== null && endHour !== null);
+  assert(startTime !== null && endTime !== null);
+  // startTime/endTime can be fractional (e.g. 9.5) if someone's timezone offset (in hours)
+  // is not an integer, e.g. St. John's
+  // !!!!!!!!!!
+  // FIXME: If startTime === endTime, and they are both fractional values, this will cause
+  // startTime to be rounded down and endTime to be rounded up, so the time range will only
+  // span 1 hour instead of 25.
+  // As of this writing (2022-10-01), LettuceMeet has this bug as well.
+  // !!!!!!!!!!
+  // TODO: I think it would be best to allow the first/last rows to be non-integer times,
+  // e.g. 9:30.
+  const startHour = Math.floor(startTime);
+  const endHour = Math.ceil(endTime);
+  const dates = useAppSelector(state => state.meetingTimes.dates);
   const [page, pageDispatch] = useReducer(pageNumberReducer, 0);
   const numDaysDisplayed = Math.min(dates.length - page*7, 7);
   const datesDisplayed = useMemo(

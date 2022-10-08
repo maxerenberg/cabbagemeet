@@ -6,6 +6,7 @@ import meetingTimesReducer from 'slices/meetingTimes';
 import resetPasswordReducer from 'slices/resetPassword';
 import respondedMeetingsReducer from 'slices/respondedMeetings';
 import selectedDatesReducer from 'slices/selectedDates';
+import visitedDayPickerReducer from 'slices/visitedDayPicker';
 
 export const store = configureStore({
   reducer: {
@@ -16,6 +17,7 @@ export const store = configureStore({
     resetPassword: resetPasswordReducer,
     respondedMeetings: respondedMeetingsReducer,
     selectedDates: selectedDatesReducer,
+    visitedDayPicker: visitedDayPickerReducer,
   },
 });
 

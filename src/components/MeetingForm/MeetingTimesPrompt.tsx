@@ -15,10 +15,15 @@ export default function MeetingTimesPrompt({
   endTime: number,
   setEndTime: (time: number) => void,
 }) {
-  const [startTimeSuffix, setStartTimeSuffix] = useState('AM');
-  const [endTimeSuffix, setEndTimeSuffix] = useState('PM');
+  const [startTimeSuffix, setStartTimeSuffix] = useState(startTime < 12 ? 'AM' : 'PM');
+  const [endTimeSuffix, setEndTimeSuffix] = useState(endTime < 12 ? 'AM' : 'PM');
   const onStartTimeChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    setStartTime(Number(e.target.value) + (startTimeSuffix === 'AM' ? 0 : 12));
+    const value = Number(e.target.value);
+    if (startTimeSuffix === 'AM') {
+      setStartTime(value);
+    } else {
+      setStartTime(value === 12 ? 12 : value + 12);
+    }
   };
   const onStartTimeSuffixChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     setStartTimeSuffix(e.target.value);
@@ -29,7 +34,12 @@ export default function MeetingTimesPrompt({
     }
   };
   const onEndTimeChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    setEndTime(Number(e.target.value) + (endTimeSuffix === 'AM' ? 0 : 12));
+    const value = Number(e.target.value);
+    if (endTimeSuffix === 'AM') {
+      setEndTime(value);
+    } else {
+      setEndTime(value === 12 ? 12 : value + 12);
+    }
   }
   const onEndTimeSuffixChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     setEndTimeSuffix(e.target.value);
@@ -40,7 +50,7 @@ export default function MeetingTimesPrompt({
     }
   };
   return (
-    <fieldset>
+    <fieldset className="create-meeting-form-group">
       <legend className="create-meeting-question">Between which times would you like to meet?</legend>
       <div className="d-flex align-items-center">
         <Form.Select value={to12HourClock(startTime)} onChange={onStartTimeChange} className="meeting-times-prompt-select">

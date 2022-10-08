@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { useParams } from 'react-router-dom';
 import { useAppDispatch, useAppSelector } from 'app/hooks';
 import GenericSpinner from 'components/GenericSpinner';
@@ -6,23 +6,34 @@ import NonFocusButton from 'components/NonFocusButton';
 import { fetchMeeting } from 'slices/meetingTimes';
 import WeeklyViewTimePicker from './WeeklyTimeViewPicker';
 import './Meeting.css';
+import EditMeeting from './EditMeeting';
+import { useToast } from 'components/Toast';
+import { selectIsLoggedIn } from 'slices/authentication';
 
 export default function Meeting() {
+  const [isEditingMeeting, setIsEditingMeeting] = useState(false);
   const params = useParams();
-  const name = useAppSelector(state => state.meetingTimes.name);
+  const urlMeetingID = params.id!;
+  const fetchedMeetingID = useAppSelector(state => state.meetingTimes.id);
   const fetchMeetingStatus = useAppSelector(state => state.meetingTimes.fetchMeetingStatus);
   const error = useAppSelector(state => state.meetingTimes.error) ?? 'unknown';
   const dispatch = useAppDispatch();
+  // The ref is needed because this component can be re-rendered before fetchMeetingStatus
+  // (stored in Redux) gets updated, causing fetchMeeting() to be dispatched twice.
+  // FIXME: there's gotta be a better way to do this...
+  const fetchIsPendingRef = useRef(false);
 
-  // if (true) {
-  //   return <GenericSpinner />;
-  // }
+  const needToFetchMeeting = fetchMeetingStatus === 'idle' || (
+    fetchMeetingStatus === 'succeeded' && fetchedMeetingID !== urlMeetingID
+  );
+  useEffect(() => {
+    if (needToFetchMeeting && !fetchIsPendingRef.current) {
+      dispatch(fetchMeeting(urlMeetingID));
+      fetchIsPendingRef.current = true;
+    }
+  }, [needToFetchMeeting, dispatch, urlMeetingID]);
 
-  if (name === null && fetchMeetingStatus === 'idle') {
-    dispatch(fetchMeeting(params.id!));
-    return <GenericSpinner />;
-  }
-  if (fetchMeetingStatus === 'loading') {
+  if (needToFetchMeeting || fetchMeetingStatus === 'loading') {
     return <GenericSpinner />;
   }
   if (fetchMeetingStatus === 'failed') {
@@ -37,26 +48,47 @@ export default function Meeting() {
       </div>
     );
   }
+  if (isEditingMeeting) {
+    return <EditMeeting setIsEditing={setIsEditingMeeting} />;
+  }
   return (
     <div className="meeting-container">
-      <MeetingTitleRow />
+      <MeetingTitleRow setIsEditingMeeting={setIsEditingMeeting} />
       <MeetingAboutRow />
       <WeeklyViewTimePicker />
     </div>
   );
 }
 
-const MeetingTitleRow = React.memo(function MeetingTitleRow() {
+const MeetingTitleRow = React.memo(function MeetingTitleRow({
+  setIsEditingMeeting,
+}: {
+  setIsEditingMeeting: (val: boolean) => void,
+}) {
   const name = useAppSelector(state => state.meetingTimes.name);
+  const isLoggedIn = useAppSelector(selectIsLoggedIn);
+  const { showToast } = useToast();
+  const onClickEditButton = () => {
+    if (isLoggedIn) {
+      setIsEditingMeeting(true);
+    } else {
+      showToast({
+        msg: 'You must be logged in to edit a meeting',
+        msgType: 'failure',
+        autoClose: true,
+      });
+    }
+  };
   return (
-    <div style={{
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'space-between'
-    }}>
+    <div className="d-flex align-items-center justify-content-between">
       <div style={{fontSize: '1.3em'}}>{name}</div>
       <div>
-        <NonFocusButton className="btn btn-outline-secondary px-4">Edit</NonFocusButton>
+        <NonFocusButton
+          className="btn btn-outline-secondary px-4"
+          onClick={onClickEditButton}
+        >
+          Edit
+        </NonFocusButton>
         <NonFocusButton className="btn btn-outline-primary px-4 ms-4">Share</NonFocusButton>
       </div>
     </div>

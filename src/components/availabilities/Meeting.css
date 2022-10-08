@@ -5,6 +5,13 @@
 /* media-breakpoint-up(md) */
 @media (min-width: 768px) {
   .meeting-avl-button {
+    min-width: 10em;
+  }
+}
+
+/* media-breakpoint-up(lg) */
+@media (min-width: 992px) {
+  .meeting-avl-button {
     min-width: 12em;
   }
 }

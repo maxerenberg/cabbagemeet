@@ -1,5 +1,9 @@
-.create-meeting-page > :is(div, fieldset):not(:first-child) {
-  margin-top: 4em;
+.create-meeting-form-group {
+  margin-top: 4rem;
+}
+
+.edit-meeting .create-meeting-form-group {
+  margin-top: 3rem;
 }
 
 .create-meeting-question {

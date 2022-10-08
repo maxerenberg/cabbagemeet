@@ -176,7 +176,7 @@ function MeetingGridBodyCells({
           const dateTime = dateTimes[rowIdx][colIdx];
           const isScheduled = scheduleSet[dateTime];
           const hoverUserIsAvailableAtThisTime = somebodyIsHovered && availabilities[hoverUser][dateTime];
-          const selectedUserIsAvailableAtThisTime = selMode.type === 'selectedOther' && availabilities[selMode.otherUser][dateTime];
+          const selectedUserIsAvailableAtThisTime = selMode.type === 'selectedOther' && availabilities[selMode.otherUserID][dateTime];
           const numPeopleAvailableAtThisTime = dateTimePeople[dateTime]?.length ?? 0;
           return (
             <Cell key={i} {...{
@@ -253,7 +253,12 @@ const Cell = React.memo(function Cell({
   const style: Style = {gridArea: `c${cellIdx}`};
   let rgb: string | undefined;
   let alpha = '100%';
-  if (selMode.type === 'editingSelf' || selMode.type === 'submittingSelf') {
+  if (
+    selMode.type === 'editingSelf'
+    || selMode.type === 'submittingSelf'
+    || selMode.type === 'submittedSelf'
+    || selMode.type === 'rejectedSelf'
+  ) {
     if (
       (isInMouseSelectionArea && mouseSelectionAreaIsAddingDateTimes)
       || (!isInMouseSelectionArea && isSelected)
@@ -276,7 +281,12 @@ const Cell = React.memo(function Cell({
     if (selectedUserIsAvailableAtThisTime) {
       rgb = 'var(--custom-primary-rgb)';
     }
-  } else if (selMode.type === 'editingOther' || selMode.type === 'submittingOther') {
+  } else if (
+    selMode.type === 'editingOther'
+    || selMode.type === 'submittingOther'
+    || selMode.type === 'submittedOther'
+    || selMode.type === 'rejectedOther'
+  ) {
     if (
       (isInMouseSelectionArea && mouseSelectionAreaIsAddingDateTimes)
       || (!isInMouseSelectionArea && isSelected)

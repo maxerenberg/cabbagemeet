@@ -11,13 +11,14 @@ import {
 
 type DateTimePeopleSet = {
   [dateTime: string]: {
-    [person: string]: true,
+    [userID: string]: true,
   }
 };
 
 function MeetingRespondents() {
   const availabilities = useAppSelector(state => state.meetingTimes.availabilities);
-  const people = Object.keys(availabilities);
+  const userInfos = useAppSelector(state => state.meetingTimes.people);
+  const userIDs = Object.keys(availabilities);
   const dateTimePeople: DateTimePeopleSet = useMemo(() => {
     const result: DateTimePeopleSet = {};
     for (const [person, dateTimes] of Object.entries(availabilities)) {
@@ -35,10 +36,10 @@ function MeetingRespondents() {
   const hoverDateTime = useAppSelector(selectHoverDateTime);
   const dispatch = useAppDispatch();
 
-  if (people.length === 0) return null;
-  let selectedUser: string | undefined;
-  if (selMode.type === 'selectedOther' || selMode.type === 'editingOther') {
-    selectedUser = selMode.otherUser;
+  if (userIDs.length === 0) return null;
+  let selectedUserID: string | undefined;
+  if (selMode.type === 'selectedOther' || selMode.type === 'editingOther' || selMode.type === 'submittingOther') {
+    selectedUserID = selMode.otherUserID;
   }
   const numPeopleForHover =
     hoverDateTime !== null && dateTimePeople.hasOwnProperty(hoverDateTime)
@@ -53,50 +54,50 @@ function MeetingRespondents() {
         width: '9em',
       }}>
         Respondents (
-          {(!selectedUser && hoverDateTime) ? numPeopleForHover + '/' : ''}
-          {people.length}
+          {(!selectedUserID && hoverDateTime) ? numPeopleForHover + '/' : ''}
+          {userIDs.length}
         )
       </div>
       <ul>
         {
-          people.map(name => {
+          userIDs.map(userID => {
             const style: Style = {};
-            if (name === selectedUser) {
+            if (userID === selectedUserID) {
               style.color = 'var(--custom-primary)';
             }
             let className = '';
             if (
-              selectedUser === undefined
+              selectedUserID === undefined
               && hoverDateTime !== null
               && !(
                 dateTimePeople.hasOwnProperty(hoverDateTime)
-                && dateTimePeople[hoverDateTime][name]
+                && dateTimePeople[hoverDateTime][userID]
               )
             ) {
               className = 'unavailable';
             }
             let onClick: React.MouseEventHandler | undefined;
-            if (name === selectedUser) {
+            if (userID === selectedUserID) {
               onClick = () => dispatch(resetSelection());
             } else {
-              onClick = () => dispatch(selectOther({otherUser: name}));
+              onClick = () => dispatch(selectOther({otherUserID: userID}));
             }
             let onMouseEnter: React.MouseEventHandler | undefined;
             let onMouseLeave: React.MouseEventHandler | undefined;
             if (selMode.type === 'none') {
-              onMouseEnter = () => dispatch(setHoverUser(name));
+              onMouseEnter = () => dispatch(setHoverUser(userID));
               onMouseLeave = () => dispatch(setHoverUser(null));
             }
             return (
               <li
-                key={name}
+                key={userID}
                 className={className}
                 style={style}
                 onMouseEnter={onMouseEnter}
                 onMouseLeave={onMouseLeave}
                 onClick={onClick}
               >
-                {name}
+                {userInfos[userID].name}
               </li>
             );
           })

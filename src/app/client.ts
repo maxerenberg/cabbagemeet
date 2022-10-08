@@ -1,7 +1,7 @@
 import { nanoid } from '@reduxjs/toolkit';
 import { range } from 'utils/arrays';
 import { getDateString, addDaysToDateString, today } from 'utils/dates';
-import { PeopleDateTimesFlat } from 'common/types';
+import type { PeopleDateTimesFlat, PeopleInfo } from 'common/types';
 
 export type ServerMeeting = {
   id: string,
@@ -10,7 +10,9 @@ export type ServerMeeting = {
   startTime: number,  // UTC time (warning: might be a decimal!)
   endTime: number,    // UTC time (warning: might be a decimal!)
   dates: string[],  // YYYY-MM-DD
+  // The keys of availabilities and people must be exactly the same.
   availabilities: PeopleDateTimesFlat,
+  people: PeopleInfo,
   scheduledStartTime?: string,  // YYYY-MM-DDTHH:MM:ssZ
   scheduledEndTime?: string,    // YYYY-MM-DDTHH:MM:ssZ
 };
@@ -28,8 +30,18 @@ export type ServerMeetingShort = {
   scheduledDay?: string;  // YYYY-MM-DD
 };
 
+export type SubmitAvailabilitiesArgs = {
+  dateTimes: string[],
+} & ({
+  userID: string;  // for submitting another user, or for submitting oneself when logged in
+} | {
+  name: string;  // for submitting oneself and NOT logged in
+});
+
 export type SubmitAvailabilitiesResponse = {
-  status: string,
+  status: 'OK',
+  availabilities: PeopleDateTimesFlat,
+  people: PeopleInfo,
 };
 
 export type LoginResponse = {
@@ -55,6 +67,52 @@ export type SubmitUnscheduleResponse = {
   status: 'OK';
 };
 
+export type EditMeetingArgs = {
+  id: string;
+  name: string;
+  about: string;
+  dates: string[];
+  startTime: number;
+  endTime: number;
+};
+
+export type EditMeetingResponse = {
+  status: 'OK';
+};
+
+export type DeleteMeetingResponse = {
+  status: 'OK';
+};
+
+function isSubmittingAsGuest(args: SubmitAvailabilitiesArgs): args is {
+  dateTimes: string[];
+  name: string;
+} {
+  return !args.hasOwnProperty('userID');
+};
+
+const dateString1 = getDateString(today);
+const dateString2 = addDaysToDateString(dateString1, 1);
+const meeting: ServerMeeting = {
+  id: nanoid(),
+  name: 'some-name',
+  about: 'some-description',
+  dates: [dateString1].concat(
+    ...range(9).map(i => addDaysToDateString(dateString1, 30+i))
+  ),
+  availabilities: {
+    'bob123': [`${dateString2}T02:00:00Z`, `${dateString2}T02:30:00Z`],
+  },
+  people: {
+    'bob123': {name: 'Bob'},
+  },
+  // TODO: test fractional time
+  startTime: 23.5,
+  endTime: 6,
+  scheduledStartTime: `${dateString2}T03:30:00Z`,
+  scheduledEndTime: `${dateString2}T04:30:00Z`,
+};
+
 class Client {
   createMeeting({
     name, about, dates, startTime, endTime,
@@ -64,60 +122,72 @@ class Client {
   }): Promise<ServerMeeting> {
     return new Promise(resolve => {
       setTimeout(() => {
-        resolve({
-          id: nanoid(),
-          name,
-          about,
-          dates,
-          startTime,
-          endTime,
-          availabilities: {},
-        });
+        meeting.name = name;
+        meeting.about = about;
+        meeting.dates = dates;
+        meeting.startTime = startTime;
+        meeting.endTime = endTime;
+        meeting.people = {};
+        meeting.availabilities = {};
+        resolve(meeting);
+      }, 1000);
+    });
+  }
+
+  editMeeting(
+    {id, name, about, dates, startTime, endTime}: EditMeetingArgs
+  ): Promise<EditMeetingResponse> {
+    return new Promise(resolve => {
+      setTimeout(() => {
+        meeting.name = name;
+        meeting.about = about;
+        meeting.dates = dates;
+        meeting.startTime = startTime;
+        meeting.endTime = endTime;
+        resolve({status: 'OK'});
+      }, 1000);
+    });
+  }
+
+  deleteMeeting(id: string): Promise<DeleteMeetingResponse> {
+    return new Promise((resolve, reject) => {
+      setTimeout(() => {
+        if (true) {
+          resolve({status: 'OK'});
+        } else {
+          reject(new Error('boom!'));
+        }
       }, 1000);
     });
   }
 
   // TODO: store meeting ID in client when meeting info is fetched the first time
   getMeeting(id: string): Promise<ServerMeeting> {
-    const d = new Date();
-    const dateString1 = getDateString(d);
-    const dateString2 = addDaysToDateString(dateString1, 1);
     return new Promise(resolve => {
       setTimeout(() => {
-        resolve({
-          id,
-          name: 'some-name',
-          about: 'some-description',
-          /*dates: [dateString1, dateString2],
-          availabilities: {
-            'bob': [
-              ...['13:00', '13:30', '15:00', '16:00', '16:30'].map(t => `${dateString1}T${t}:00Z`),
-              ...['18:00', '18:30', '20:30'].map(t => `${dateString2}T${t}:00Z`),
-            ],
-            'alice': [
-              ...['13:30', '15:30', '16:30', '17:00'].map(t => `${dateString1}T${t}:00Z`),
-            ],
-          },
-          startTime: 13,
-          endTime: 21,*/
-          dates: [dateString1].concat(
-            ...range(9).map(i => addDaysToDateString(dateString1, 30+i))
-          ),
-          availabilities: {
-            'bob': [`${dateString2}T02:00:00Z`, `${dateString2}T02:30:00Z`],
-          },
-          startTime: 23,
-          endTime: 6,
-        });
+        meeting.id = id;
+        resolve(meeting);
       }, 1000);
     });
   }
 
-  submitAvailabilities(user: string, dateTimes: string[]): Promise<SubmitAvailabilitiesResponse> {
+  submitAvailabilities(args: SubmitAvailabilitiesArgs): Promise<SubmitAvailabilitiesResponse> {
     return new Promise((resolve, reject) => {
       setTimeout(() => {
-        if (false) {
-          resolve({status: 'OK'});
+        if (true) {
+          let userID: string | undefined;
+          if (isSubmittingAsGuest(args)) {
+            userID = nanoid();
+            meeting.people[userID] = {name: args.name};
+          } else {
+            userID = args.userID;
+          }
+          meeting.availabilities[userID] = args.dateTimes;
+          resolve({
+            status: 'OK',
+            availabilities: meeting.availabilities,
+            people: meeting.people,
+          });
         } else {
           reject(new Error('boom!'));
         }

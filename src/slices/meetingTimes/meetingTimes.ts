@@ -1,13 +1,16 @@
 import { createAsyncThunk, createSlice } from '@reduxjs/toolkit';
 import type { PayloadAction } from '@reduxjs/toolkit';
-import client from 'app/client';
+import client, { EditMeetingArgs, EditMeetingResponse } from 'app/client';
 import type { ServerMeeting } from 'app/client';
-import type { RootState } from 'app/store';
-import type { PeopleDateTimes, RequestStatus, DateTimeSet } from 'common/types';
+import type { RootState, AppThunk } from 'app/store';
+import type { PeopleDateTimes, RequestStatus, DateTimeSet, PeopleInfo, PeopleDateTimesFlat } from 'common/types';
 import { selectSelectedDates } from 'slices/selectedDates';
 import { arrayToObject } from 'utils/arrays';
 import { addOffsetToDateTimes, addMinutesToDateTimeString, UTCOffsetHours } from 'utils/dates';
 import { PeopleDateTimesFlatToPeopleDateTimes } from './meetingTimes.helpers';
+import { assert } from 'utils/misc';
+import { resetCreatedMeetings } from 'slices/createdMeetings';
+import { resetRespondedMeetings } from 'slices/respondedMeetings';
 
 // All dates and times are stored in local time, except for the DateTime strings
 // which are stored in UTC.
@@ -27,10 +30,14 @@ type MeetingTimesState = {
   about: string | null,
   id: string | null,
   dates: string[],  // must be sorted at all times
+  // The keys of availabilities and people must be exactly the same.
   availabilities: PeopleDateTimes,
+  people: PeopleInfo,
   scheduledDateTimes?: DateTimeSet,
   fetchMeetingStatus: RequestStatus,
   createMeetingStatus: RequestStatus,
+  editMeetingStatus: RequestStatus,
+  deleteMeetingStatus: RequestStatus,
   error: string | null,
 };
 
@@ -42,16 +49,18 @@ const initialState: MeetingTimesState = {
   id: null,
   dates: [],
   availabilities: {},
+  people: {},
   fetchMeetingStatus: 'idle',
   createMeetingStatus: 'idle',
+  editMeetingStatus: 'idle',
+  deleteMeetingStatus: 'idle',
   error: null,
 };
 
 export const fetchMeeting = createAsyncThunk(
   'meetingTimes/fetchMeeting',
   async (id: string) => {
-    const meeting = await client.getMeeting(id);
-    return meeting;
+    return await client.getMeeting(id);
   },
 );
 
@@ -78,15 +87,31 @@ export const createMeeting = createAsyncThunk<
       -UTCOffsetHours
     );
 
-    const meeting = await client.createMeeting({
+    return await client.createMeeting({
       name,
       about,
       dates,
       startTime,
       endTime,
     });
-    return meeting;
   },
+);
+
+export const editMeeting = createAsyncThunk<
+  EditMeetingResponse,
+  EditMeetingArgs
+>(
+  'meetingTimes/editMeeting',
+  async (payload) => {
+    return await client.editMeeting(payload);
+  }
+);
+
+export const deleteMeeting = createAsyncThunk(
+  'meetingTimes/deleteMeeting',
+  async (id: string) => {
+    return await client.deleteMeeting(id);
+  }
 );
 
 export const meetingTimesSlice = createSlice({
@@ -102,10 +127,11 @@ export const meetingTimesSlice = createSlice({
     },
     removeDay: (state, action: PayloadAction<string>) => {
       const dateString = action.payload;
-      return {
-        ...state,
-        dates: state.dates.filter(d => d !== dateString),
-      };
+      state.dates = state.dates.filter(d => d !== dateString);
+    },
+    setPeopleInfoAndAvailabilities: (state, { payload }: PayloadAction<{people: PeopleInfo, availabilities: PeopleDateTimesFlat}>) => {
+      state.people = payload.people;
+      state.availabilities = PeopleDateTimesFlatToPeopleDateTimes(payload.availabilities);
     },
     setUserAvailabilities: (state, action: PayloadAction<{user: string, dateTimes: DateTimeSet}>) => {
       const {user, dateTimes} = action.payload;
@@ -113,6 +139,24 @@ export const meetingTimesSlice = createSlice({
     },
     resetCreateMeetingStatus: (state) => {
       state.createMeetingStatus = 'idle';
+      state.error = null;
+    },
+    resetEditMeetingStatusInternal: (state) => {
+      state.editMeetingStatus = 'idle';
+      state.error = null;
+    },
+    resetDeleteMeetingStatusInternal: (state) => {
+      if (state.deleteMeetingStatus === 'failed') {
+        return {
+          ...state,
+          deleteMeetingStatus: 'idle',
+          error: null,
+        };
+      } else if (state.deleteMeetingStatus === 'succeeded') {
+        return initialState;
+      } else {
+        throw new Error('deleteMeetingStatus should be failed or succeeded');
+      }
     },
     setScheduledDateTimes: (state, { payload }: PayloadAction<DateTimeSet>) => {
       state.scheduledDateTimes = payload;
@@ -127,7 +171,11 @@ export const meetingTimesSlice = createSlice({
   extraReducers: (builder) => {
     builder
       .addCase(fetchMeeting.pending, (state) => {
-        state.fetchMeetingStatus = 'loading';
+        assert(state.fetchMeetingStatus !== 'loading', 'fetchMeetingStatus is already loading');
+        return {
+          ...initialState,
+          fetchMeetingStatus: 'loading',
+        };
       })
       .addCase(fetchMeeting.fulfilled, (state, { payload }) => {
         const {
@@ -161,12 +209,13 @@ export const meetingTimesSlice = createSlice({
           UTCOffsetHours,
         );
         const availabilities = PeopleDateTimesFlatToPeopleDateTimes(availabilitiesFlat);
-        dates.sort();
         return {
           ...state,
           startTime,
           endTime,
-          dates,
+          // FIXME: why is dates not mutable here...?
+          dates: [...dates].sort(),
+          people: payload.people,
           availabilities,
           scheduledDateTimes,
           name,
@@ -205,6 +254,7 @@ export const meetingTimesSlice = createSlice({
           endTime,
           dates,
           availabilities,
+          scheduledDateTimes: undefined,
           name,
           about,
           id,
@@ -214,14 +264,81 @@ export const meetingTimesSlice = createSlice({
       .addCase(createMeeting.rejected, (state, action) => {
         state.createMeetingStatus = 'failed';
         state.error = action.error.message || null;
+      })
+      .addCase(editMeeting.pending, (state) => {
+        state.editMeetingStatus = 'loading';
+      })
+      .addCase(editMeeting.fulfilled, (state, action) => {
+        state.name = action.meta.arg.name;
+        state.about = action.meta.arg.about;
+        state.dates = action.meta.arg.dates;
+        state.startTime = action.meta.arg.startTime;
+        state.endTime = action.meta.arg.endTime;
+        state.editMeetingStatus = 'succeeded';
+      })
+      .addCase(editMeeting.rejected, (state, action) => {
+        state.editMeetingStatus = 'failed';
+        state.error = action.error.message || null;
+      })
+      .addCase(deleteMeeting.pending, (state) => {
+        state.deleteMeetingStatus = 'loading';
+      })
+      .addCase(deleteMeeting.fulfilled, (state) => {
+        // Ah...turns out that this is a bad idea. The DeleteMeetingModal is
+        // still mounted when the request succeeds, which causes the spinner
+        // to immediately show and the modal to unmount. This means the modal
+        // never even has a chance to process the fact that deleteMeetingStatus
+        // changed to 'succeeded'. So we need to delete the meeting info from
+        // the resetDeleteMeetingStatus reducer instead.
+        //
+        // return {
+        //   ...initialState,
+        //   deleteMeetingStatus: 'succeeded',
+        // };
+
+        state.deleteMeetingStatus = 'succeeded';
+      })
+      .addCase(deleteMeeting.rejected, (state, action) => {
+        state.deleteMeetingStatus = 'failed';
+        state.error = action.error.message || null;
       });
   }
 });
 
+const {
+  resetEditMeetingStatusInternal,
+  resetDeleteMeetingStatusInternal,
+} = meetingTimesSlice.actions;
+
+export const resetEditMeetingStatus =
+  (): AppThunk =>
+  (dispatch, getState) => {
+    const editMeetingStatus = getState().meetingTimes.editMeetingStatus;
+    dispatch(resetEditMeetingStatusInternal());
+    if (editMeetingStatus === 'succeeded') {
+      // Need to invalidate the data for created/responded meetings
+      // This is ugly :(
+      // TODO: use a library which handles this automatically, e.g. RTK Query
+      dispatch(resetCreatedMeetings());
+      dispatch(resetRespondedMeetings());
+    }
+  };
+export const resetDeleteMeetingStatus =
+  (): AppThunk =>
+  (dispatch, getState) => {
+    const deleteMeetingStatus = getState().meetingTimes.deleteMeetingStatus;
+    dispatch(resetDeleteMeetingStatusInternal());
+    if (deleteMeetingStatus === 'succeeded') {
+      // Likewise...
+      dispatch(resetCreatedMeetings());
+      dispatch(resetRespondedMeetings());
+    }
+  };
+
 export const {
   addDay,
   removeDay,
-  setUserAvailabilities,
+  setPeopleInfoAndAvailabilities,
   resetCreateMeetingStatus,
   setScheduledDateTimes,
   unsetScheduledDateTimes,

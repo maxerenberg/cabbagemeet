@@ -8,7 +8,14 @@ import React from "react";
 };
 
 /**
- * A mapping of usernames to ISO 8601 strings (including TZ info).
+ * Each string MUST have the format YYYY-MM-DD
+ */
+export type DateSet = {
+  [date: string]: true,
+};
+
+/**
+ * A mapping of user IDs to ISO 8601 strings (including TZ info).
  * e.g. {'bob': ['2022-09-01T06:00:00Z', '2022-09-01T09:30:00Z']}.
  * Each string MUST be a multiple of 30 minutes.
  * Each string MUST have the format YYYY-MM-DDTHH:mm:ssZ.
@@ -16,11 +23,17 @@ import React from "react";
  * as this adds millisecond information (which we do not need).
  */
 export type PeopleDateTimesFlat = {
-  [person: string]: string[],
+  [userID: string]: string[],
 };
 
 export type PeopleDateTimes = {
-  [person: string]: DateTimeSet
+  [userID: string]: DateTimeSet
+};
+
+export type PeopleInfo = {
+  [userID: string]: {
+    name: string;
+  },
 };
 
 export type Style = React.CSSProperties;

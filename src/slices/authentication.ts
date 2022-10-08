@@ -133,8 +133,8 @@ const initialState: AuthenticationState =
   //   submitLoginFormState: 'idle',
   // }
   {
-    userID: '0',
-    name: 'Max',
+    userID: 'bob123',
+    name: 'Bob',
     submitLogoutState: 'idle',
   }
   ;
@@ -263,6 +263,7 @@ export const authenticationSlice = createSlice({
 export const { setAuthRequestToIdle } = authenticationSlice.actions;
 
 export const selectAuth = (state: RootState) => state.authentication;
+export const selectUserID = (state: RootState) => state.authentication.userID;
 export const selectIsLoggedIn = (state: RootState) => state.authentication.userID !== null;
 export const selectSignupState = createSelector(
   [selectAuth],

@@ -1,5 +1,4 @@
-import React, { useState, useCallback, useEffect } from 'react';
-import type { SerializedError } from '@reduxjs/toolkit';
+import React, { useState, useCallback, useEffect, useMemo } from 'react';
 import BottomOverlay from 'components/BottomOverlay';
 import ButtonSpinnerRight from 'components/ButtonSpinnerRight';
 import NonFocusButton from 'components/NonFocusButton';
@@ -14,12 +13,16 @@ import {
   goBackToEditingSchedule,
   submitSchedule,
   submitUnschedule,
+  goBackToEditingSelf,
+  editSelfAsOther,
 } from 'slices/availabilitiesSelection';
 import { useAppSelector, useAppDispatch } from 'app/hooks';
 import SaveTimesModal from './SaveTimesModal';
 import { useToast } from 'components/Toast';
 import { assertIsNever } from 'utils/misc';
 import { selectMeetingIsScheduled } from 'slices/meetingTimes';
+import { selectUserID } from 'slices/authentication';
+import { addMinutesToDateTimeString, daysOfWeek, months, to12HourClock } from 'utils/dates';
 
 function AvailabilitiesRow({
   moreDaysToRight,
@@ -30,6 +33,19 @@ function AvailabilitiesRow({
 }) {
   const selMode = useAppSelector(selectSelMode);
   const isScheduled = useAppSelector(selectMeetingIsScheduled);
+  const scheduledDateTimes = useAppSelector(state => state.meetingTimes.scheduledDateTimes);
+  const scheduledDateTimeTitle = useMemo(() => {
+    if (scheduledDateTimes === undefined) return null;
+    const scheduledDateTimesFlat = Object.keys(scheduledDateTimes).sort();
+    const startDateTime = scheduledDateTimesFlat[0];
+    let endDateTime = scheduledDateTimesFlat[scheduledDateTimesFlat.length - 1];
+    // Each key of scheduledDateTimes represents the start of a 30-minute interval,
+    // so if we want a fully spanning interval, we need to add 30 min. to endDateTime
+    endDateTime = addMinutesToDateTimeString(endDateTime, 30);
+    return createTitleWithSchedule(startDateTime, endDateTime);
+  }, [scheduledDateTimes]);
+  const peopleInfos = useAppSelector(state => state.meetingTimes.people);
+  const selfUserID = useAppSelector(selectUserID);
   const dispatch = useAppDispatch();
   const { showToast } = useToast();
   const [shouldShowModal, setShouldShowModal] = useState(false);
@@ -41,9 +57,57 @@ function AvailabilitiesRow({
   let onLeftBtnClick: React.MouseEventHandler<HTMLButtonElement> | undefined;
   let leftBtnDisabled = false;
   let title = 'Availabilities';
+  let otherUserName = 'unknown';
+
+  // TODO: write a selector for this
+  if (
+    selMode.type === 'selectedOther'
+    || selMode.type === 'editingOther'
+    || selMode.type === 'submittingOther'
+    || selMode.type === 'submittedOther'
+    || selMode.type === 'rejectedOther'
+  ) {
+    otherUserName = peopleInfos[selMode.otherUserID].name;
+  }
+  if (scheduledDateTimeTitle !== null) {
+    title = scheduledDateTimeTitle;
+  }
+  const selfIsInAvailabilities = selfUserID !== null && peopleInfos.hasOwnProperty(selfUserID);
 
   useEffect(() => {
-    if (selMode.type === 'submittedSchedule') {
+    if (selMode.type === 'submittedSelf') {
+      showToast({
+        msg: 'Availabilities successfully submitted',
+        msgType: 'success',
+        autoClose: true,
+      });
+      dispatch(resetSelection());
+    } else if (selMode.type === 'rejectedSelf') {
+      showToast({
+        msg: `Error updating availabilities: ${selMode.error.message ?? 'unknown'}`,
+        msgType: 'failure',
+      });
+      dispatch(goBackToEditingSelf());
+    } else if (selMode.type === 'submittedOther') {
+      const msg = selfUserID === selMode.otherUserID
+        ? 'Availabilities successfully updated'
+        : `${otherUserName}'s availabilities successfully updated`;
+      showToast({
+        msg,
+        msgType: 'success',
+        autoClose: true,
+      });
+      dispatch(resetSelection());
+    } else if (selMode.type === 'rejectedOther') {
+      const mainMsg = selfUserID === selMode.otherUserID
+       ? 'Error updating availabilities'
+       : `Error updating ${otherUserName}'s availabilities`;
+      showToast({
+        msg: `${mainMsg}: ${selMode.error.message ?? 'unknown'}`,
+        msgType: 'failure',
+      });
+      dispatch(goBackToEditingOther());
+    } else if (selMode.type === 'submittedSchedule') {
       showToast({
         msg: `Schedule successfully submitted`,
         msgType: 'success',
@@ -70,11 +134,16 @@ function AvailabilitiesRow({
       });
       dispatch(resetSelection());
     }
-  }, [selMode, showToast, dispatch]);
+  }, [selMode, selfUserID, otherUserName, showToast, dispatch]);
 
   if (selMode.type === 'none') {
-    rightBtnText = 'Add availability';
-    onRightBtnClick = () => dispatch(editSelf());
+    if (selfIsInAvailabilities) {
+      rightBtnText = 'Edit availability';
+      onRightBtnClick = () => dispatch(editSelfAsOther());
+    } else {
+      rightBtnText = 'Add availability';
+      onRightBtnClick = () => dispatch(editSelf());
+    }
   } else if (selMode.type === 'editingSelf') {
     title = 'Add your availability';
     rightBtnText = 'Continue';
@@ -84,45 +153,34 @@ function AvailabilitiesRow({
       onRightBtnClick = () => setShouldShowModal(true);
     }
   } else if (selMode.type === 'editingOther') {
-    title = `Edit ${selMode.otherUser}'s availability`;
+    if (selfUserID === selMode.otherUserID) {
+      title = 'Edit your availability';
+    } else {
+      title = `Edit ${otherUserName}'s availability`;
+    }
     rightBtnText = 'Next';
     if (moreDaysToRight) {
       onRightBtnClick = () => pageDispatch('inc');
     } else {
-      onRightBtnClick = async () => {
-        try {
-          await dispatch(submitOther());
-        } catch (anyError: any) {
-          const error = anyError as SerializedError;
-          console.error('AvailabilitiesRow: submission failed:', error);
-          showToast({
-            msg: `Error updating ${selMode.otherUser}'s availabilities`,
-            msgType: 'failure',
-          });
-          dispatch(goBackToEditingOther());
-          return;
-        }
-        showToast({
-          msg: `${selMode.otherUser}'s availabilities successfully updated`,
-          msgType: 'success',
-          autoClose: true,
-        });
-        dispatch(resetSelection());
-      };
+      onRightBtnClick = () =>  dispatch(submitOther());
     }
   } else if (selMode.type === 'editingSchedule') {
     title = 'Schedule your meeting';
     rightBtnText = 'Save';
     onRightBtnClick = () => dispatch(submitSchedule());;
   } else if (selMode.type === 'selectedOther') {
-    title = `${selMode.otherUser}'s availability`;
-    rightBtnText = `Edit ${selMode.otherUser}'s availability`;
+    title = `${otherUserName}'s availability`;
+    rightBtnText = `Edit ${otherUserName}'s availability`;
     onRightBtnClick = () => dispatch(editOther());
-  } else if (selMode.type === 'submittingOther') {
-    title = `Edit ${selMode.otherUser}'s availability`;
+  } else if (selMode.type === 'submittingOther' || selMode.type === 'submittedOther' || selMode.type === 'rejectedOther') {
+    if (selfUserID === selMode.otherUserID) {
+      title = 'Edit your availability';
+    } else {
+      title = `Edit ${otherUserName}'s availability`;
+    }
     rightBtnText = 'Next';
     rightBtnDisabled = true;
-  } else if (selMode.type === 'submittingSelf') {
+  } else if (selMode.type === 'submittingSelf' || selMode.type === 'submittedSelf' || selMode.type === 'rejectedSelf') {
     title = 'Add your availability';
     rightBtnText = 'Continue';
     rightBtnDisabled = true;
@@ -138,7 +196,7 @@ function AvailabilitiesRow({
     assertIsNever(selMode);
   }
 
-  if (selMode.type === 'none') {
+  if (selMode.type === 'none' || selMode.type === 'submittingUnschedule' || selMode.type === 'submittedUnschedule' || selMode.type === 'rejectedUnschedule') {
     if (isScheduled) {
       leftBtnText = 'Unschedule';
       onLeftBtnClick = () => dispatch(submitUnschedule());
@@ -164,7 +222,7 @@ function AvailabilitiesRow({
         marginBottom: '2em',
       }}>
         <div style={{fontSize: '1.3em'}}>{title}</div>
-        <div className="d-none d-md-block">
+        <div className="d-none d-md-flex">
           {leftBtnText && (
             <NonFocusButton
               className="btn btn-outline-primary px-0 meeting-avl-button"
@@ -206,3 +264,19 @@ function AvailabilitiesRow({
   );
 }
 export default React.memo(AvailabilitiesRow);
+
+/**
+ * Generates a title of the form e.g. "Sat, Sep 24 from 9:00AM - 10:00AM"
+ * @param startDateTime YYYY-MM-DDTHH:mm:ssZ
+ * @param endDateTime YYYY-MM-DDTHH:mm:ssZ
+ */
+function createTitleWithSchedule(startDateTime: string, endDateTime: string): string {
+  const startDate = new Date(startDateTime);
+  const endDate = new Date(endDateTime);
+  const dayOfWeek = daysOfWeek[startDate.getDay()].substring(0, 3);
+  const month = months[startDate.getMonth()].substring(0, 3);
+  const day = startDate.getDate();
+  const startTime = to12HourClock(startDate.getHours()) + ':' + String(startDate.getMinutes()).padStart(2, '0') + (startDate.getHours() < 12 ? 'AM' : 'PM');
+  const endTime = to12HourClock(endDate.getHours()) + ':' + String(endDate.getMinutes()).padStart(2, '0') + (endDate.getHours() < 12 ? 'AM' : 'PM');
+  return `${dayOfWeek}, ${month} ${day} from ${startTime} - ${endTime}`;
+}

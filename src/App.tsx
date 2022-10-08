@@ -49,14 +49,11 @@ export default function App() {
 function AppRoot() {
   return (
     <div className="App light-theme d-flex flex-column">
-      <Navbar expand="md" className="mt-md-3 mb-md-5">
+      <Navbar expand="md" className="mt-3 mb-5">
         <Container className="app-main-container custom-navbar-container">
-          {/*
-            We intentionally use <a> here to force a reload of the whole page
-            to completely reset the Redux state.
-            FIXME: reset Redux state manually
-          */}
-          <Navbar.Brand href="/">Logo</Navbar.Brand>
+          <LinkContainer to="/">
+            <Navbar.Brand href="/">Logo</Navbar.Brand>
+          </LinkContainer>
           <Navbar.Toggle aria-controls="app-navbar-nav" className="custom-navbar-toggle" />
           {/* TODO: hide offcanvas when link is clicked */}
           <Navbar.Offcanvas
@@ -66,7 +63,7 @@ function AppRoot() {
           >
             <Offcanvas.Header closeButton>
               <Offcanvas.Title id="app-navbar-offcanvas-label">
-                <a href="/">LOGO</a>
+                <Link to="/">LOGO</Link>
               </Offcanvas.Title>
             </Offcanvas.Header>
             <Offcanvas.Body>

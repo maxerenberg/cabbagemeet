@@ -1,7 +1,8 @@
 import { useNavigate, Link } from 'react-router-dom';
 import { useAppDispatch, useAppSelector } from 'app/hooks';
 import BottomOverlay from 'components/BottomOverlay';
-import { setVisitedDayPicker, selectSelectedDates } from 'slices/selectedDates';
+import { selectSelectedDates } from 'slices/selectedDates';
+import { setVisitedDayPicker } from 'slices/visitedDayPicker';
 import './DayPicker.css';
 import Calendar from './Calendar';
 
@@ -12,7 +13,7 @@ export default function DayPicker() {
     state => Object.keys(selectSelectedDates(state)).length > 0
   );
   const onClick = () => {
-    dispatch(setVisitedDayPicker());
+    dispatch(setVisitedDayPicker(true));
     navigate("/create");
   };
 

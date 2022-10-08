@@ -1,17 +1,13 @@
 import { createSlice } from '@reduxjs/toolkit';
 import type { PayloadAction } from '@reduxjs/toolkit';
 import type { RootState } from 'app/store';
+import type { DateSet } from 'common/types';
 import { getDateString, today } from 'utils/dates';
 
 export type SelectedDatesType = {
   // These are the dates which the user has selected from the calendar
   // e.g. { '2022-08-27': true, '2022-08-28': true }
-  dates: {
-    [date: string]: true
-  },
-  // This is true iff the user visited the DayPicker page at least once
-  // (we track this so that we can redirect them if they visit '/create' directly)
-  visitedDayPicker: boolean,
+  dates: DateSet,
 };
 
 const initialState: SelectedDatesType = {
@@ -19,7 +15,6 @@ const initialState: SelectedDatesType = {
   dates: {
     [getDateString(today)]: true,
   },
-  visitedDayPicker: false,
 };
 
 export const selectedDatesSlice = createSlice({
@@ -34,8 +29,11 @@ export const selectedDatesSlice = createSlice({
       const dateString = action.payload;
       delete state.dates[dateString];
     },
-    setVisitedDayPicker: (state) => {
-      state.visitedDayPicker = true;
+    setDates: (state, action: PayloadAction<DateSet>) => {
+      state.dates = action.payload;
+    },
+    reset: (state) => {
+      return initialState;
     },
   }
 });
@@ -43,10 +41,10 @@ export const selectedDatesSlice = createSlice({
 export const {
   addDate,
   removeDate,
-  setVisitedDayPicker,
+  setDates: setSelectedDates,
+  reset: resetSelectedDates,
 } = selectedDatesSlice.actions;
 
 export const selectSelectedDates = (state: RootState) => state.selectedDates.dates;
-export const selectVisitedDayPicker = (state: RootState) => state.selectedDates.visitedDayPicker;
 
 export default selectedDatesSlice.reducer;

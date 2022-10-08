@@ -3,7 +3,7 @@ import { LeftArrow as SVGLeftArrow, RightArrow as SVGRightArrow } from 'componen
 import { range } from 'utils/arrays'
 import {
   addDaysToDateString,
-  daysOfWeek,
+  daysOfWeekAbbr,
   today,
   todayString,
  } from 'utils/dates';
@@ -13,7 +13,7 @@ export default function Calendar() {
   const [page, setPage] = useState(0);
   const firstDateInGridForPage0 = addDaysToDateString(todayString, -today.getDay());
   const firstDateInGrid = addDaysToDateString(firstDateInGridForPage0, 28 * page);
-  
+
   const monthCells = range(28).map((cellIdx) => (
     <CalendarCell
       cellIdx={cellIdx}
@@ -51,7 +51,7 @@ export default function Calendar() {
 const DayOfWeekRow = React.memo(function DayOfWeekRow() {
   return (
     <>
-      {daysOfWeek.map(day => (
+      {daysOfWeekAbbr.map(day => (
         <div key={day} className="daypicker-dayofweek-cell">
           {day}
         </div>

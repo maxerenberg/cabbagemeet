@@ -83,7 +83,7 @@ export function getYearMonthDayFromDateString(date: string): [number, number, nu
 }
 
 export function to12HourClock(n: number) {
-  return (n % 12 === 0) ? 0 : (n % 12);
+  return (n === 0 || n === 12) ? 12 : (n % 12);
 }
 
 export function floorTowardsZero(val: number): number {
@@ -171,7 +171,7 @@ export function getMonthAbbrFromDate(date: Date): string {
 }
 
 export function getDayOfWeekAbbr(date: Date) {
-  return daysOfWeek[date.getDay()];
+  return daysOfWeekAbbr[date.getDay()];
 }
 
 export const months = [
@@ -180,5 +180,7 @@ export const months = [
 ];
 
 export const daysOfWeek = [
-  'SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT',
-];
+  'Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'
+]
+
+export const daysOfWeekAbbr = daysOfWeek.map(day => day.substring(0, 3).toUpperCase());
