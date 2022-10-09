@@ -22,6 +22,7 @@ import MeetingForm from 'components/MeetingForm';
 import Signup from 'components/Signup';
 import Meeting from 'components/availabilities/Meeting';
 import Profile from 'components/Profile';
+import Settings from 'components/Settings';
 import { selectIsLoggedIn } from 'slices/authentication';
 
 export default function App() {
@@ -38,6 +39,7 @@ export default function App() {
           <Route path="forgot-password" element={<ForgotPassword />} />
           <Route path="me">
             <Route index element={<Profile />} />
+            <Route path="settings" element={<Settings />} />
           </Route>
         </Route>
         {/* TODO: use custom 404 page */}

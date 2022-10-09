@@ -51,14 +51,14 @@ function LoginForm() {
   }
 
   useEffect(() => {
-    if (loginState === 'rejected') {
+    if (loginState === 'failed') {
       showToast({
         msg: `An error occurred: ${loginError!.message || 'unknown'}`,
         msgType: 'failure',
       });
       dispatch(setAuthRequestToIdle());
-    } else if (loginState === 'fulfilled') {
-      dispatch(setAuthRequestToIdle());
+    } else if (loginState === 'succeeded') {
+      //dispatch(setAuthRequestToIdle());
       navigate('/');
     }
   }, [loginState, loginError, dispatch, navigate, showToast]);

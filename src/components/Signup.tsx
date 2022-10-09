@@ -52,14 +52,14 @@ function SignupForm() {
   }
 
   useEffect(() => {
-    if (signupState === 'rejected') {
+    if (signupState === 'failed') {
       showToast({
         msg: `An error occurred: ${signupError!.message || 'unknown'}`,
         msgType: 'failure',
       });
       dispatch(setAuthRequestToIdle());
-    } else if (signupState === 'fulfilled') {
-      dispatch(setAuthRequestToIdle());
+    } else if (signupState === 'succeeded') {
+      //dispatch(setAuthRequestToIdle());
       navigate('/');
     }
   }, [signupState, signupError, dispatch, navigate, showToast]);

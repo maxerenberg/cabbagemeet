@@ -47,6 +47,7 @@ export type SubmitAvailabilitiesResponse = {
 export type LoginResponse = {
   name: string;
   userID: string;
+  isSubscribedToNotifications: boolean;
 };
 
 export type SignupResponse = LoginResponse;
@@ -83,6 +84,10 @@ export type EditMeetingResponse = {
 export type DeleteMeetingResponse = {
   status: 'OK';
 };
+
+export type EditNameResponse = { status: 'OK' };
+export type SubscribeToNotificationsResponse = { status: 'OK' };
+export type DeleteAccountResponse = { status: 'OK' };
 
 function isSubmittingAsGuest(args: SubmitAvailabilitiesArgs): args is {
   dateTimes: string[];
@@ -202,6 +207,7 @@ class Client {
           resolve({
             name: 'John Smith',
             userID: nanoid(),
+            isSubscribedToNotifications: true,
           });
         } else {
           reject(new Error('boom!'));
@@ -217,6 +223,7 @@ class Client {
           resolve({
             name: 'John Smith',
             userID: nanoid(),
+            isSubscribedToNotifications: true,
           });
         } else {
           reject(new Error('boom!'));
@@ -238,6 +245,43 @@ class Client {
   }
 
   resetPassword(email: string): Promise<ResetPasswordResponse> {
+    return new Promise((resolve, reject) => {
+      setTimeout(() => {
+        if (true) {
+          resolve({status: 'OK'});
+        } else {
+          reject(new Error('boom!'));
+        }
+      }, 1000);
+    });
+  }
+
+  editName(newName: string): Promise<EditNameResponse> {
+    return new Promise((resolve, reject) => {
+      setTimeout(() => {
+        if (true) {
+          resolve({status: 'OK'});
+        } else {
+          reject(new Error('boom!'));
+        }
+      }, 1000);
+    });
+  }
+
+  subscribeToNotifications(subscribe: boolean): Promise<SubscribeToNotificationsResponse> {
+    return new Promise((resolve, reject) => {
+      setTimeout(() => {
+        if (true) {
+          resolve({status: 'OK'});
+        } else {
+          reject(new Error('boom!'));
+        }
+      }, 1000);
+    });
+  }
+
+  deleteAccount(): Promise<DeleteAccountResponse> {
+    // TODO: clear the saved userID
     return new Promise((resolve, reject) => {
       setTimeout(() => {
         if (true) {

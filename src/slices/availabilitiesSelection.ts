@@ -10,6 +10,7 @@ import {
 } from 'slices/meetingTimes';
 import { assert } from 'utils/misc';
 import { addMinutesToDateTimeString } from 'utils/dates';
+import { selectUserID } from './authentication';
 
 // TODO: place these fields directly into AvailabilitiesSelectionState
 // and get rid of the type predicate functions
@@ -482,7 +483,7 @@ export const editSelfAsOther =
   const rootState = getState();
   const state = selectSelModeAndDateTimes(rootState);
   assert(state.selMode.type === 'none');
-  const selfUserID = rootState.authentication.userID;
+  const selfUserID = selectUserID(rootState);
   assert(selfUserID !== null);
   const selfAvailabilities = rootState.meetingTimes.availabilities[selfUserID];
   assert(selfAvailabilities !== undefined);

@@ -5,7 +5,6 @@
 .close_icon_button {
   border: none;
   background-color: initial;
-  padding: 0.5rem;
   color: var(--custom-secondary);
 }
 

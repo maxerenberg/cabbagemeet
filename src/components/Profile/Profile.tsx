@@ -6,11 +6,12 @@ import BottomOverlay from "components/BottomOverlay";
 import ButtonSpinnerRight from "components/ButtonSpinnerRight";
 import NonFocusButton from "components/NonFocusButton";
 import {
-  selectAuth,
   selectLogoutState,
   selectLogoutError,
   submitLogout,
   setAuthRequestToIdle,
+  selectUserInfo,
+  selectIsLoggedIn,
 } from "slices/authentication";
 import { assert } from 'utils/misc';
 import CreatedOrRespondedMeetings from "./CreatedOrRespondedMeetings";
@@ -18,17 +19,17 @@ import styles from './Profile.module.css';
 import { useToast } from "components/Toast";
 
 export default function Profile() {
-  const auth = useAppSelector(selectAuth);
+  const isLoggedIn = useAppSelector(selectIsLoggedIn);
   const navigate = useNavigate();
   const [seeCreatedMeetings, setSeeCreatedMeetings] = useState(true);
 
   useEffect(() => {
-    if (auth.userID === null) {
+    if (!isLoggedIn) {
       navigate('/');
     }
-  }, [auth.userID, navigate]);
+  }, [isLoggedIn, navigate]);
 
-  if (auth.userID === null) {
+  if (!isLoggedIn) {
     // User is about to be redirected
     return null;
   }
@@ -45,8 +46,8 @@ export default function Profile() {
 };
 
 function Heading() {
-  const auth = useAppSelector(selectAuth);
-  assert(auth.userID !== null);
+  const userInfo = useAppSelector(selectUserInfo);
+  assert(userInfo !== null);
   const dispatch = useAppDispatch();
   const onSignoutClick = () => dispatch(submitLogout());
   const logoutState = useAppSelector(selectLogoutState);
@@ -54,9 +55,9 @@ function Heading() {
   const { showToast } = useToast();
 
   useEffect(() => {
-    if (logoutState === 'fulfilled') {
+    if (logoutState === 'succeeded') {
       dispatch(setAuthRequestToIdle());
-    } else if (logoutState === 'rejected') {
+    } else if (logoutState === 'failed') {
       showToast({
         msg: `Failed to logout: ${logoutError!.message || 'unknown'}`,
         msgType: 'failure',
@@ -65,13 +66,13 @@ function Heading() {
     }
   }, [logoutState, logoutError, dispatch, showToast]);
 
-  const signoutBtnDisabled = logoutState === 'pending';
+  const signoutBtnDisabled = logoutState === 'loading';
   const signoutBtnSpinner = signoutBtnDisabled && <ButtonSpinnerRight />;
 
   return (
     <div className="d-flex align-items-center">
       <h4 className="mb-0">
-        {auth.name}&#39;s meetings
+        {userInfo.name}&#39;s meetings
       </h4>
       <button
         className="d-none d-md-block btn btn-outline-primary px-3 ms-auto"
