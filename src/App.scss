@@ -19,14 +19,14 @@
   }
 }
 
-@include media-breakpoint-only(md) {
+@include media-breakpoint-up(md) {
   .app-main-container {
-    max-width: max(90%, map.get($container-max-widths, "md"));
+    padding: 0;
   }
 }
 
-@include media-breakpoint-up(lg) {
+@include media-breakpoint-only(md) {
   .app-main-container {
-    max-width: map.get($container-max-widths, "lg");
+    max-width: max(90%, map.get($container-max-widths, "md"));
   }
 }

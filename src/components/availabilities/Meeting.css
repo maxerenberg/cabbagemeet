@@ -38,22 +38,40 @@
   border: 2px dashed black;
 }
 
+.weeklyview__bodycell_scheduled_inner {
+  width: 80%;
+  height: 100%;
+  margin: 0 auto;
+  overflow: hidden;
+  background-color: var(--custom-scheduled-cell-color);
+  color: white;
+  padding-left: 0.7em;
+  font-size: 0.7em;
+  display: flex;
+  align-items: center;
+}
+
+/* media-breakpoint-up(lg) */
+@media (min-width: 992px) {
+  .weeklyview__bodycell_scheduled_inner {
+    font-size: 0.8em;
+  }
+}
+
 .weeklyview-grid {
   text-align: right;
 }
 
-.weeklyview-grid > div {
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-}
-
 .weeklyview__hourcell {
   padding-right: 0.5em;
+  font-size: 0.9em;
 }
 
 .weeklyview__colheadercell {
+  display: flex;
+  flex-direction: column;
   align-items: center;
+  justify-content: center;
 }
 
 .weeklyview-grid__monthtext {
@@ -62,6 +80,8 @@
   font-size: 1.4em;
   height: 2em;
   margin-bottom: 1em;
+  display: flex;
+  align-items: center;
 }
 
 .respondents-container {

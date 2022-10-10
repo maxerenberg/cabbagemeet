@@ -165,6 +165,10 @@ function MeetingGridBodyCells({
     return rows;
   }, [numRows, numCols, dateStrings, startHour]);
   const scheduleSet = useAppSelector(selectScheduledDateTimes);
+  const earliestScheduledDateTime = useMemo(() => {
+    const dateTimes = Object.keys(scheduleSet);
+    return dateTimes.length > 0 ? dateTimes.sort()[0] : null;
+  }, [scheduleSet]);
   const selMode = useAppSelector(selectSelMode);
   const hoverUser = useAppSelector(selectHoverUser);
   const somebodyIsHovered = hoverUser !== null;
@@ -175,6 +179,7 @@ function MeetingGridBodyCells({
         gridCoords.map(([colIdx, rowIdx], i) => {
           const dateTime = dateTimes[rowIdx][colIdx];
           const isScheduled = scheduleSet[dateTime];
+          const isEarliestScheduled = dateTime === earliestScheduledDateTime;
           const hoverUserIsAvailableAtThisTime = somebodyIsHovered && availabilities[hoverUser][dateTime];
           const selectedUserIsAvailableAtThisTime = selMode.type === 'selectedOther' && availabilities[selMode.otherUserID][dateTime];
           const numPeopleAvailableAtThisTime = dateTimePeople[dateTime]?.length ?? 0;
@@ -185,6 +190,7 @@ function MeetingGridBodyCells({
               colIdx,
               dateTime,
               isScheduled,
+              isEarliestScheduled,
               somebodyIsHovered,
               hoverUserIsAvailableAtThisTime,
               selectedUserIsAvailableAtThisTime,
@@ -205,6 +211,7 @@ const Cell = React.memo(function Cell({
   cellIdx,
   dateTime,
   isScheduled,
+  isEarliestScheduled,
   somebodyIsHovered,
   hoverUserIsAvailableAtThisTime,
   selectedUserIsAvailableAtThisTime,
@@ -216,6 +223,7 @@ const Cell = React.memo(function Cell({
   cellIdx: number,
   dateTime: string,
   isScheduled: boolean,
+  isEarliestScheduled: boolean,
   somebodyIsHovered: boolean,
   hoverUserIsAvailableAtThisTime: boolean,
   selectedUserIsAvailableAtThisTime: boolean,
@@ -307,10 +315,6 @@ const Cell = React.memo(function Cell({
       rgb = 'var(--custom-primary-rgb)';
       alpha = Math.round(100 * (0.2 + 0.8 * (numPeopleAvailableAtThisTime / totalPeople))) + '%';
     }
-    if (isScheduled) {
-      // TODO: only partially cover the cell
-      rgb = 'var(--custom-scheduled-cell-rgb)';
-    }
   } else {
     assertIsNever(selMode);
   }
@@ -352,6 +356,11 @@ const Cell = React.memo(function Cell({
       onMouseLeave={onMouseLeave}
       onMouseDown={onMouseDown}
     >
+      {isScheduled && (
+        <div className="weeklyview__bodycell_scheduled_inner">
+          {isEarliestScheduled && 'SCHEDULED'}
+        </div>
+      )}
     </div>
   );
 });

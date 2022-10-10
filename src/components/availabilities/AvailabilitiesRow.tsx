@@ -13,7 +13,6 @@ import {
   goBackToEditingSchedule,
   submitSchedule,
   submitUnschedule,
-  goBackToEditingSelf,
   editSelfAsOther,
 } from 'slices/availabilitiesSelection';
 import { useAppSelector, useAppDispatch } from 'app/hooks';
