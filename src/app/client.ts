@@ -4,6 +4,12 @@ import { getDateString, addDaysToDateString, today } from 'utils/dates';
 import { assert } from 'utils/misc';
 import type { PeopleDateTimesFlat, PeopleInfo } from 'common/types';
 
+export type ExternalCalendarEvent = {
+  name: string;
+  startDateTime: string;
+  endDateTime: string;
+};
+
 export type ServerMeeting = {
   id: string,
   name: string,
@@ -16,6 +22,7 @@ export type ServerMeeting = {
   people: PeopleInfo,
   scheduledStartTime?: string,  // YYYY-MM-DDTHH:MM:ssZ
   scheduledEndTime?: string,    // YYYY-MM-DDTHH:MM:ssZ
+  googleCalendarEvents?: ExternalCalendarEvent[],
 };
 
 export type ServerMeetingShort = {
@@ -48,6 +55,7 @@ export type SubmitAvailabilitiesResponse = {
 export type LoginResponse = {
   name: string;
   userID: string;
+  hasLinkedGoogleAccount: boolean;
   isSubscribedToNotifications: boolean;
 };
 
@@ -89,6 +97,7 @@ export type DeleteMeetingResponse = {
 export type EditNameResponse = { status: 'OK' };
 export type SubscribeToNotificationsResponse = { status: 'OK' };
 export type DeleteAccountResponse = { status: 'OK' };
+export type UnlinkGoogleCalendarResponse = { status: 'OK' };
 
 function isSubmittingAsGuest(args: SubmitAvailabilitiesArgs): args is {
   dateTimes: string[];
@@ -109,14 +118,20 @@ const sampleMeeting: ServerMeeting = {
   availabilities: {
     'bob123': [`${dateString2}T02:00:00Z`, `${dateString2}T02:30:00Z`],
   },
+  googleCalendarEvents: [
+    {
+      name: 'Event 1',
+      startDateTime: `${dateString2}T01:30:00Z`,
+      endDateTime: `${dateString2}T02:30:00Z`,
+    },
+  ],
   people: {
     'bob123': {name: 'Bob'},
   },
-  // TODO: test fractional time
   startTime: 23.5,
   endTime: 6,
-  scheduledStartTime: `${dateString2}T03:30:00Z`,
-  scheduledEndTime: `${dateString2}T04:30:00Z`,
+  scheduledStartTime: `${dateString2}T02:30:00Z`,
+  scheduledEndTime: `${dateString2}T03:30:00Z`,
 };
 
 class Client {
@@ -229,6 +244,7 @@ class Client {
           resolve({
             name: 'John Smith',
             userID: nanoid(),
+            hasLinkedGoogleAccount: false,
             isSubscribedToNotifications: true,
           });
         } else {
@@ -245,6 +261,7 @@ class Client {
           resolve({
             name: 'John Smith',
             userID: nanoid(),
+            hasLinkedGoogleAccount: false,
             isSubscribedToNotifications: true,
           });
         } else {
@@ -291,6 +308,18 @@ class Client {
   }
 
   subscribeToNotifications(subscribe: boolean): Promise<SubscribeToNotificationsResponse> {
+    return new Promise((resolve, reject) => {
+      setTimeout(() => {
+        if (true) {
+          resolve({status: 'OK'});
+        } else {
+          reject(new Error('boom!'));
+        }
+      }, 1000);
+    });
+  }
+
+  unlinkGoogleCalendar(): Promise<UnlinkGoogleCalendarResponse> {
     return new Promise((resolve, reject) => {
       setTimeout(() => {
         if (true) {

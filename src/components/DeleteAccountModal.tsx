@@ -25,8 +25,8 @@ export default function DeleteAccountModal({onClose}: {onClose: () => void}) {
         autoClose: true,
       });
       dispatch(resetDeleteAccountStatus());
-      // The user will automatically get redirected to / when the userInfo
-      // is deleted from the Redux store (see Settings.tsx)
+      // The user will automatically get redirected to the homepage when the
+      // userInfo is deleted from the Redux store (see Settings.tsx)
     } else if (deleteAccountStatus === 'failed') {
       showToast({
         msg: `Failed to delete account: ${error?.message ?? 'unknown'}`,

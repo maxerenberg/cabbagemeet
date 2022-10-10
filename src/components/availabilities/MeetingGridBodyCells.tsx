@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React, { ReactElement, useMemo } from 'react';
 import { useAppSelector, useAppDispatch } from 'app/hooks';
 import type { PeopleDateTimes, Style } from 'common/types';
 import {
@@ -19,7 +19,8 @@ import { flatGridCoords } from 'utils/arrays';
 import { addDaysToDateString, customToISOString } from 'utils/dates';
 import { assertIsNever } from 'utils/misc';
 import { useEffect } from 'react';
-import { selectScheduledDateTimes } from 'slices/meetingTimes';
+import { selectMeetingIsScheduled, selectScheduledDateTimes } from 'slices/meetingTimes';
+import { ExternalCalendarEvent } from 'app/client';
 
 // TODO: deal with decimal start/end times
 
@@ -145,8 +146,8 @@ function MeetingGridBodyCells({
     const rows: string[][] = [];
     for (let rowIdx = 0; rowIdx < numRows; rowIdx++) {
       const row: string[] = [];
+      const hour = (startHour + Math.floor(rowIdx / 2)) % 24;
       for (let colIdx = 0; colIdx < numCols; colIdx++) {
-        const hour = (startHour + Math.floor(rowIdx / 2)) % 24;
         let date = dateStrings[colIdx];
         if (hour < startHour) {
           // This can happen if [startTime, endTime) spans midnight, e.g.
@@ -165,6 +166,30 @@ function MeetingGridBodyCells({
     return rows;
   }, [numRows, numCols, dateStrings, startHour]);
   const scheduleSet = useAppSelector(selectScheduledDateTimes);
+  const externalEvents = useAppSelector(state => state.meetingTimes.externalCalendarEvents);
+  // Take the first event of each dateTime, and take the first dateTime of each event
+  const dateTimesToExternalEventInfo = useMemo(() => {
+    const result: {
+      [dateTime: string]: {
+        eventName: string;
+        isStartOfEvent: boolean;
+      }
+    } = {};
+    if (externalEvents === undefined) {
+      return result;
+    }
+    for (const {name, dateTimes} of externalEvents) {
+      for (const dateTime of dateTimes) {
+        if (!result.hasOwnProperty(dateTime)) {
+          result[dateTime] = {
+            eventName: name,
+            isStartOfEvent: dateTime === dateTimes[0]
+          };
+        }
+      }
+    }
+    return result;
+  }, [externalEvents]);
   const earliestScheduledDateTime = useMemo(() => {
     const dateTimes = Object.keys(scheduleSet);
     return dateTimes.length > 0 ? dateTimes.sort()[0] : null;
@@ -180,6 +205,8 @@ function MeetingGridBodyCells({
           const dateTime = dateTimes[rowIdx][colIdx];
           const isScheduled = scheduleSet[dateTime];
           const isEarliestScheduled = dateTime === earliestScheduledDateTime;
+          const externalEventName = dateTimesToExternalEventInfo[dateTime]?.eventName;
+          const isFirstDateTimeOfExternalEvent = dateTimesToExternalEventInfo[dateTime]?.isStartOfEvent ?? false;
           const hoverUserIsAvailableAtThisTime = somebodyIsHovered && availabilities[hoverUser][dateTime];
           const selectedUserIsAvailableAtThisTime = selMode.type === 'selectedOther' && availabilities[selMode.otherUserID][dateTime];
           const numPeopleAvailableAtThisTime = dateTimePeople[dateTime]?.length ?? 0;
@@ -191,6 +218,8 @@ function MeetingGridBodyCells({
               dateTime,
               isScheduled,
               isEarliestScheduled,
+              externalEventName,
+              isFirstDateTimeOfExternalEvent,
               somebodyIsHovered,
               hoverUserIsAvailableAtThisTime,
               selectedUserIsAvailableAtThisTime,
@@ -212,6 +241,8 @@ const Cell = React.memo(function Cell({
   dateTime,
   isScheduled,
   isEarliestScheduled,
+  externalEventName,
+  isFirstDateTimeOfExternalEvent,
   somebodyIsHovered,
   hoverUserIsAvailableAtThisTime,
   selectedUserIsAvailableAtThisTime,
@@ -224,6 +255,8 @@ const Cell = React.memo(function Cell({
   dateTime: string,
   isScheduled: boolean,
   isEarliestScheduled: boolean,
+  externalEventName: string | undefined,
+  isFirstDateTimeOfExternalEvent: boolean,
   somebodyIsHovered: boolean,
   hoverUserIsAvailableAtThisTime: boolean,
   selectedUserIsAvailableAtThisTime: boolean,
@@ -232,6 +265,7 @@ const Cell = React.memo(function Cell({
 }) {
   const selMode = useAppSelector(selectSelMode);
   const isSelected = useAppSelector(state => !!selectSelectedTimes(state)[dateTime]);
+  const meetingIsScheduled = useAppSelector(selectMeetingIsScheduled);
   const mouseStateType = useAppSelector((state) => selectMouseState(state)?.type);
   const isInMouseSelectionArea = useAppSelector((state) => {
     const mouseState = selectMouseState(state);
@@ -319,13 +353,57 @@ const Cell = React.memo(function Cell({
     assertIsNever(selMode);
   }
 
+  let externalEventBox: ReactElement<HTMLDivElement> | undefined;
+  // FIXME: this is getting too complicated
+  if (
+    (
+      selMode.type === 'editingSelf'
+      || selMode.type === 'submittingSelf'
+      || selMode.type === 'submittedSelf'
+      || selMode.type === 'rejectedSelf'
+      || selMode.type === 'editingOther'
+      || selMode.type === 'submittingOther'
+      || selMode.type === 'submittedOther'
+      || selMode.type === 'rejectedOther'
+    )
+    && externalEventName !== undefined
+    && !meetingIsScheduled
+  ) {
+    externalEventBox = (
+      <div className="weeklyview__bodycell_external_event">
+        {isFirstDateTimeOfExternalEvent && externalEventName}
+      </div>
+    );
+  }
+
+  let scheduledTimeBox: ReactElement<HTMLDivElement> | undefined;
+  if (
+    (
+      selMode.type === 'none'
+      || selMode.type === 'submittingUnschedule'
+      || selMode.type === 'submittedUnschedule'
+      || selMode.type === 'rejectedUnschedule'
+    )
+    && isScheduled
+  ) {
+    scheduledTimeBox = (
+      <div className="weeklyview__bodycell_scheduled_inner">
+        {isEarliestScheduled && 'SCHEDULED'}
+      </div>
+    );
+  }
+
   if (rgb !== undefined) {
     style.backgroundColor = `rgba(${rgb}, ${alpha})`;
   }
   let onMouseEnter: React.MouseEventHandler | undefined;
   let onMouseLeave: React.MouseEventHandler | undefined;
   let onMouseDown: React.MouseEventHandler | undefined;
-  if (selMode.type === 'editingSelf' || selMode.type === 'editingOther' || selMode.type === 'editingSchedule') {
+  if (
+    selMode.type === 'editingSelf'
+    || selMode.type === 'editingOther'
+    || selMode.type === 'editingSchedule'
+  ) {
     if (mouseStateType === 'upNoCellsSelected') {
       onMouseDown = () => dispatch(notifyMouseDown({cell: {rowIdx, colIdx}, wasOriginallySelected: isSelected}));
     } else if (mouseStateType === 'down') {
@@ -356,11 +434,9 @@ const Cell = React.memo(function Cell({
       onMouseLeave={onMouseLeave}
       onMouseDown={onMouseDown}
     >
-      {isScheduled && (
-        <div className="weeklyview__bodycell_scheduled_inner">
-          {isEarliestScheduled && 'SCHEDULED'}
-        </div>
-      )}
+      {/* at most of one of these will be shown */}
+      {scheduledTimeBox}
+      {externalEventBox}
     </div>
   );
 });

@@ -2,13 +2,25 @@
 export const today = new Date();
 export const todayString = getDateString(today);
 // from https://stackoverflow.com/a/34405528
+// TODO: what should we show when there are two dates displayed
+// with different time zones (due to Daylight Savings Time)?
 export const tzAbbr = today.toLocaleTimeString('en-us', {timeZoneName: 'short'}).split(' ')[2];
+
+// !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+// TODO: test Daylight Savings Time
+// !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
 // This is the offset from UTC time for the local time. For example, if the local
 // timezone is EDT, then this would be -4.
 // This value is not necessarily an integer, but it will be multiple of 0.5.
 // This value must be SUBTRACTED from the local time to obtain a UTC time.
 // This value must be ADDED to UTC time to obtain a local time.
-export const UTCOffsetHours = -(today.getTimezoneOffset() / 60);
+export function getUTCOffsetHours(date: Date | string): number {
+  if (typeof date === 'string') {
+    date = getDateFromString(date);
+  }
+  return -(date.getTimezoneOffset() / 60);
+}
 
 /**
  * Returns date in YYYY-MM-DD format

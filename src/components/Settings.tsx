@@ -1,8 +1,9 @@
-import { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import Form from 'react-bootstrap/Form';
 import { useNavigate } from "react-router-dom";
 import { useAppDispatch, useAppSelector } from "app/hooks";
 import ButtonSpinnerRight from "components/ButtonSpinnerRight";
+import NonFocusButton from "components/NonFocusButton";
 import DeleteAccountModal from "./DeleteAccountModal";
 import {
   editName,
@@ -15,6 +16,10 @@ import {
   selectUserInfo,
   subscribeToNotifications,
   resetSubscribeToNotificationsStatus,
+  unlinkGoogleCalendar,
+  selectUnlinkGoogleCalendarState,
+  selectUnlinkGoogleCalendarError,
+  resetUnlinkGoogleCalendarStatus,
 } from "slices/authentication";
 import { assert } from "utils/misc";
 import { useToast } from "./Toast";
@@ -133,6 +138,31 @@ function GeneralSettings() {
 }
 
 function LinkedAccounts() {
+  const userInfo = useAppSelector(selectUserInfo);
+  assert(userInfo !== null);
+  const unlinkGoogleCalendarState = useAppSelector(selectUnlinkGoogleCalendarState);
+  const unlinkGoogleCalendarError = useAppSelector(selectUnlinkGoogleCalendarError);
+  const dispatch = useAppDispatch();
+  const {showToast} = useToast();
+  useEffect(() => {
+    if (unlinkGoogleCalendarState === 'succeeded') {
+      dispatch(resetUnlinkGoogleCalendarStatus());
+    } else if (unlinkGoogleCalendarState === 'failed') {
+      showToast({
+        msg: `Failed to unlink Google account: ${unlinkGoogleCalendarError?.message ?? 'unknown'}`,
+        msgType: 'failure',
+      });
+      dispatch(resetUnlinkGoogleCalendarStatus());
+    }
+  }, [unlinkGoogleCalendarState, unlinkGoogleCalendarError, dispatch, showToast]);
+  const hasLinkedGoogleAccount = userInfo.hasLinkedGoogleAccount;
+  const buttonVariant = hasLinkedGoogleAccount ? 'secondary' : 'primary';
+  let onClick: React.MouseEventHandler<HTMLButtonElement> | undefined;
+  if (hasLinkedGoogleAccount) {
+    onClick = () => dispatch(unlinkGoogleCalendar());
+  }
+  const isLoading = unlinkGoogleCalendarState === 'loading';
+  const spinner = isLoading && <ButtonSpinnerRight />;
   return (
     <div>
       <h4>Linked Accounts</h4>
@@ -149,13 +179,14 @@ function LinkedAccounts() {
           </small>
         </div>
         <div className="flex-md-shrink-0">
-          <button
+          <NonFocusButton
             type="button"
             style={{minWidth: 'max-content'}}
-            className="btn btn-outline-primary w-100 w-md-auto mt-3 mt-md-0"
+            className={`btn btn-outline-${buttonVariant} w-100 w-md-auto mt-3 mt-md-0`}
+            onClick={onClick}
           >
-            Link Google Calendar
-          </button>
+            {hasLinkedGoogleAccount ? 'Unlink' : 'Link'} Google Calendar {spinner}
+          </NonFocusButton>
         </div>
       </div>
     </div>
@@ -212,7 +243,7 @@ function NotificationSettings() {
           </p>
         </div>
         <div className="flex-md-shrink-0">
-          <button
+          <NonFocusButton
             type="button"
             style={{minWidth: 'max-content'}}
             className="btn btn-outline-primary w-100 w-md-auto mt-3 mt-md-0"
@@ -221,7 +252,7 @@ function NotificationSettings() {
           >
             {isSubscribed ? 'Unsubscribe from updates' : 'Subscribe to updates'}
             {spinner}
-          </button>
+          </NonFocusButton>
         </div>
       </div>
     </div>
@@ -244,14 +275,14 @@ function AccountSettings() {
           </p>
         </div>
         <div className="flex-md-shrink-0">
-          <button
+          <NonFocusButton
             type="button"
             style={{minWidth: 'max-content'}}
             className="btn btn-outline-danger px-4 w-100 w-md-auto mt-3 mt-md-0"
             onClick={onDeleteClick}
           >
             Delete
-          </button>
+          </NonFocusButton>
         </div>
       </div>
       {showModal && <DeleteAccountModal onClose={onClose} />}

@@ -46,7 +46,7 @@ function MeetingRespondents() {
     ? Object.keys(dateTimePeople[hoverDateTime]).length
     : 0;
   return (
-    <div className="respondents-container">
+    <div className="respondents-container flex-md-shrink-0">
       <div style={{
         marginTop: '1em',
         marginBottom: '2em',

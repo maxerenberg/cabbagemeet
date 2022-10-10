@@ -1,6 +1,6 @@
 import { createAsyncThunk, createSlice } from '@reduxjs/toolkit';
 import type { SerializedError } from '@reduxjs/toolkit';
-import client, { DeleteAccountResponse, LogoutResponse, SubscribeToNotificationsResponse } from 'app/client';
+import client, { DeleteAccountResponse, LogoutResponse, SubscribeToNotificationsResponse, UnlinkGoogleCalendarResponse } from 'app/client';
 import type { SignupResponse, LoginResponse, EditNameResponse } from 'app/client';
 import type { RootState } from 'app/store';
 import { assert } from 'utils/misc';
@@ -9,6 +9,7 @@ import { RequestStatus } from 'common/types';
 type UserInfo = {
   userID: string;
   name: string;
+  hasLinkedGoogleAccount: boolean;
   isSubscribedToNotifications: boolean;
 };
 
@@ -24,6 +25,8 @@ export type AuthenticationState = {
   editNameError: SerializedError | null;
   subscribeToNotificationsState: RequestStatus;
   subscribeToNotificationsError: SerializedError | null;
+  unlinkGoogleCalendarState: RequestStatus;
+  unlinkGoogleCalendarError: SerializedError | null;
   deleteAccountState: RequestStatus;
   deleteAccountError: SerializedError | null;
 };
@@ -31,8 +34,15 @@ export type AuthenticationState = {
 // TODO: get token (JWT?) from server, store it in LocalStorage
 const initialState: AuthenticationState =
   {
-    userInfo: null,
-    loginState: 'idle',
+    // userInfo: null,
+    // loginState: 'idle',
+    userInfo: {
+      userID: 'bob123',
+      name: 'Bob',
+      hasLinkedGoogleAccount: true,
+      isSubscribedToNotifications: true,
+    },
+    loginState: 'succeeded',
     loginError: null,
     signupState: 'idle',
     signupError: null,
@@ -42,28 +52,11 @@ const initialState: AuthenticationState =
     editNameError: null,
     subscribeToNotificationsState: 'idle',
     subscribeToNotificationsError: null,
+    unlinkGoogleCalendarState: 'idle',
+    unlinkGoogleCalendarError: null,
     deleteAccountState: 'idle',
     deleteAccountError: null,
   }
-  // {
-  //   userInfo: {
-  //     userID: 'bob123',
-  //     name: 'Bob',
-  //     isSubscribedToNotifications: true,
-  //   },
-  //   loginState: 'succeeded',
-  //   loginError: null,
-  //   signupState: 'idle',
-  //   signupError: null,
-  //   logoutState: 'idle',
-  //   logoutError: null,
-  //   editNameState: 'idle',
-  //   editNameError: null,
-  //   subscribeToNotificationsState: 'idle',
-  //   subscribeToNotificationsError: null,
-  //   deleteAccountState: 'idle',
-  //   deleteAccountError: null,
-  // }
   ;
 
 type signupInfo = {
@@ -107,6 +100,11 @@ export const deleteAccount = createAsyncThunk<DeleteAccountResponse>(
   () => client.deleteAccount()
 );
 
+export const unlinkGoogleCalendar = createAsyncThunk<UnlinkGoogleCalendarResponse>(
+  'authentication/unlinkGoogleCalendar',
+  () => client.unlinkGoogleCalendar()
+);
+
 export const authenticationSlice = createSlice({
   name: 'authentication',
   initialState: initialState as AuthenticationState,  // needed to prevent type narrowing
@@ -138,6 +136,10 @@ export const authenticationSlice = createSlice({
       state.subscribeToNotificationsState = 'idle';
       state.subscribeToNotificationsError = null;
     },
+    resetUnlinkGoogleCalendarStatus: (state) => {
+      state.unlinkGoogleCalendarState = 'idle';
+      state.unlinkGoogleCalendarError = null;
+    },
     resetDeleteAccountStatus: (state) => {
       if (state.deleteAccountState === 'succeeded') {
         state.deleteAccountState = 'idle';
@@ -161,6 +163,7 @@ export const authenticationSlice = createSlice({
         state.userInfo = {
           userID: payload.userID,
           name: payload.name,
+          hasLinkedGoogleAccount: payload.hasLinkedGoogleAccount,
           isSubscribedToNotifications: payload.isSubscribedToNotifications
         };
         state.signupState = 'succeeded';
@@ -176,6 +179,7 @@ export const authenticationSlice = createSlice({
         state.userInfo = {
           userID: payload.userID,
           name: payload.name,
+          hasLinkedGoogleAccount: payload.hasLinkedGoogleAccount,
           isSubscribedToNotifications: payload.isSubscribedToNotifications
         };
         state.loginState = 'succeeded';
@@ -218,6 +222,18 @@ export const authenticationSlice = createSlice({
         state.subscribeToNotificationsState = 'failed';
         state.subscribeToNotificationsError = action.error;
       })
+      .addCase(unlinkGoogleCalendar.pending, (state) => {
+        state.unlinkGoogleCalendarState = 'loading';
+      })
+      .addCase(unlinkGoogleCalendar.fulfilled, (state) => {
+        assert(state.userInfo !== null);
+        state.unlinkGoogleCalendarState = 'succeeded';
+        state.userInfo.hasLinkedGoogleAccount = false;
+      })
+      .addCase(unlinkGoogleCalendar.rejected, (state, action) => {
+        state.unlinkGoogleCalendarState = 'failed';
+        state.unlinkGoogleCalendarError = action.error;
+      })
       .addCase(deleteAccount.pending, (state) => {
         state.deleteAccountState = 'loading';
       })
@@ -235,6 +251,7 @@ export const {
   setAuthRequestToIdle,
   resetEditNameStatus,
   resetSubscribeToNotificationsStatus,
+  resetUnlinkGoogleCalendarStatus,
   resetDeleteAccountStatus,
 } = authenticationSlice.actions;
 
@@ -254,5 +271,7 @@ export const selectSubscribeToNotificationsState = (state: RootState) => state.a
 export const selectSubscribeToNotificationsError = (state: RootState) => state.authentication.subscribeToNotificationsError;
 export const selectDeleteAccountState = (state: RootState) => state.authentication.deleteAccountState;
 export const selectDeleteAccountError = (state: RootState) => state.authentication.deleteAccountError;
+export const selectUnlinkGoogleCalendarState = (state: RootState) => state.authentication.unlinkGoogleCalendarState;
+export const selectUnlinkGoogleCalendarError = (state: RootState) => state.authentication.unlinkGoogleCalendarError;
 
 export default authenticationSlice.reducer;

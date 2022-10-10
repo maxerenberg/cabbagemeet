@@ -155,8 +155,13 @@ function AvailabilitiesRow({
     rightBtnText = 'Save';
     onRightBtnClick = () => dispatch(submitSchedule());;
   } else if (selMode.type === 'selectedOther') {
-    title = `${otherUserName}'s availability`;
-    rightBtnText = `Edit ${otherUserName}'s availability`;
+    if (selfUserID === selMode.otherUserID) {
+      title = 'Your availability';
+      rightBtnText = 'Edit availability';
+    } else {
+      title = `${otherUserName}'s availability`;
+      rightBtnText = `Edit ${otherUserName}'s availability`;
+    }
     onRightBtnClick = () => dispatch(editOther());
   } else if (selMode.type === 'submittingOther' || selMode.type === 'submittedOther' || selMode.type === 'rejectedOther') {
     if (selfUserID === selMode.otherUserID) {
@@ -211,7 +216,7 @@ function AvailabilitiesRow({
         <div className="d-none d-md-flex">
           {leftBtnText && (
             <NonFocusButton
-              className="btn btn-outline-primary px-0 meeting-avl-button"
+              className="btn btn-outline-primary px-3 meeting-avl-button"
               onClick={onLeftBtnClick}
               disabled={leftBtnDisabled}
             >
@@ -219,7 +224,7 @@ function AvailabilitiesRow({
             </NonFocusButton>
           )}
           <NonFocusButton
-            className="btn btn-primary ms-4 px-0 meeting-avl-button"
+            className="btn btn-primary ms-4 px-3 meeting-avl-button"
             disabled={rightBtnDisabled}
             onClick={onRightBtnClick}
           >

@@ -3,6 +3,7 @@
   --bs-secondary-rgb: var(--custom-secondary-rgb);
 
   --custom-scheduled-cell-color: violet;
+  --custom-scheduled-cell-rgb: 238, 130, 238;
 }
 
 /* Custom colors */

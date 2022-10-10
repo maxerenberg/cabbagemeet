@@ -3,7 +3,7 @@ import type { SerializedError } from '@reduxjs/toolkit';
 import type { ServerMeetingShort } from 'app/client';
 import client from "app/client";
 import type { RootState } from "app/store";
-import { addOffsetToDateTimes, UTCOffsetHours } from "utils/dates";
+import { addOffsetToDateTimes, getUTCOffsetHours } from "utils/dates";
 
 export type MeetingShortInfo = {
   id: string;
@@ -68,7 +68,13 @@ export const createdMeetingsSlice = createSlice({
                 endTime: serverMeeting.endTime,
                 dates: serverMeeting.dates ?? [],
               },
-              UTCOffsetHours
+              // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+              // TODO: what happens if the TZ on dates[1] is different from the TZ
+              // on dates[0] (due to Daylight Savings Time)?
+              // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+              (serverMeeting.dates
+                ? getUTCOffsetHours(serverMeeting.dates[0])
+                : getUTCOffsetHours(serverMeeting.scheduledDay!))
             );
             return {
               id: serverMeeting.id,

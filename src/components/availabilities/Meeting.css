@@ -42,9 +42,20 @@
   width: 80%;
   height: 100%;
   margin: 0 auto;
-  overflow: hidden;
-  background-color: var(--custom-scheduled-cell-color);
   color: white;
+  background-color: var(--custom-scheduled-cell-color);
+}
+
+.weeklyview__bodycell_external_event {
+  width: 100%;
+  /* TODO: choose a text color with good contrast */
+  background-color: rgba(var(--custom-scheduled-cell-rgb), 70%);
+}
+
+.weeklyview__bodycell_scheduled_inner,
+.weeklyview__bodycell_external_event {
+  height: 100%;
+  overflow: hidden;
   padding-left: 0.7em;
   font-size: 0.7em;
   display: flex;
@@ -86,7 +97,7 @@
 
 .respondents-container {
   margin-top: 4em;
-  margin-left: 2em;
+  margin-left: 1em;
   min-width: 10em;
 }
 
