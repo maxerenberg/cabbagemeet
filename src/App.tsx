@@ -93,7 +93,6 @@ function HeaderLinks() {
     },
   ];
   if (isLoggedIn) {
-    links.push({to: '/me/notifications', desc: 'Notifications'});
     links.push({to: '/me', desc: 'Profile'});
   } else {
     links.push({to: '/signup', desc: 'Sign up'});

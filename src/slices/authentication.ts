@@ -30,28 +30,9 @@ export type AuthenticationState = {
 
 // TODO: get token (JWT?) from server, store it in LocalStorage
 const initialState: AuthenticationState =
-  // {
-  //   userInfo: null,
-  //   loginState: 'idle',
-  //   loginError: null,
-  //   signupState: 'idle',
-  //   signupError: null,
-  //   logoutState: 'idle',
-  //   logoutError: null,
-  //   editNameState: 'idle',
-  //   editNameError: null,
-  //   subscribeToNotificationsState: 'idle',
-  //   subscribeToNotificationsError: null,
-  //   deleteAccountState: 'idle',
-  //   deleteAccountError: null,
-  // }
   {
-    userInfo: {
-      userID: 'bob123',
-      name: 'Bob',
-      isSubscribedToNotifications: true,
-    },
-    loginState: 'succeeded',
+    userInfo: null,
+    loginState: 'idle',
     loginError: null,
     signupState: 'idle',
     signupError: null,
@@ -64,6 +45,25 @@ const initialState: AuthenticationState =
     deleteAccountState: 'idle',
     deleteAccountError: null,
   }
+  // {
+  //   userInfo: {
+  //     userID: 'bob123',
+  //     name: 'Bob',
+  //     isSubscribedToNotifications: true,
+  //   },
+  //   loginState: 'succeeded',
+  //   loginError: null,
+  //   signupState: 'idle',
+  //   signupError: null,
+  //   logoutState: 'idle',
+  //   logoutError: null,
+  //   editNameState: 'idle',
+  //   editNameError: null,
+  //   subscribeToNotificationsState: 'idle',
+  //   subscribeToNotificationsError: null,
+  //   deleteAccountState: 'idle',
+  //   deleteAccountError: null,
+  // }
   ;
 
 type signupInfo = {

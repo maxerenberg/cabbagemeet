@@ -14,9 +14,9 @@ import { useToast } from 'components/Toast';
 import './SaveTimesModal.css';
 
 function SaveTimesModal({
-  closeModal,
+  onClose,
 }: {
-  closeModal: () => void,
+  onClose: () => void,
 }) {
   const dispatch = useAppDispatch();
   const selMode = useAppSelector(state => selectSelModeAndDateTimes(state).selMode);
@@ -24,10 +24,9 @@ function SaveTimesModal({
   const [name, setName] = useState('');
   const [errorMsg, setErrorMsg] = useState('');
   const [validated, setValidated] = useState(false);
-  const onClose = closeModal;
 
   useEffect(() => {
-    if (selMode.type === 'submittedOther') {
+    if (selMode.type === 'submittedSelf') {
       showToast({
         msg: 'Availabilities successfully submitted',
         msgType: 'success',
@@ -36,7 +35,7 @@ function SaveTimesModal({
       dispatch(resetSelection());
       // automatically close the modal if the request succeeds
       onClose();
-    } else if (selMode.type === 'rejectedOther') {
+    } else if (selMode.type === 'rejectedSelf') {
       setErrorMsg(selMode.error.message || 'error was not specified');
       dispatch(goBackToEditingSelf());
     }

@@ -372,7 +372,7 @@ export const availabilitiesSelectionSlice = createSlice({
   },
   extraReducers: (builder) => {
     builder
-      .addCase(submitAvailabilities.pending, (state, action) => {
+      .addCase(submitAvailabilities.pending, (state) => {
         if (state.selMode.type === 'editingSelf') {
           state.selMode = {type: 'submittingSelf'};
         } else if (state.selMode.type === 'editingOther') {

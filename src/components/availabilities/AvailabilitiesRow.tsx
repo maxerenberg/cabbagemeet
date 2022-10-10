@@ -75,20 +75,7 @@ function AvailabilitiesRow({
   const selfIsInAvailabilities = selfUserID !== null && peopleInfos.hasOwnProperty(selfUserID);
 
   useEffect(() => {
-    if (selMode.type === 'submittedSelf') {
-      showToast({
-        msg: 'Availabilities successfully submitted',
-        msgType: 'success',
-        autoClose: true,
-      });
-      dispatch(resetSelection());
-    } else if (selMode.type === 'rejectedSelf') {
-      showToast({
-        msg: `Error updating availabilities: ${selMode.error.message ?? 'unknown'}`,
-        msgType: 'failure',
-      });
-      dispatch(goBackToEditingSelf());
-    } else if (selMode.type === 'submittedOther') {
+    if (selMode.type === 'submittedOther') {
       const msg = selfUserID === selMode.otherUserID
         ? 'Availabilities successfully updated'
         : `${otherUserName}'s availabilities successfully updated`;
@@ -259,7 +246,7 @@ function AvailabilitiesRow({
           {rightBtnText} {rightBtnSpinner}
         </NonFocusButton>
       </BottomOverlay>
-      {shouldShowModal && <SaveTimesModal closeModal={closeModal} />}
+      {shouldShowModal && <SaveTimesModal onClose={closeModal} />}
     </>
   );
 }

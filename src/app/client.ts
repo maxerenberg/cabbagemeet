@@ -1,6 +1,7 @@
 import { nanoid } from '@reduxjs/toolkit';
 import { range } from 'utils/arrays';
 import { getDateString, addDaysToDateString, today } from 'utils/dates';
+import { assert } from 'utils/misc';
 import type { PeopleDateTimesFlat, PeopleInfo } from 'common/types';
 
 export type ServerMeeting = {
@@ -98,7 +99,7 @@ function isSubmittingAsGuest(args: SubmitAvailabilitiesArgs): args is {
 
 const dateString1 = getDateString(today);
 const dateString2 = addDaysToDateString(dateString1, 1);
-const meeting: ServerMeeting = {
+const sampleMeeting: ServerMeeting = {
   id: nanoid(),
   name: 'some-name',
   about: 'some-description',
@@ -119,6 +120,12 @@ const meeting: ServerMeeting = {
 };
 
 class Client {
+  meeting: ServerMeeting | null;
+
+  constructor() {
+    this.meeting = null;
+  }
+
   createMeeting({
     name, about, dates, startTime, endTime,
   }: {
@@ -127,14 +134,17 @@ class Client {
   }): Promise<ServerMeeting> {
     return new Promise(resolve => {
       setTimeout(() => {
-        meeting.name = name;
-        meeting.about = about;
-        meeting.dates = dates;
-        meeting.startTime = startTime;
-        meeting.endTime = endTime;
-        meeting.people = {};
-        meeting.availabilities = {};
-        resolve(meeting);
+        this.meeting = {
+          id: nanoid(),
+          name,
+          about,
+          dates,
+          startTime,
+          endTime,
+          people: {},
+          availabilities: {},
+        };
+        resolve(this.meeting);
       }, 1000);
     });
   }
@@ -144,11 +154,12 @@ class Client {
   ): Promise<EditMeetingResponse> {
     return new Promise(resolve => {
       setTimeout(() => {
-        meeting.name = name;
-        meeting.about = about;
-        meeting.dates = dates;
-        meeting.startTime = startTime;
-        meeting.endTime = endTime;
+        assert(this.meeting !== null);
+        this.meeting.name = name;
+        this.meeting.about = about;
+        this.meeting.dates = dates;
+        this.meeting.startTime = startTime;
+        this.meeting.endTime = endTime;
         resolve({status: 'OK'});
       }, 1000);
     });
@@ -170,8 +181,11 @@ class Client {
   getMeeting(id: string): Promise<ServerMeeting> {
     return new Promise(resolve => {
       setTimeout(() => {
-        meeting.id = id;
-        resolve(meeting);
+        this.meeting = {
+          ...sampleMeeting,
+          id,
+        }
+        resolve(this.meeting);
       }, 1000);
     });
   }
@@ -179,19 +193,27 @@ class Client {
   submitAvailabilities(args: SubmitAvailabilitiesArgs): Promise<SubmitAvailabilitiesResponse> {
     return new Promise((resolve, reject) => {
       setTimeout(() => {
+        assert(this.meeting !== null);
         if (true) {
           let userID: string | undefined;
           if (isSubmittingAsGuest(args)) {
             userID = nanoid();
-            meeting.people[userID] = {name: args.name};
+            // Somewhere, either React or the Typescript compiler is calling
+            // Object.preventExtensions on this.meeting.people, so trying to mutate
+            // it in the error "Object is not extensible".
+            // So we'll just create a new object instead.
+            this.meeting.people = {
+              ...this.meeting.people,
+              [userID]: {name: args.name},
+            }
           } else {
             userID = args.userID;
           }
-          meeting.availabilities[userID] = args.dateTimes;
+          this.meeting.availabilities[userID] = args.dateTimes;
           resolve({
             status: 'OK',
-            availabilities: meeting.availabilities,
-            people: meeting.people,
+            availabilities: this.meeting.availabilities,
+            people: this.meeting.people,
           });
         } else {
           reject(new Error('boom!'));
