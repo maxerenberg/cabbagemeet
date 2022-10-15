@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef } from 'react';
+import React, { useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { useAppDispatch, useAppSelector } from 'app/hooks';
 import GenericSpinner from 'components/GenericSpinner';
@@ -9,6 +9,7 @@ import './Meeting.css';
 import EditMeeting from './EditMeeting';
 import { useToast } from 'components/Toast';
 import { selectIsLoggedIn } from 'slices/authentication';
+import useEffectOnce from 'utils/useEffectOnce.hook';
 
 export default function Meeting() {
   const [isEditingMeeting, setIsEditingMeeting] = useState(false);
@@ -18,18 +19,13 @@ export default function Meeting() {
   const fetchMeetingStatus = useAppSelector(state => state.meetingTimes.fetchMeetingStatus);
   const error = useAppSelector(state => state.meetingTimes.error) ?? 'unknown';
   const dispatch = useAppDispatch();
-  // The ref is needed because this component can be re-rendered before fetchMeetingStatus
-  // (stored in Redux) gets updated, causing fetchMeeting() to be dispatched twice.
-  // FIXME: there's gotta be a better way to do this...
-  const fetchIsPendingRef = useRef(false);
 
   const needToFetchMeeting = fetchMeetingStatus === 'idle' || (
     fetchMeetingStatus === 'succeeded' && fetchedMeetingID !== urlMeetingID
   );
-  useEffect(() => {
-    if (needToFetchMeeting && !fetchIsPendingRef.current) {
+  useEffectOnce(() => {
+    if (needToFetchMeeting) {
       dispatch(fetchMeeting(urlMeetingID));
-      fetchIsPendingRef.current = true;
     }
   }, [needToFetchMeeting, dispatch, urlMeetingID]);
 
@@ -37,7 +33,6 @@ export default function Meeting() {
     return <GenericSpinner />;
   }
   if (fetchMeetingStatus === 'failed') {
-    console.error(error);
     return (
       <div className="d-flex justify-content-center">
         <p>

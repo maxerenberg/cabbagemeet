@@ -1,20 +1,24 @@
 import { createAsyncThunk, createSlice } from '@reduxjs/toolkit';
 import type { SerializedError } from '@reduxjs/toolkit';
-import client, { DeleteAccountResponse, LogoutResponse, SubscribeToNotificationsResponse, UnlinkGoogleCalendarResponse } from 'app/client';
-import type { SignupResponse, LoginResponse, EditNameResponse } from 'app/client';
+import client, { GetSelfInfoResponse } from 'app/client';
+import type {
+  UserInfo,
+  SignupResponse,
+  LoginResponse,
+  EditNameResponse,
+  DeleteAccountResponse,
+  LogoutResponse,
+  SubscribeToNotificationsResponse,
+  UnlinkGoogleCalendarResponse,
+} from 'app/client';
 import type { RootState } from 'app/store';
 import { assert } from 'utils/misc';
-import { RequestStatus } from 'common/types';
-
-type UserInfo = {
-  userID: string;
-  name: string;
-  hasLinkedGoogleAccount: boolean;
-  isSubscribedToNotifications: boolean;
-};
+import type { RequestStatus } from 'common/types';
 
 export type AuthenticationState = {
   userInfo: UserInfo | null;
+  getSelfInfoState: RequestStatus;
+  getSelfInfoError: SerializedError | null;
   loginState: RequestStatus;
   loginError: SerializedError | null;
   signupState: RequestStatus;
@@ -31,33 +35,30 @@ export type AuthenticationState = {
   deleteAccountError: SerializedError | null;
 };
 
-// TODO: get token (JWT?) from server, store it in LocalStorage
-const initialState: AuthenticationState =
-  {
-    // userInfo: null,
-    // loginState: 'idle',
-    userInfo: {
-      userID: 'bob123',
-      name: 'Bob',
-      hasLinkedGoogleAccount: true,
-      isSubscribedToNotifications: true,
-    },
-    loginState: 'succeeded',
-    loginError: null,
-    signupState: 'idle',
-    signupError: null,
-    logoutState: 'idle',
-    logoutError: null,
-    editNameState: 'idle',
-    editNameError: null,
-    subscribeToNotificationsState: 'idle',
-    subscribeToNotificationsError: null,
-    unlinkGoogleCalendarState: 'idle',
-    unlinkGoogleCalendarError: null,
-    deleteAccountState: 'idle',
-    deleteAccountError: null,
-  }
-  ;
+const initialState: AuthenticationState = {
+  userInfo: null,
+  getSelfInfoState: 'idle',
+  getSelfInfoError: null,
+  loginState: 'idle',
+  loginError: null,
+  signupState: 'idle',
+  signupError: null,
+  logoutState: 'idle',
+  logoutError: null,
+  editNameState: 'idle',
+  editNameError: null,
+  subscribeToNotificationsState: 'idle',
+  subscribeToNotificationsError: null,
+  unlinkGoogleCalendarState: 'idle',
+  unlinkGoogleCalendarError: null,
+  deleteAccountState: 'idle',
+  deleteAccountError: null,
+};
+
+export const getSelfInfo = createAsyncThunk<GetSelfInfoResponse>(
+  'authentication/getSelfInfo',
+  () => client.getSelfInfo()
+);
 
 type signupInfo = {
   name: string;
@@ -80,6 +81,7 @@ export const submitLoginForm = createAsyncThunk<LoginResponse, loginInfo>(
   ({ email, password }) => client.login(email, password)
 );
 
+// TODO: reset meetingTimes, createdMeetings, respondedMeetings
 export const submitLogout = createAsyncThunk<LogoutResponse, void>(
   'authentication/submitLogout',
   () => client.logout()
@@ -156,16 +158,24 @@ export const authenticationSlice = createSlice({
   },
   extraReducers: (builder) => {
     builder
+      .addCase(getSelfInfo.pending, (state) => {
+        state.getSelfInfoState = 'loading';
+      })
+      .addCase(getSelfInfo.fulfilled, (state, {payload}) => {
+        if (payload !== null) {
+          state.userInfo = payload;
+        }
+        state.getSelfInfoState = 'succeeded';
+      })
+      .addCase(getSelfInfo.rejected, (state, action) => {
+        state.getSelfInfoState = 'failed';
+        state.getSelfInfoError = action.error;
+      })
       .addCase(submitSignupForm.pending, (state) => {
         state.signupState = 'loading';
       })
       .addCase(submitSignupForm.fulfilled, (state, {payload}) => {
-        state.userInfo = {
-          userID: payload.userID,
-          name: payload.name,
-          hasLinkedGoogleAccount: payload.hasLinkedGoogleAccount,
-          isSubscribedToNotifications: payload.isSubscribedToNotifications
-        };
+        state.userInfo = payload;
         state.signupState = 'succeeded';
       })
       .addCase(submitSignupForm.rejected, (state, action) => {
@@ -176,12 +186,7 @@ export const authenticationSlice = createSlice({
         state.loginState = 'loading';
       })
       .addCase(submitLoginForm.fulfilled, (state, {payload}) => {
-        state.userInfo = {
-          userID: payload.userID,
-          name: payload.name,
-          hasLinkedGoogleAccount: payload.hasLinkedGoogleAccount,
-          isSubscribedToNotifications: payload.isSubscribedToNotifications
-        };
+        state.userInfo = payload;
         state.loginState = 'succeeded';
       })
       .addCase(submitLoginForm.rejected, (state, action) => {
@@ -258,6 +263,8 @@ export const {
 export const selectAuth = (state: RootState) => state.authentication;
 export const selectUserInfo = (state: RootState) => state.authentication.userInfo;
 export const selectUserID = (state: RootState) => state.authentication.userInfo?.userID || null;
+export const selectGetSelfInfoState = (state: RootState) => state.authentication.getSelfInfoState;
+export const selectGetSelfInfoError = (state: RootState) => state.authentication.getSelfInfoError;
 export const selectIsLoggedIn = (state: RootState) => state.authentication.userInfo !== null;
 export const selectSignupState = (state: RootState) => state.authentication.signupState;
 export const selectSignupError = (state: RootState) => state.authentication.signupError;

@@ -10,6 +10,7 @@ import {
   resetEditNameStatus,
   selectEditNameError,
   selectEditNameState,
+  selectGetSelfInfoState,
   selectIsLoggedIn,
   selectSubscribeToNotificationsState,
   selectSubscribeToNotificationsError,
@@ -24,19 +25,26 @@ import {
 import { assert } from "utils/misc";
 import { useToast } from "./Toast";
 import styles from './Settings.module.css';
+import GenericSpinner from "./GenericSpinner";
 
 export default function Settings() {
+  const getSelfInfoState = useAppSelector(selectGetSelfInfoState);
   const isLoggedIn = useAppSelector(selectIsLoggedIn);
+  const shouldBeRedirectedToHomePage = !isLoggedIn && (getSelfInfoState === 'succeeded' || getSelfInfoState === 'failed');
   const navigate = useNavigate();
 
   useEffect(() => {
-    if (!isLoggedIn) {
+    if (shouldBeRedirectedToHomePage) {
       navigate('/');
     }
-  }, [isLoggedIn, navigate]);
+  }, [shouldBeRedirectedToHomePage, navigate]);
+
+  if (shouldBeRedirectedToHomePage) {
+    return null;
+  }
 
   if (!isLoggedIn) {
-    return null;
+    return <GenericSpinner />;
   }
 
   return (

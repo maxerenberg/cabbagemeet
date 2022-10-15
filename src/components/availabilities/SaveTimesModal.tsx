@@ -6,11 +6,8 @@ import Modal from 'components/Modal';
 import NonFocusButton from 'components/NonFocusButton';
 import {
   selectSelModeAndDateTimes,
-  goBackToEditingSelf,
-  resetSelection,
-  submitSelf,
+  submitSelfAsGuest,
 } from 'slices/availabilitiesSelection';
-import { useToast } from 'components/Toast';
 import './SaveTimesModal.css';
 
 function SaveTimesModal({
@@ -20,26 +17,22 @@ function SaveTimesModal({
 }) {
   const dispatch = useAppDispatch();
   const selMode = useAppSelector(state => selectSelModeAndDateTimes(state).selMode);
-  const { showToast } = useToast();
   const [name, setName] = useState('');
+  const [email, setEmail] = useState('');
   const [errorMsg, setErrorMsg] = useState('');
   const [validated, setValidated] = useState(false);
 
   useEffect(() => {
+    // The AvailabilitiesRow component takes care of showing a toast and resetting
+    // the Redux state. We just need to take care of closing the modal (or showing
+    // an error in the modal).
     if (selMode.type === 'submittedSelf') {
-      showToast({
-        msg: 'Availabilities successfully submitted',
-        msgType: 'success',
-        autoClose: true,
-      });
-      dispatch(resetSelection());
       // automatically close the modal if the request succeeds
       onClose();
     } else if (selMode.type === 'rejectedSelf') {
-      setErrorMsg(selMode.error.message || 'error was not specified');
-      dispatch(goBackToEditingSelf());
+      setErrorMsg(selMode.error.message ?? 'unknown');
     }
-  }, [selMode, showToast, dispatch, onClose]);
+  }, [selMode, onClose]);
 
   const onSubmit: React.FormEventHandler<HTMLFormElement> = (ev) => {
     ev.preventDefault();
@@ -48,7 +41,7 @@ function SaveTimesModal({
       setValidated(true);
       return;
     }
-    dispatch(submitSelf(name));
+    dispatch(submitSelfAsGuest(name, email || undefined));
   };
 
   const isSubmitting = selMode.type === 'submittingSelf';
@@ -90,6 +83,8 @@ function SaveTimesModal({
             type="email"
             placeholder="What's your email address? (optional)"
             className="form-text-input"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
           />
           <Form.Control.Feedback type="invalid">
             Please enter a valid email address.

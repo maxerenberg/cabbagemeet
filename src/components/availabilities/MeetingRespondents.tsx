@@ -6,7 +6,7 @@ import {
   selectHoverDateTime,
   setHoverUser,
   resetSelection,
-  selectOther,
+  selectUser,
 } from 'slices/availabilitiesSelection';
 
 type DateTimePeopleSet = {
@@ -38,7 +38,9 @@ function MeetingRespondents() {
 
   if (userIDs.length === 0) return null;
   let selectedUserID: string | undefined;
-  if (selMode.type === 'selectedOther' || selMode.type === 'editingOther' || selMode.type === 'submittingOther') {
+  if (selMode.type === 'selectedUser') {
+    selectedUserID = selMode.selectedUserID;
+  } else if (selMode.type === 'editingOther' || selMode.type === 'submittingOther') {
     selectedUserID = selMode.otherUserID;
   }
   const numPeopleForHover =
@@ -80,7 +82,7 @@ function MeetingRespondents() {
             if (userID === selectedUserID) {
               onClick = () => dispatch(resetSelection());
             } else {
-              onClick = () => dispatch(selectOther({otherUserID: userID}));
+              onClick = () => dispatch(selectUser({userID}));
             }
             let onMouseEnter: React.MouseEventHandler | undefined;
             let onMouseLeave: React.MouseEventHandler | undefined;

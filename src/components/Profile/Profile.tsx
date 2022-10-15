@@ -6,6 +6,7 @@ import BottomOverlay from "components/BottomOverlay";
 import ButtonSpinnerRight from "components/ButtonSpinnerRight";
 import NonFocusButton from "components/NonFocusButton";
 import {
+  selectGetSelfInfoState,
   selectLogoutState,
   selectLogoutError,
   submitLogout,
@@ -13,24 +14,24 @@ import {
   selectUserInfo,
   selectIsLoggedIn,
 } from "slices/authentication";
-import { assert } from 'utils/misc';
 import CreatedOrRespondedMeetings from "./CreatedOrRespondedMeetings";
 import styles from './Profile.module.css';
 import { useToast } from "components/Toast";
 
 export default function Profile() {
+  const getSelfInfoState = useAppSelector(selectGetSelfInfoState);
   const isLoggedIn = useAppSelector(selectIsLoggedIn);
   const navigate = useNavigate();
   const [seeCreatedMeetings, setSeeCreatedMeetings] = useState(true);
+  const shouldBeRedirectedToHomePage = !isLoggedIn && (getSelfInfoState === 'succeeded' || getSelfInfoState === 'failed');
 
   useEffect(() => {
-    if (!isLoggedIn) {
+    if (shouldBeRedirectedToHomePage) {
       navigate('/');
     }
-  }, [isLoggedIn, navigate]);
+  }, [shouldBeRedirectedToHomePage, navigate]);
 
-  if (!isLoggedIn) {
-    // User is about to be redirected
+  if (shouldBeRedirectedToHomePage) {
     return null;
   }
 
@@ -47,7 +48,6 @@ export default function Profile() {
 
 function Heading() {
   const userInfo = useAppSelector(selectUserInfo);
-  assert(userInfo !== null);
   const dispatch = useAppDispatch();
   const onSignoutClick = () => dispatch(submitLogout());
   const logoutState = useAppSelector(selectLogoutState);
@@ -66,13 +66,21 @@ function Heading() {
     }
   }, [logoutState, logoutError, dispatch, showToast]);
 
+  let visibilityClass = "visible";
+  if (userInfo === null) {
+    // To prevent "waterfalling" of network requests, we allow this component
+    // to load even if user data has not loaded yet. If it turns out that
+    // the user is not logged in, they will get redirected to the home page.
+    visibilityClass = "invisible";
+  }
+
   const signoutBtnDisabled = logoutState === 'loading';
   const signoutBtnSpinner = signoutBtnDisabled && <ButtonSpinnerRight />;
 
   return (
-    <div className="d-flex align-items-center">
+    <div className={`d-flex align-items-center ${visibilityClass}`}>
       <h4 className="mb-0">
-        {userInfo.name}&#39;s meetings
+        {userInfo?.name}&#39;s meetings
       </h4>
       <button
         className="d-none d-md-block btn btn-outline-primary px-3 ms-auto"

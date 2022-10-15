@@ -20,7 +20,6 @@ import { addDaysToDateString, customToISOString } from 'utils/dates';
 import { assertIsNever } from 'utils/misc';
 import { useEffect } from 'react';
 import { selectMeetingIsScheduled, selectScheduledDateTimes } from 'slices/meetingTimes';
-import { ExternalCalendarEvent } from 'app/client';
 
 // TODO: deal with decimal start/end times
 
@@ -208,7 +207,7 @@ function MeetingGridBodyCells({
           const externalEventName = dateTimesToExternalEventInfo[dateTime]?.eventName;
           const isFirstDateTimeOfExternalEvent = dateTimesToExternalEventInfo[dateTime]?.isStartOfEvent ?? false;
           const hoverUserIsAvailableAtThisTime = somebodyIsHovered && availabilities[hoverUser][dateTime];
-          const selectedUserIsAvailableAtThisTime = selMode.type === 'selectedOther' && availabilities[selMode.otherUserID][dateTime];
+          const selectedUserIsAvailableAtThisTime = selMode.type === 'selectedUser' && availabilities[selMode.selectedUserID][dateTime];
           const numPeopleAvailableAtThisTime = dateTimePeople[dateTime]?.length ?? 0;
           return (
             <Cell key={i} {...{
@@ -319,7 +318,7 @@ const Cell = React.memo(function Cell({
       rgb = 'var(--custom-primary-rgb)';
       alpha = Math.round(100 * (0.2 + 0.8 * (numPeopleAvailableAtThisTime / totalPeople))) + '%';
     }
-  } else if (selMode.type === 'selectedOther') {
+  } else if (selMode.type === 'selectedUser') {
     if (selectedUserIsAvailableAtThisTime) {
       rgb = 'var(--custom-primary-rgb)';
     }
@@ -409,7 +408,7 @@ const Cell = React.memo(function Cell({
     } else if (mouseStateType === 'down') {
       onMouseEnter = () => dispatch(notifyMouseEnter({cell: {rowIdx, colIdx}}));
     }
-  } else if (selMode.type === 'selectedOther') {
+  } else if (selMode.type === 'selectedUser') {
     onMouseDown = () => showToast({
       msg: `Click the 'Edit availability' button`,
       msgType: 'success',

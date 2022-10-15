@@ -347,5 +347,8 @@ export const {
 
 export const selectScheduledDateTimes = (state: RootState) => state.meetingTimes.scheduledDateTimes || {};
 export const selectMeetingIsScheduled = (state: RootState) => state.meetingTimes.scheduledDateTimes !== undefined;
+export const selectSelfIsInAvailabilities = (state: RootState) =>
+  state.authentication.userInfo !== null
+  && state.meetingTimes.people.hasOwnProperty(state.authentication.userInfo.userID);
 
 export default meetingTimesSlice.reducer;

@@ -1,16 +1,22 @@
 import { createAsyncThunk, createSelector, createSlice, SerializedError } from '@reduxjs/toolkit';
 import type { PayloadAction } from '@reduxjs/toolkit';
-import client, { SubmitScheduleResponse, SubmitUnscheduleResponse } from 'app/client';
+import client from 'app/client';
+import type {
+  SubmitScheduleResponse,
+  SubmitUnscheduleResponse,
+  SubmitAvailabilitiesArgs,
+} from 'app/client';
 import type { AppThunk, RootState } from 'app/store';
 import type { DateTimeSet } from 'common/types';
 import {
   setScheduledDateTimes,
   setPeopleInfoAndAvailabilities,
   unsetScheduledDateTimes,
+  selectSelfIsInAvailabilities,
 } from 'slices/meetingTimes';
 import { assert } from 'utils/misc';
 import { addMinutesToDateTimeString } from 'utils/dates';
-import { selectUserID } from './authentication';
+import { selectIsLoggedIn, selectUserID } from './authentication';
 
 // TODO: place these fields directly into AvailabilitiesSelectionState
 // and get rid of the type predicate functions
@@ -23,9 +29,9 @@ type SelModeEditing = {
 } | {
   type: 'editingSchedule';
 };
-type SelModeSelectedOther = {
-  type: 'selectedOther';
-  otherUserID: string;
+type SelModeSelectedUser = {
+  type: 'selectedUser';
+  selectedUserID: string;
 };
 type SelModeSubmittingSelf = {
   type: 'submittingSelf';
@@ -78,7 +84,7 @@ type SelModeSubmittedDateTimes = SelModeSubmittedSelf | SelModeSubmittedOther | 
 type SelModeRejectedDateTimes = SelModeRejectedSelf | SelModeRejectedOther | SelModeRejectedSchedule;
 
 export type SelMode =
-  SelModeNone | SelModeEditing | SelModeSelectedOther | SelModeSubmittingDateTimes
+  SelModeNone | SelModeEditing | SelModeSelectedUser | SelModeSubmittingDateTimes
   | SelModeSubmittingUnschedule | SelModeFulfilled | SelModeRejected;
 
 type CellCoord = {
@@ -111,7 +117,7 @@ export type AvailabilitiesSelectionState = {
   selMode: SelModeSubmittingUnschedule
          | SelModeSubmittedUnschedule
          | SelModeRejectedUnschedule
-         | SelModeSelectedOther;
+         | SelModeSelectedUser;
 };
 
 function stateIsSubmittingAvailabilities(state: AvailabilitiesSelectionState): state is {
@@ -174,13 +180,24 @@ const initialState: AvailabilitiesSelectionState = {
   hoverDateTime: null,
 };
 
-function isSubmittingAsGuest(args: { userID: string } | { name: string }): args is { name: string } {
-  return !args.hasOwnProperty('userID');
+type submitAvailabilitiesThunkArgs = {
+  otherUserID: string;
+} | {
+  guestName: string;
+  guestEmail?: string;
+} | null;
+
+function isSubmittingAsGuest(args: submitAvailabilitiesThunkArgs): args is { guestName: string, guestEmail?: string } {
+  return !!args?.hasOwnProperty('guestName');
 }
 
-export const submitAvailabilities = createAsyncThunk<
+function isSubmittingOtherUser(args: submitAvailabilitiesThunkArgs): args is { otherUserID: string } {
+  return !!args?.hasOwnProperty('otherUserID');
+}
+
+const submitAvailabilities = createAsyncThunk<
   void,
-  { userID: string } | { name: string },
+  submitAvailabilitiesThunkArgs,
   { state: RootState }
 >(
   'availabilitiesSelection/submitAvailabilities',
@@ -196,13 +213,14 @@ export const submitAvailabilities = createAsyncThunk<
 
     const dateTimes = state.dateTimes;
     const dateTimesFlat = Object.keys(dateTimes);
-    const submitArgs = isSubmittingAsGuest(payload) ? {
-      name: payload.name,
-      dateTimes: dateTimesFlat,
-    } : {
-      userID: payload.userID,
-      dateTimes: dateTimesFlat,
-    };
+    const submitArgs: SubmitAvailabilitiesArgs = {dateTimes: dateTimesFlat};
+    if (isSubmittingAsGuest(payload)) {
+      submitArgs.guestName = payload.guestName;
+      submitArgs.guestEmail = payload.guestEmail;
+    } else if (isSubmittingOtherUser(payload)) {
+      submitArgs.otherUserID = payload.otherUserID;
+    }
+
     const {people, availabilities} = await client.submitAvailabilities(submitArgs);
     // TODO: don't dispatch action to another slice
     dispatch(setPeopleInfoAndAvailabilities({ people, availabilities }));
@@ -249,19 +267,12 @@ export const availabilitiesSelectionSlice = createSlice({
   name: 'availabilitiesSelection',
   initialState,
   reducers: {
-    editSelf: (state) => {
-      assert(state.selMode.type === 'none');
-      return {
-        selMode: {type: 'editingSelf'},
-        dateTimes: {},
-        mouse: initialMouseState,
-      };
-    },
     goBackToEditingSelf: (state) => {
       // This should only be used after an error occurs.
-      // We could still be in the editingOther state if an error occurred
+      // We could still be in the editingSelf state if an error occurred
       // before we even had a chance to make the network request
-      assert(state.selMode.type === 'editingSelf' || state.selMode.type === 'submittingSelf');
+      // TODO: do we need to check for submittingSelf state?
+      assert(state.selMode.type === 'editingSelf' || state.selMode.type === 'submittingSelf' || state.selMode.type === 'rejectedSelf');
       state.selMode = {type: 'editingSelf'};
     },
     createSchedule: (state) => {
@@ -276,40 +287,39 @@ export const availabilitiesSelectionSlice = createSlice({
       assert(state.selMode.type === 'rejectedSchedule');
       state.selMode = {type: 'editingSchedule'};
     },
-    editOtherInternal: (state, action: PayloadAction<{otherUserAvailabilities: DateTimeSet}>) => {
-      assert(state.selMode.type === 'selectedOther');
-      const { otherUserAvailabilities } = action.payload;
+    editUserInternal: (state, {payload: {availabilities, isSelf}}: PayloadAction<{availabilities: DateTimeSet, isSelf: boolean}>) => {
+      let selMode: {type: 'editingSelf'} | {type: 'editingOther', otherUserID: string} | undefined;
+      if (isSelf) {
+        assert(state.selMode.type === 'none' || state.selMode.type === 'selectedUser');
+        selMode = {type: 'editingSelf'};
+      } else {
+        assert(state.selMode.type === 'selectedUser');
+        selMode = {type: 'editingOther', otherUserID: state.selMode.selectedUserID};
+      }
       return {
-        selMode: {type: 'editingOther', otherUserID: state.selMode.otherUserID},
-        dateTimes: otherUserAvailabilities,
+        selMode,
+        dateTimes: availabilities,
         mouse: initialMouseState,
       };
     },
-    selectOther: (state, action: PayloadAction<{otherUserID: string}>) => {
-      assert(state.selMode.type === 'none' || state.selMode.type === 'selectedOther');
+    selectUser: (state, action: PayloadAction<{userID: string}>) => {
+      assert(state.selMode.type === 'none' || state.selMode.type === 'selectedUser');
       return {
-        selMode: {type: 'selectedOther', otherUserID: action.payload.otherUserID}
+        selMode: {type: 'selectedUser', selectedUserID: action.payload.userID}
       };
     },
     goBackToEditingOther: (state) => {
       // Should be used after an error occurs
       // We could still be in the editingOther state if an error occurred
       // before we even had a chance to make the network request
-      assert(state.selMode.type === 'editingOther' || state.selMode.type === 'submittingOther');
+      // TODO: do we need to check for submittingSelf state?
+      assert(state.selMode.type === 'editingOther' || state.selMode.type === 'submittingOther' || state.selMode.type === 'rejectedOther');
       state.selMode = {type: 'editingOther', otherUserID: state.selMode.otherUserID};
     },
     cancelEditingOther: (state) => {
       assert(state.selMode.type === 'editingOther');
       return {
-        selMode: {type: 'selectedOther', otherUserID: state.selMode.otherUserID}
-      };
-    },
-    editSelfAsOtherInternal: (state, { payload }: PayloadAction<{selfUserID: string, selfAvailabilities: DateTimeSet}>) => {
-      assert(state.selMode.type === 'none');
-      return {
-        selMode: {type: 'editingOther', otherUserID: payload.selfUserID},
-        dateTimes: payload.selfAvailabilities,
-        mouse: initialMouseState,
+        selMode: {type: 'selectedUser', selectedUserID: state.selMode.otherUserID}
       };
     },
     reset: (state) => {
@@ -427,11 +437,10 @@ export const availabilitiesSelectionSlice = createSlice({
 });
 
 export const {
-  editSelf,
   goBackToEditingSelf,
   createSchedule,
   goBackToEditingSchedule,
-  selectOther,
+  selectUser,
   goBackToEditingOther,
   cancelEditingOther,
   reset: resetSelection,
@@ -446,49 +455,81 @@ export const {
   notifyMouseEnter,
 } = availabilitiesSelectionSlice.actions;
 const {
-  editOtherInternal,
-  editSelfAsOtherInternal,
+  editUserInternal,
 } = availabilitiesSelectionSlice.actions;
 
-export const submitSelf =
-  (name: string): AppThunk<Promise<void>> =>
-  async (dispatch, getState) => {
+export const submitSelfAsGuest =
+  (name: string, email?: string): AppThunk =>
+  (dispatch, getState) => {
     const state = selectSelModeAndDateTimes(getState());
     assert(state.selMode.type === 'editingSelf');
-    return await dispatch(submitAvailabilities({name})).unwrap();
+    dispatch(submitAvailabilities({guestName: name, guestEmail: email}));
+  };
+export const submitSelfWhenLoggedIn =
+  (): AppThunk =>
+  async (dispatch, getState) => {
+    const rootState = getState();
+    const state = selectSelModeAndDateTimes(rootState);
+    assert(state.selMode.type === 'editingSelf');
+    const isLoggedIn = selectIsLoggedIn(rootState);
+    assert(isLoggedIn);
+    dispatch(submitAvailabilities(null));
   };
 export const submitOther =
-  (): AppThunk<Promise<void>> =>
-  async (dispatch, getState) => {
+  (): AppThunk =>
+  (dispatch, getState) => {
     const state = selectSelModeAndDateTimes(getState());
     assert(state.selMode.type === 'editingOther');
-    return await dispatch(submitAvailabilities({userID: state.selMode.otherUserID})).unwrap();
+    dispatch(submitAvailabilities({otherUserID: state.selMode.otherUserID}));
   };
-export const editOther =
+export const editSelectedUser =
   (): AppThunk =>
   (dispatch, getState) => {
     const rootState = getState();
     const state = selectSelModeAndDateTimes(rootState);
-    assert(state.selMode.type === 'selectedOther');
-    const otherUser = state.selMode.otherUserID;
-    const otherUserAvailabilities = rootState.meetingTimes.availabilities[otherUser];
-    assert(otherUserAvailabilities !== undefined);
-    dispatch(editOtherInternal({ otherUserAvailabilities }));
+    assert(state.selMode.type === 'selectedUser');
+    const selectedUserID = state.selMode.selectedUserID;
+    const selectedUserAvailabilities = rootState.meetingTimes.availabilities[selectedUserID];
+    assert(selectedUserAvailabilities !== undefined);
+    const selfUserID = selectUserID(rootState);
+    dispatch(editUserInternal({
+      availabilities: selectedUserAvailabilities,
+      isSelf: selectedUserID === selfUserID,
+    }));
   };
-export const editSelfAsOther =
+const editSelfWhenNotLoggedIn =
   (): AppThunk =>
   (dispatch, getState) => {
-  // Should be used when the current user is logged in and they want to edit their
-  // own availabilities
-  const rootState = getState();
-  const state = selectSelModeAndDateTimes(rootState);
-  assert(state.selMode.type === 'none');
-  const selfUserID = selectUserID(rootState);
-  assert(selfUserID !== null);
-  const selfAvailabilities = rootState.meetingTimes.availabilities[selfUserID];
-  assert(selfAvailabilities !== undefined);
-  dispatch(editSelfAsOtherInternal({selfUserID, selfAvailabilities}));
-};
+    const state = selectSelModeAndDateTimes(getState());
+    assert(state.selMode.type === 'none');
+    dispatch(editUserInternal({availabilities: {}, isSelf: true}));
+  };
+const editSelfWhenLoggedIn =
+  (): AppThunk =>
+  (dispatch, getState) => {
+    const rootState = getState();
+    const state = selectSelModeAndDateTimes(rootState);
+    assert(state.selMode.type === 'none' || state.selMode.type === 'selectedUser');
+    const selfUserID = selectUserID(rootState);
+    assert(selfUserID !== null);
+    const selfIsInAvailabilities = selectSelfIsInAvailabilities(rootState);
+    const availabilities =
+      selfIsInAvailabilities
+      ? rootState.meetingTimes.availabilities[selfUserID]
+      : {};
+    assert(availabilities !== undefined);
+    dispatch(editUserInternal({availabilities, isSelf: true}));
+  };
+export const editSelf =
+  (): AppThunk =>
+  (dispatch, getState) => {
+    const isLoggedIn = selectIsLoggedIn(getState());
+    if (isLoggedIn) {
+      dispatch(editSelfWhenLoggedIn());
+    } else {
+      dispatch(editSelfWhenNotLoggedIn());
+    }
+  };
 
 export const selectSelModeAndDateTimes = (state: RootState) => state.availabilitiesSelection;
 export const selectSelMode = createSelector(

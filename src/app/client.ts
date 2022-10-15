@@ -4,6 +4,15 @@ import { getDateString, addDaysToDateString, today } from 'utils/dates';
 import { assert } from 'utils/misc';
 import type { PeopleDateTimesFlat, PeopleInfo } from 'common/types';
 
+export type UserInfo = {
+  userID: string;
+  name: string;
+  hasLinkedGoogleAccount: boolean;
+  isSubscribedToNotifications: boolean;
+};
+
+export type GetSelfInfoResponse = UserInfo | null;
+
 export type ExternalCalendarEvent = {
   name: string;
   startDateTime: string;
@@ -39,12 +48,11 @@ export type ServerMeetingShort = {
 };
 
 export type SubmitAvailabilitiesArgs = {
-  dateTimes: string[],
-} & ({
-  userID: string;  // for submitting another user, or for submitting oneself when logged in
-} | {
-  name: string;  // for submitting oneself and NOT logged in
-});
+  dateTimes: string[];
+  otherUserID?: string;
+  guestName?: string;
+  guestEmail?: string;
+};
 
 export type SubmitAvailabilitiesResponse = {
   status: 'OK',
@@ -52,14 +60,9 @@ export type SubmitAvailabilitiesResponse = {
   people: PeopleInfo,
 };
 
-export type LoginResponse = {
-  name: string;
-  userID: string;
-  hasLinkedGoogleAccount: boolean;
-  isSubscribedToNotifications: boolean;
-};
+export type LoginResponse = UserInfo;
 
-export type SignupResponse = LoginResponse;
+export type SignupResponse = UserInfo;
 
 export type LogoutResponse = {
   status: 'OK';
@@ -99,15 +102,12 @@ export type SubscribeToNotificationsResponse = { status: 'OK' };
 export type DeleteAccountResponse = { status: 'OK' };
 export type UnlinkGoogleCalendarResponse = { status: 'OK' };
 
-function isSubmittingAsGuest(args: SubmitAvailabilitiesArgs): args is {
-  dateTimes: string[];
-  name: string;
-} {
-  return !args.hasOwnProperty('userID');
-};
-
 const dateString1 = getDateString(today);
 const dateString2 = addDaysToDateString(dateString1, 1);
+const peopleDB: PeopleInfo = {
+  'bob123': {name: 'Bob'},
+  'alice123': {name: 'Alice'}
+};
 const sampleMeeting: ServerMeeting = {
   id: nanoid(),
   name: 'some-name',
@@ -116,7 +116,7 @@ const sampleMeeting: ServerMeeting = {
     ...range(9).map(i => addDaysToDateString(dateString1, 30+i))
   ),
   availabilities: {
-    'bob123': [`${dateString2}T02:00:00Z`, `${dateString2}T02:30:00Z`],
+    'alice123': [`${dateString2}T02:00:00Z`, `${dateString2}T02:30:00Z`],
   },
   googleCalendarEvents: [
     {
@@ -126,7 +126,7 @@ const sampleMeeting: ServerMeeting = {
     },
   ],
   people: {
-    'bob123': {name: 'Bob'},
+    'alice123': peopleDB['alice123'],
   },
   startTime: 23.5,
   endTime: 6,
@@ -136,9 +136,12 @@ const sampleMeeting: ServerMeeting = {
 
 class Client {
   meeting: ServerMeeting | null;
+  // FIXME: actually, this is a bad idea.
+  userID: string | null;
 
   constructor() {
     this.meeting = null;
+    this.userID = null;
   }
 
   createMeeting({
@@ -205,31 +208,55 @@ class Client {
     });
   }
 
-  submitAvailabilities(args: SubmitAvailabilitiesArgs): Promise<SubmitAvailabilitiesResponse> {
+  submitAvailabilities({dateTimes, otherUserID = undefined, guestName = undefined}: SubmitAvailabilitiesArgs): Promise<SubmitAvailabilitiesResponse> {
     return new Promise((resolve, reject) => {
       setTimeout(() => {
         assert(this.meeting !== null);
         if (true) {
           let userID: string | undefined;
-          if (isSubmittingAsGuest(args)) {
+          if (guestName !== undefined) {
             userID = nanoid();
-            // Somewhere, either React or the Typescript compiler is calling
-            // Object.preventExtensions on this.meeting.people, so trying to mutate
-            // it in the error "Object is not extensible".
-            // So we'll just create a new object instead.
-            this.meeting.people = {
-              ...this.meeting.people,
-              [userID]: {name: args.name},
-            }
+            peopleDB[userID] = {name: guestName};
+          } else if (otherUserID !== undefined) {
+            userID = otherUserID;
           } else {
-            userID = args.userID;
+            assert(this.userID !== null);
+            userID = this.userID;
           }
-          this.meeting.availabilities[userID] = args.dateTimes;
+          // Somewhere, either React or the Typescript compiler is calling
+          // Object.preventExtensions on this.meeting.people, so trying to mutate
+          // it produces the error "Object is not extensible".
+          // So we'll just create a new object instead.
+          this.meeting.people = {
+            ...this.meeting.people,
+            [userID]: peopleDB[userID],
+          }
+          this.meeting.availabilities[userID] = dateTimes;
           resolve({
             status: 'OK',
             availabilities: this.meeting.availabilities,
             people: this.meeting.people,
           });
+        } else {
+          reject(new Error('boom!'));
+        }
+      }, 1000);
+    });
+  }
+
+  getSelfInfo(): Promise<GetSelfInfoResponse> {
+    return new Promise((resolve, reject) => {
+      setTimeout(() => {
+        if (false) {
+          this.userID = 'bob123';
+          resolve({
+            name: 'John Smith',
+            userID: this.userID!,
+            hasLinkedGoogleAccount: true,
+            isSubscribedToNotifications: true,
+          });
+        } else if (true) {
+          resolve(null);
         } else {
           reject(new Error('boom!'));
         }
