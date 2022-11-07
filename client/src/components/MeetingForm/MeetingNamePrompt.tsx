@@ -1,8 +1,8 @@
 import React from 'react';
 import Form from 'react-bootstrap/Form';
 import BottomOverlay from 'components/BottomOverlay';
-import ButtonSpinnerRight from 'components/ButtonSpinnerRight';
 import { useAppSelector } from 'app/hooks';
+import ButtonWithSpinner from 'components/ButtonWithSpinner';
 
 export default function MeetingNamePrompt({
   meetingName,
@@ -15,7 +15,6 @@ export default function MeetingNamePrompt({
   const onMeetingNameChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setMeetingName(e.target.value);
   };
-  const spinner = isLoading && <ButtonSpinnerRight />;
   return (
     <Form.Group className="d-flex align-items-center">
       <Form.Control
@@ -25,23 +24,25 @@ export default function MeetingNamePrompt({
         value={meetingName}
         onChange={onMeetingNameChange}
       />
-      <button
-        className="btn btn-primary px-4 d-none d-md-block ms-md-4 create-meeting-button"
+      <ButtonWithSpinner
+        className="btn btn-primary d-none d-md-block ms-md-4 create-meeting-button"
         tabIndex={-1}
         type="submit"
         disabled={meetingName === '' || isLoading}
+        isLoading={isLoading}
       >
-        Create {spinner}
-      </button>
+        Create
+      </ButtonWithSpinner>
       <BottomOverlay>
-        <button
-          className="btn btn-light px-4 ms-auto create-meeting-button"
+        <ButtonWithSpinner
+          className="btn btn-light ms-auto create-meeting-button"
           tabIndex={-1}
           type="submit"
           disabled={meetingName === '' || isLoading}
+          isLoading={isLoading}
         >
-          Create {spinner}
-        </button>
+          Create
+        </ButtonWithSpinner>
       </BottomOverlay>
     </Form.Group>
   );

@@ -1,62 +1,31 @@
-import { useEffect } from "react";
 import { Link } from "react-router-dom";
-import { useAppDispatch, useAppSelector } from "app/hooks";
 import GenericSpinner from 'components/GenericSpinner';
-import {
-  fetchCreatedMeetings,
-  selectCreatedMeetings,
-  selectFetchCreatedMeetingsError,
-  selectFetchCreatedMeetingsStatus,
-} from "slices/createdMeetings";
-import {
-  fetchRespondedMeetings,
-  selectRespondedMeetings,
-  selectFetchRespondedMeetingsError,
-  selectFetchRespondedMeetingsStatus,
-} from "slices/respondedMeetings";
-import type { MeetingShortInfo } from "slices/createdMeetings";
-import { addDaysToDateString, getMonthAbbr, getYearMonthDayFromDateString, tzAbbr } from "utils/dates";
+import { addDaysToDateString, getLocalYearMonthDayFromDate, getMonthAbbr, getYearMonthDayFromDateString, tzAbbr } from "utils/dates.utils";
 import styles from './Profile.module.css';
+import { useCreatedMeetings, useRespondedMeetings } from "utils/meetings.hooks";
+import { getReqErrorMessage } from "utils/requests.utils";
+import type { MeetingShortResponse } from "slices/api";
 
 export default function CreatedMeetings({showCreatedMeetings}: {showCreatedMeetings: boolean}) {
+  const createdMeetingsReqInfo = useCreatedMeetings({skip: !showCreatedMeetings});
+  const respondedMeetingsReqInfo = useRespondedMeetings({skip: showCreatedMeetings});
   const {
-    selectFetchMeetingsStatus,
-    selectFetchMeetingsError,
-    selectMeetings,
-    fetchMeetings,
-  } = showCreatedMeetings ? {
-    selectFetchMeetingsStatus: selectFetchCreatedMeetingsStatus,
-    selectFetchMeetingsError: selectFetchCreatedMeetingsError,
-    selectMeetings: selectCreatedMeetings,
-    fetchMeetings: fetchCreatedMeetings,
-  } : {
-    selectFetchMeetingsStatus: selectFetchRespondedMeetingsStatus,
-    selectFetchMeetingsError: selectFetchRespondedMeetingsError,
-    selectMeetings: selectRespondedMeetings,
-    fetchMeetings: fetchRespondedMeetings,
-  };
+    data,
+    isError,
+    error,
+  } = showCreatedMeetings ? createdMeetingsReqInfo : respondedMeetingsReqInfo;
 
-  const fetchMeetingsStatus = useAppSelector(selectFetchMeetingsStatus);
-  const fetchMeetingsError = useAppSelector(selectFetchMeetingsError);
-  const meetings = useAppSelector(selectMeetings);
-  const dispatch = useAppDispatch();
-
-  useEffect(() => {
-    if (fetchMeetingsStatus === 'idle') {
-      dispatch(fetchMeetings());
-    }
-  }, [fetchMeetingsStatus, dispatch, fetchMeetings]);
-
-  if (fetchMeetingsStatus === 'idle' || fetchMeetingsStatus === 'pending') {
-    return <GenericSpinner />;
-  } else if (fetchMeetingsStatus === 'rejected') {
+  if (isError) {
     // TODO: add a Retry button
     return (
       <p className="my-auto">
-        An error occurred: {fetchMeetingsError!.message}
+        An error occurred: {getReqErrorMessage(error!)}
       </p>
     );
+  } else if (!data) {
+    return <GenericSpinner />;
   }
+  const {meetings} = data;
 
   if (meetings.length === 0) {
     return (
@@ -82,19 +51,19 @@ export default function CreatedMeetings({showCreatedMeetings}: {showCreatedMeeti
     {
       meetings.map(meeting => (
         <Link
-          key={meeting.id}
-          to={`/m/${meeting.id}`}
+          key={meeting.meetingID}
+          to={`/m/${meeting.meetingID}`}
           className={`text-decoration-none rounded p-3 p-md-4 p-lg-5 mt-5 d-flex ${styles.meetingCard}`}
         >
           <ScheduleInfo meeting={meeting} />
           <div className={`ps-4 ${styles.meetingCardRight}`}>
             <h5>{meeting.name}</h5>
             {
-              meeting.scheduledDay === undefined && (
+              meeting.scheduledStartDateTime || (
                 <div>
                   <CalendarIcon />
                   <span className="ms-2">
-                    {meetingDatesRangeString(meeting.dates!)}
+                    {meetingDatesRangeString(meeting.tentativeDates)}
                   </span>
                 </div>
               )
@@ -119,15 +88,15 @@ export default function CreatedMeetings({showCreatedMeetings}: {showCreatedMeeti
   );
 };
 
-function ScheduleInfo({meeting}: {meeting: MeetingShortInfo}) {
-  if (meeting.scheduledDay === undefined) {
+function ScheduleInfo({meeting}: {meeting: MeetingShortResponse}) {
+  if (!meeting.scheduledStartDateTime) {
     return (
       <h4 className="my-auto pe-4">
         Not scheduled
       </h4>
     );
   }
-  const [year, month, day] = getYearMonthDayFromDateString(meeting.scheduledDay);
+  const [year, month, day] = getLocalYearMonthDayFromDate(new Date(meeting.scheduledStartDateTime));
   return (
     <div className="my-auto ps-4 pe-5 d-flex flex-column align-items-center">
       <span>{getMonthAbbr(month - 1)}</span>
@@ -163,8 +132,8 @@ function shortTimeString(hour: number): string {
   return `${HH}:${mm} ${amOrPm}`;
 }
 
-function meetingTimesRangeString(meeting: MeetingShortInfo): string {
-  return `${shortTimeString(meeting.startTime)} - ${shortTimeString(meeting.endTime)}`;
+function meetingTimesRangeString(meeting: MeetingShortResponse): string {
+  return `${shortTimeString(meeting.minStartHour)} - ${shortTimeString(meeting.maxEndHour)}`;
 }
 
 function CalendarIcon() {

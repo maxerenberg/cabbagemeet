@@ -1,4 +1,4 @@
-import { BadRequestException, Body, Controller, Delete, ForbiddenException, Get, HttpCode, NotFoundException, Param, ParseIntPipe, Patch, Post, Put, UseGuards } from '@nestjs/common';
+import { BadRequestException, Body, Controller, Delete, ForbiddenException, Get, HttpCode, HttpStatus, NotFoundException, Param, ParseIntPipe, Patch, Post, Put, UseGuards } from '@nestjs/common';
 import { DeepPartial } from 'typeorm';
 import { AuthUser, MaybeAuthUser } from 'src/auth/auth-user.decorator';
 import JwtAuthGuard from 'src/auth/jwt-auth.guard';
@@ -16,11 +16,53 @@ import AddGuestRespondentDto from './add-guest-respondent.dto';
 import EditMeetingDto from './edit-meeting.dto';
 import ScheduleMeetingDto from './schedule-meeting.dto';
 import { ModuleRef } from '@nestjs/core';
+import type MeetingShortResponse from './meeting-short-response';
 
 const modifyMeetingAuthzDoc = (
   'If the meeting was created by a registed user, then '
   + 'the client must be logged in as that user.'
 );
+
+export function meetingToMeetingShortResponse(meeting: Meeting): MeetingShortResponse {
+  const response: MeetingShortResponse = {
+    meetingID: meeting.ID,
+    name: meeting.Name,
+    about: meeting.About,
+    timezone: meeting.Timezone,
+    minStartHour: meeting.MinStartHour,
+    maxEndHour: meeting.MaxEndHour,
+    tentativeDates: JSON.parse(meeting.TentativeDates),
+  };
+  if (meeting.ScheduledStartDateTime && meeting.ScheduledEndDateTime) {
+    response.scheduledStartDateTime = meeting.ScheduledStartDateTime;
+    response.scheduledEndDateTime = meeting.ScheduledEndDateTime;
+  }
+  return response;
+}
+
+export function meetingToMeetingResponse(
+  meeting: Meeting,
+  callingUser?: User | null,
+): MeetingResponse {
+  const response: MeetingResponse = {
+    ...meetingToMeetingShortResponse(meeting),
+    // Make sure to use a left join
+    respondents: meeting.Respondents.map(respondent => ({
+      respondentID: respondent.RespondentID,
+      name: respondent.User?.Name ?? respondent.GuestName!,
+      availabilities: JSON.parse(respondent.Availabilities),
+    })),
+  };
+  if (callingUser) {
+    for (const respondent of meeting.Respondents) {
+      if (respondent.UserID === callingUser.ID) {
+        response.selfRespondentID = respondent.RespondentID;
+        break;
+      }
+    }
+  }
+  return response;
+}
 
 @ApiTags('meetings')
 @Controller('meetings')
@@ -35,39 +77,6 @@ export class MeetingsController {
   onModuleInit() {
     // circular dependency
     this.oauth2Service = this.moduleRef.get(OAuth2Service, {strict: false});
-  }
-
-  private meetingToMeetingResponse(
-    meeting: Meeting,
-    callingUser?: User | null,
-  ): MeetingResponse {
-    const response: MeetingResponse = {
-      meetingID: meeting.ID,
-      name: meeting.Name,
-      about: meeting.About,
-      minStartHour: meeting.MinStartHour,
-      maxEndHour: meeting.MaxEndHour,
-      tentativeDates: JSON.parse(meeting.TentativeDates),
-      // Make sure to use {relations: {Respondents: true}}
-      respondents: meeting.Respondents.map(respondent => ({
-        respondentID: respondent.RespondentID,
-        name: respondent.User?.Name ?? respondent.GuestName!,
-        availabilities: JSON.parse(respondent.Availabilities),
-      })),
-    };
-    if (meeting.ScheduledStartDateTime && meeting.ScheduledEndDateTime) {
-      response.scheduledStartDateTime = meeting.ScheduledStartDateTime;
-      response.scheduledEndDateTime = meeting.ScheduledEndDateTime;
-    }
-    if (callingUser) {
-      for (const respondent of meeting.Respondents) {
-        if (respondent.UserID === callingUser.ID) {
-          response.selfRespondentID = respondent.RespondentID;
-          break;
-        }
-      }
-    }
-    return response;
   }
 
   private async checkIfRespondentExistsAndClientIsAllowedToModifyThem(
@@ -103,6 +112,7 @@ export class MeetingsController {
       ' they will be registered as the meeting\'s creator. Otherwise, the meeting will' +
       ' have no creator.'
     ),
+    operationId: 'createMeeting',
   })
   @ApiBadRequestResponse({type: BadRequestResponse})
   @Post()
@@ -114,6 +124,7 @@ export class MeetingsController {
     const partialMeeting: DeepPartial<Meeting> = {
       Name: body.name,
       About: body.about,
+      Timezone: body.timezone,
       MinStartHour: body.minStartHour,
       MaxEndHour: body.maxEndHour,
       TentativeDates: JSON.stringify(body.tentativeDates),
@@ -125,12 +136,13 @@ export class MeetingsController {
     // Normally we would do a left join to get the respondents
     // Since we just created the meeting, this field will be undefined
     meeting.Respondents = [];
-    return this.meetingToMeetingResponse(meeting);
+    return meetingToMeetingResponse(meeting);
   }
 
   @ApiOperation({
     summary: 'Get a meeting',
     description: 'Retrieve the information about a meeting.',
+    operationId: 'getMeeting',
   })
   @ApiBadRequestResponse({type: BadRequestResponse})
   @ApiNotFoundResponse({type: NotFoundResponse})
@@ -144,12 +156,13 @@ export class MeetingsController {
     if (!meeting) {
       throw new NotFoundException();
     }
-    return this.meetingToMeetingResponse(meeting, maybeUser);
+    return meetingToMeetingResponse(meeting, maybeUser);
   }
 
   @ApiOperation({
     summary: 'Edit a meeting',
     description: 'Edit a meeting. ' + modifyMeetingAuthzDoc,
+    operationId: 'editMeeting',
   })
   @ApiBadRequestResponse({type: BadRequestResponse})
   @ApiNotFoundResponse({type: NotFoundResponse})
@@ -172,12 +185,13 @@ export class MeetingsController {
       throw new BadRequestException('At least one property must be specified');
     }
     const meeting = await this.meetingsService.updateMeeting(meetingID, updatedInfo);
-    return this.meetingToMeetingResponse(meeting, maybeUser);
+    return meetingToMeetingResponse(meeting, maybeUser);
   }
 
   @ApiOperation({
     summary: 'Schedule a meeting',
     description: 'Schedule a meeting. ' + modifyMeetingAuthzDoc,
+    operationId: 'scheduleMeeting',
   })
   @ApiBadRequestResponse({type: BadRequestResponse})
   @ApiNotFoundResponse({type: NotFoundResponse})
@@ -204,12 +218,13 @@ export class MeetingsController {
         maybeUser.ID, meetingID, body.startDateTime, body.endDateTime
       );
     }
-    return this.meetingToMeetingResponse(meeting, maybeUser);
+    return meetingToMeetingResponse(meeting, maybeUser);
   }
 
   @ApiOperation({
     summary: 'Unschedule a meeting',
     description: 'Unschedule a meeting. ' + modifyMeetingAuthzDoc,
+    operationId: 'unscheduleMeeting',
   })
   @ApiNotFoundResponse({type: NotFoundResponse})
   @ApiForbiddenResponse({type: ForbiddenResponse})
@@ -229,17 +244,18 @@ export class MeetingsController {
       // Update the user's external calendars, if necessary
       await this.oauth2Service.google_deleteEventForMeeting(maybeUser.ID, meetingID);
     }
-    return this.meetingToMeetingResponse(meeting, maybeUser);
+    return meetingToMeetingResponse(meeting, maybeUser);
   }
 
   @ApiOperation({
     summary: 'Delete a meeting',
     description: 'Delete a meeting. ' + modifyMeetingAuthzDoc,
+    operationId: 'deleteMeeting',
   })
   @ApiNotFoundResponse({type: NotFoundResponse})
   @ApiForbiddenResponse({type: ForbiddenResponse})
   @Delete(':id')
-  @HttpCode(204)
+  @HttpCode(HttpStatus.NO_CONTENT)
   @UseGuards(OptionalJwtAuthGuard)
   async deleteMeeting(
     @Param('id', ParseIntPipe) meetingID: number,
@@ -252,9 +268,13 @@ export class MeetingsController {
   // TODO: return the updated meeting after adding/updating a respondent
   // so that the client doesn't need to make an extra request
 
+  // TODO: email notifications for when people add availabilities or meeting
+  // is scheduled
+
   @ApiOperation({
     summary: 'Add guest availabilities',
     description: 'Add the meeting availabilities for a guest user.',
+    operationId: 'addGuestRespondent',
   })
   @Post(':id/respondents/guest')
   async addGuestRespondent(
@@ -267,6 +287,7 @@ export class MeetingsController {
   @ApiOperation({
     summary: 'Add own availabilities',
     description: 'Add or update the meeting availabilities of the user who is currently logged in.',
+    operationId: 'addSelfRespondent',
   })
   @ApiForbiddenResponse({type: ForbiddenResponse})
   @ApiCookieAuth()
@@ -291,6 +312,7 @@ export class MeetingsController {
       'Update the meeting availabilities of an existing respondent.<br><br>'
       + 'If the respondent is a registered user, then the client must be logged in as that user.'
     ),
+    operationId: 'updateAvailabilities',
   })
   @ApiForbiddenResponse({type: ForbiddenResponse})
   @Put(':id/respondents/:respondentID')
@@ -311,6 +333,7 @@ export class MeetingsController {
       'Remove a respondent from a meeting.<br><br>'
       + 'If the respondent is a registered user, then the client must be logged in as that user.'
     ),
+    operationId: 'deleteRespondent',
   })
   @Delete(':id/respondents/:respondentID')
   @UseGuards(OptionalJwtAuthGuard)

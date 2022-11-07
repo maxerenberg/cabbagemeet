@@ -9,11 +9,9 @@ import type {
 import type { RootState, AppThunk } from 'app/store';
 import type { PeopleDateTimes, RequestStatus, DateTimeSet, PeopleInfo, PeopleDateTimesFlat } from 'common/types';
 import { selectSelectedDates } from 'slices/selectedDates';
-import { addOffsetToDateTimes, getUTCOffsetHours, today } from 'utils/dates';
+import { convertOtherTzToLocal } from 'utils/dates.utils';
 import { ExternalCalendarEventsToExternalCalendarEventsWithDateTimes, PeopleDateTimesFlatToPeopleDateTimes, startAndEndDateTimeToDateTimeSet } from './meetingTimes.helpers';
-import { assert } from 'utils/misc';
-import { resetCreatedMeetings } from 'slices/createdMeetings';
-import { resetRespondedMeetings } from 'slices/respondedMeetings';
+import { assert } from 'utils/misc.utils';
 
 // All dates and times are stored in local time, except for the DateTime strings
 // which are stored in UTC.
@@ -87,21 +85,12 @@ export const createMeeting = createAsyncThunk<
       about,
     } = payload;
     const localDates = Object.keys(selectSelectedDates(getState()));
-    const { startTime, endTime, dates } = addOffsetToDateTimes(
-      {
-        startTime: localStartTime,
-        endTime: localEndTime,
-        dates: localDates,
-      },
-      -getUTCOffsetHours(today)
-    );
-
     return await client.createMeeting({
       name,
       about,
-      dates,
-      startTime,
-      endTime,
+      dates: localDates,
+      startTime: localStartTime,
+      endTime: localEndTime,
     });
   },
 );
@@ -204,9 +193,8 @@ export const meetingTimesSlice = createSlice({
           payload.googleCalendarEvents
           ? ExternalCalendarEventsToExternalCalendarEventsWithDateTimes(payload.googleCalendarEvents)
           : undefined;
-        const {startTime, endTime, dates} = addOffsetToDateTimes(
-          { startTime: UTCStartTime, endTime: UTCEndTime, dates: UTCDates },
-          getUTCOffsetHours(UTCDates[0]),
+        const {startHour: startTime, endHour: endTime, dates} = convertOtherTzToLocal(
+          { startHour: UTCStartTime, endHour: UTCEndTime, dates: UTCDates, timezone: '', },
         );
         const availabilities = PeopleDateTimesFlatToPeopleDateTimes(availabilitiesFlat);
         return {
@@ -242,9 +230,8 @@ export const meetingTimesSlice = createSlice({
           about,
           id,
         } = action.payload;
-        const {startTime, endTime, dates} = addOffsetToDateTimes(
-          { startTime: UTCStartTime, endTime: UTCEndTime, dates: UTCDates },
-          getUTCOffsetHours(UTCDates[0]),
+        const {startHour: startTime, endHour: endTime, dates} = convertOtherTzToLocal(
+          { startHour: UTCStartTime, endHour: UTCEndTime, dates: UTCDates, timezone: '', },
         );
         const availabilities = PeopleDateTimesFlatToPeopleDateTimes(availabilitiesFlat);
         dates.sort();
@@ -313,26 +300,12 @@ const {
 export const resetEditMeetingStatus =
   (): AppThunk =>
   (dispatch, getState) => {
-    const editMeetingStatus = getState().meetingTimes.editMeetingStatus;
     dispatch(resetEditMeetingStatusInternal());
-    if (editMeetingStatus === 'succeeded') {
-      // Need to invalidate the data for created/responded meetings
-      // This is ugly :(
-      // TODO: use a library which handles this automatically, e.g. RTK Query
-      dispatch(resetCreatedMeetings());
-      dispatch(resetRespondedMeetings());
-    }
   };
 export const resetDeleteMeetingStatus =
   (): AppThunk =>
   (dispatch, getState) => {
-    const deleteMeetingStatus = getState().meetingTimes.deleteMeetingStatus;
     dispatch(resetDeleteMeetingStatusInternal());
-    if (deleteMeetingStatus === 'succeeded') {
-      // Likewise...
-      dispatch(resetCreatedMeetings());
-      dispatch(resetRespondedMeetings());
-    }
   };
 
 export const {

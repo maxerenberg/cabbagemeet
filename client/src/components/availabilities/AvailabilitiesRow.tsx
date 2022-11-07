@@ -1,7 +1,5 @@
 import React, { useState, useCallback, useEffect, useMemo } from 'react';
 import BottomOverlay from 'components/BottomOverlay';
-import ButtonSpinnerRight from 'components/ButtonSpinnerRight';
-import NonFocusButton from 'components/NonFocusButton';
 import {
   selectSelMode,
   resetSelection,
@@ -19,10 +17,11 @@ import {
 import { useAppSelector, useAppDispatch } from 'app/hooks';
 import SaveTimesModal from './SaveTimesModal';
 import { useToast } from 'components/Toast';
-import { assertIsNever } from 'utils/misc';
+import { assertIsNever } from 'utils/misc.utils';
 import { selectMeetingIsScheduled, selectSelfIsInAvailabilities } from 'slices/meetingTimes';
 import { selectUserID } from 'slices/authentication';
-import { addMinutesToDateTimeString, daysOfWeek, months, to12HourClock } from 'utils/dates';
+import { addMinutesToDateTimeString, daysOfWeek, months, to12HourClock } from 'utils/dates.utils';
+import ButtonWithSpinner from 'components/ButtonWithSpinner';
 
 function AvailabilitiesRow({
   moreDaysToRight,
@@ -218,9 +217,6 @@ function AvailabilitiesRow({
     onLeftBtnClick = () => dispatch(resetSelection());
   }
 
-  const leftBtnSpinner = leftBtnDisabled && <ButtonSpinnerRight />;
-  const rightBtnSpinner = rightBtnDisabled && <ButtonSpinnerRight />;
-
   return (
     <>
       <div style={{
@@ -233,40 +229,44 @@ function AvailabilitiesRow({
         <div style={{fontSize: '1.3em'}}>{title}</div>
         <div className="d-none d-md-flex">
           {leftBtnText && (
-            <NonFocusButton
-              className="btn btn-outline-primary px-3 meeting-avl-button"
+            <ButtonWithSpinner
+              as="NonFocusButton"
+              className="btn btn-outline-primary meeting-avl-button"
               onClick={onLeftBtnClick}
-              disabled={leftBtnDisabled}
+              isLoading={leftBtnDisabled}
             >
-              {leftBtnText} {leftBtnSpinner}
-            </NonFocusButton>
+              {leftBtnText}
+            </ButtonWithSpinner>
           )}
-          <NonFocusButton
-            className="btn btn-primary ms-4 px-3 meeting-avl-button"
-            disabled={rightBtnDisabled}
+          <ButtonWithSpinner
+            as="NonFocusButton"
+            className="btn btn-primary ms-4 meeting-avl-button"
+            isLoading={rightBtnDisabled}
             onClick={onRightBtnClick}
           >
-            {rightBtnText} {rightBtnSpinner}
-          </NonFocusButton>
+            {rightBtnText}
+          </ButtonWithSpinner>
         </div>
       </div>
       <BottomOverlay>
         {leftBtnText && (
-          <NonFocusButton
-            className="btn btn-outline-light px-4 meeting-avl-button"
+          <ButtonWithSpinner
+            as="NonFocusButton"
+            className="btn btn-outline-light meeting-avl-button"
             onClick={onLeftBtnClick}
-            disabled={leftBtnDisabled}
+            isLoading={leftBtnDisabled}
           >
-            {leftBtnText} {leftBtnSpinner}
-          </NonFocusButton>
+            {leftBtnText}
+          </ButtonWithSpinner>
         )}
-        <NonFocusButton
-          className="btn btn-light ms-auto px-4 meeting-avl-button"
-          disabled={rightBtnDisabled}
+        <ButtonWithSpinner
+          as="NonFocusButton"
+          className="btn btn-light ms-auto meeting-avl-button"
+          isLoading={rightBtnDisabled}
           onClick={onRightBtnClick}
         >
-          {rightBtnText} {rightBtnSpinner}
-        </NonFocusButton>
+          {rightBtnText}
+        </ButtonWithSpinner>
       </BottomOverlay>
       {shouldShowModal && <SaveTimesModal onClose={closeModal} />}
     </>

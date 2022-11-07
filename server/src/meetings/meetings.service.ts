@@ -4,14 +4,7 @@ import { DeepPartial, Repository } from 'typeorm';
 import MeetingRespondent from './meeting-respondent.entity';
 import Meeting from './meeting.entity';
 
-export type MeetingShort = Pick<
-  Meeting,
-  'ID' | 'Name' | 'MinStartHour' | 'MaxEndHour' | 'TentativeDates' | 'ScheduledStartDateTime'
->;
 export class NoSuchMeetingError extends Error {}
-const meetingShortColumns = [
-  'ID', 'Name', 'MinStartHour', 'MaxEndHour', 'TentativeDates', 'ScheduledStartDateTime'
-].map(s => 'Meeting.' + s);
 
 @Injectable()
 export default class MeetingsService {
@@ -102,22 +95,22 @@ export default class MeetingsService {
     await this.respondentsRepository.delete(respondentID);
   }
 
-  async getMeetingsCreatedBy(userID: number): Promise<MeetingShort[]> {
+  getMeetingsCreatedBy(userID: number): Promise<Meeting[]> {
     // TODO: support cursor-based pagination
-    return await this.meetingsRepository
+    return this.meetingsRepository
       .createQueryBuilder()
-      .select(meetingShortColumns)
+      .select(['Meeting'])
       .where('CreatorID = :userID', {userID})
       .limit(100)
       .getMany();
   }
 
-  async getMeetingsRespondedToBy(userID: number): Promise<MeetingShort[]> {
+  async getMeetingsRespondedToBy(userID: number): Promise<Meeting[]> {
     // TODO: support cursor-based pagination
     return await this.meetingsRepository
       .createQueryBuilder()
       .innerJoin('Meeting.Respondents', 'MeetingRespondent')
-      .select(meetingShortColumns)
+      .select(['Meeting'])
       .where('MeetingRespondent.UserID = :userID', {userID})
       .limit(100)
       .getMany();

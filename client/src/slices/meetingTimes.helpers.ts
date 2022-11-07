@@ -1,8 +1,8 @@
 import type { ExternalCalendarEvent } from 'app/client';
 import type { DateTimeSet, PeopleDateTimes, PeopleDateTimesFlat } from 'common/types';
-import { arrayToObject } from 'utils/arrays';
-import { addMinutesToDateTimeString } from 'utils/dates';
-import { assert } from 'utils/misc';
+import { arrayToObject } from 'utils/arrays.utils';
+import { addMinutesToDateTimeString } from 'utils/dates.utils';
+import { assert } from 'utils/misc.utils';
 import type { ExternalCalendarEventWithDateTimes } from './meetingTimes';
 
 /**

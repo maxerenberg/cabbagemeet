@@ -1,17 +1,27 @@
 import {
+  BadRequestException,
+  Body,
+  ConflictException,
   Controller,
   Get,
+  HttpCode,
+  HttpStatus,
   Logger,
+  Post,
   Query,
   Res,
   UseGuards,
 } from '@nestjs/common';
+import { ApiExcludeEndpoint, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { Response } from 'express';
 import { AuthUser } from 'src/auth/auth-user.decorator';
 import JwtAuthGuard from 'src/auth/jwt-auth.guard';
 import CustomJwtService from 'src/custom-jwt/custom-jwt.service';
 import { assertIsNever } from 'src/misc.utils';
 import User from 'src/users/user.entity';
+import { DeepPartial } from 'typeorm';
+import ConfirmLinkAccountDto from './confirm-link-account.dto';
+import GoogleOAuth2 from './google-oauth2.entity';
 import OAuth2Service, {
   oauth2Reasons,
   OAuth2State,
@@ -21,6 +31,7 @@ import OAuth2Service, {
   OAuth2NotAllScopesGrantedError,
 } from './oauth2.service';
 
+@ApiTags('externalCalendars')
 @Controller()
 export class Oauth2Controller {
   private readonly logger = new Logger(Oauth2Controller.name);
@@ -49,6 +60,7 @@ export class Oauth2Controller {
     }
   }
 
+  @ApiExcludeEndpoint()
   @Get('redirect/google')
   async googleRedirect(
     @Res() res: Response,
@@ -120,17 +132,55 @@ export class Oauth2Controller {
     } catch (err: any) {
       // TODO: show a nice error message page
       if (err instanceof OAuth2NotConfiguredError) {
-        res.status(403).contentType('text/plain').send('Google OAuth2 not available');
+        res.redirect('/error?e=E_GOOGLE_OAUTH2_NOT_AVAILABLE');
       } else if (err instanceof OAuth2AccountAlreadyLinkedError) {
-        res.status(409).contentType('text/plain').send(
-          'This Google account is already linked to an existing local account'
-        );
+        res.redirect('/error?e=E_GOOGLE_ACCOUNT_ALREADY_LINKED');
       } else if (err instanceof OAuth2NotAllScopesGrantedError) {
-        res.status(403).contentType('text/plain').send('Not all OAuth2 scopes were granted');
+        res.redirect('/error?e=E_NOT_ALL_OAUTH2_SCOPES_GRANTED');
       } else {
         this.logger.error(err);
-        res.status(500).contentType('text/plain').send('Internal server error');
+        res.redirect('/error?e=E_INTERNAL_SERVER_ERROR');
       }
+    }
+  }
+
+  @ApiOperation({
+    summary: 'Confirm Google account linking',
+    description: (
+      'Confirm that the Google account in the encryptedEntity should be linked to the'
+      + ' account of the user who is currently logged in. This should be called after'
+      + ' the user is redirected to the /confirm-link-google-account page.'
+    ),
+    operationId: 'confirmLinkGoogleAccount',
+  })
+  @Post('confirm-link-google-account')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @UseGuards(JwtAuthGuard)
+  async confirmLinkGoogleAccount(
+    @AuthUser() user: User,
+    @Body() body: ConfirmLinkAccountDto,
+  ) {
+    const iv = Buffer.from(body.iv, 'base64url');
+    const salt = Buffer.from(body.salt, 'base64url');
+    const encryptedEntity = Buffer.from(body.encrypted_entity, 'base64url');
+    const oauth2Entity = JSON.parse(
+      await this.jwtService.decryptText(encryptedEntity, iv, salt)
+    ) as DeepPartial<GoogleOAuth2>;
+    // sanity check
+    if (!(
+      typeof oauth2Entity === 'object'
+      && typeof oauth2Entity.UserID === 'number'
+      && oauth2Entity.UserID === user.ID
+    )) {
+      throw new BadRequestException('Invalid encrypted entity');
+    }
+    try {
+      await this.oauth2Service.google_linkAccountFromConfirmation(oauth2Entity);
+    } catch (err: any) {
+      if (err instanceof OAuth2AccountAlreadyLinkedError) {
+        throw new ConflictException('This Google account is already linked');
+      }
+      throw err;
     }
   }
 }

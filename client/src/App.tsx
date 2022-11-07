@@ -13,7 +13,7 @@ import {
 import './App.scss';
 import './custom.css';
 import 'common/common.css';
-import { useAppDispatch, useAppSelector } from 'app/hooks';
+import { useAppSelector } from 'app/hooks';
 import DayPicker from 'components/DayPicker/DayPicker';
 import ForgotPassword from 'components/ForgotPassword';
 import HowItWorksPage from 'components/HowItWorksPage';
@@ -23,10 +23,13 @@ import Signup from 'components/Signup';
 import Meeting from 'components/availabilities/Meeting';
 import Profile from 'components/Profile';
 import Settings from 'components/Settings';
-import { getSelfInfo, selectGetSelfInfoError, selectGetSelfInfoState, selectIsLoggedIn } from 'slices/authentication';
-import useEffectOnce from 'utils/useEffectOnce.hook';
+import { selectTokenIsPresent } from 'slices/authentication';
 import { useEffect } from 'react';
 import { useToast } from 'components/Toast';
+import { useExtractTokenFromQueryParams, useSelfInfo } from 'utils/auth.hooks';
+import { getReqErrorMessage } from 'utils/requests.utils';
+import ErrorPage from 'components/ErrorPage';
+import ConfirmLinkExternalCalendar from 'components/ConfirmLinkExternalCalendar';
 
 export default function App() {
   return (
@@ -39,7 +42,9 @@ export default function App() {
           <Route path="m/:id" element={<Meeting />} />
           <Route path="signup" element={<Signup />} />
           <Route path="login" element={<Login />} />
+          <Route path="confirm-link-google-account" element={<ConfirmLinkExternalCalendar provider="google" />} />
           <Route path="forgot-password" element={<ForgotPassword />} />
+          <Route path="error" element={<ErrorPage />} />
           <Route path="me">
             <Route index element={<Profile />} />
             <Route path="settings" element={<Settings />} />
@@ -52,21 +57,18 @@ export default function App() {
 }
 
 function AppRoot() {
-  const getSelfInfoFailed = useAppSelector(state => selectGetSelfInfoState(state) === 'failed');
-  const getSelfInfoError = useAppSelector(selectGetSelfInfoError);
-  const dispatch = useAppDispatch();
   const {showToast} = useToast();
-  useEffectOnce(() => {
-    dispatch(getSelfInfo());
-  }, []);
+  const {isError, error} = useSelfInfo();
   useEffect(() => {
-    if (getSelfInfoFailed) {
+    if (isError) {
       showToast({
-        msg: `Failed to get user info: ${getSelfInfoError?.message ?? 'unknown'}`,
+        // TODO: create helper function to serialize error message
+        msg: `Failed to get user info: ${getReqErrorMessage(error!)}`,
         msgType: 'failure',
       });
     }
-  }, [getSelfInfoFailed, getSelfInfoError, showToast]);
+  }, [isError, error, showToast]);
+  useExtractTokenFromQueryParams();
   return (
     <div className="App light-theme d-flex flex-column">
       <Navbar expand="md" className="mt-3 mb-5">
@@ -103,14 +105,15 @@ function AppRoot() {
 }
 
 function HeaderLinks() {
-  const isLoggedIn = useAppSelector(selectIsLoggedIn);
+  // assume that user info will be successfully fetched if token is present (optimistic)
+  const isOrWillBeLoggedIn = useAppSelector(selectTokenIsPresent);
   const links = [
     {
       to: "/how-it-works",
       desc: "How it works",
     },
   ];
-  if (isLoggedIn) {
+  if (isOrWillBeLoggedIn) {
     links.push({to: '/me', desc: 'Profile'});
   } else {
     links.push({to: '/signup', desc: 'Sign up'});

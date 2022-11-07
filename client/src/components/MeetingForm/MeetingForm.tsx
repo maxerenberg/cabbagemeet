@@ -10,7 +10,7 @@ import './MeetingForm.css';
 import MeetingNamePrompt from './MeetingNamePrompt';
 import MeetingAboutPrompt from './MeetingAboutPrompt';
 import MeetingTimesPrompt from './MeetingTimesPrompt';
-import { assert } from 'utils/misc';
+import { assert } from 'utils/misc.utils';
 
 export default function MeetingForm() {
   const [meetingName, setMeetingName] = useState('');

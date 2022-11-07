@@ -53,6 +53,10 @@
   color: var(--custom-primary-contrast);
 }
 
+.custom-btn-min-width {
+  min-width: 6.5em;
+}
+
 footer {
   padding: 2rem 0;
 }

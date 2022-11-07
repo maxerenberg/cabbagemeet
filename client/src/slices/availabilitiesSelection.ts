@@ -14,9 +14,9 @@ import {
   unsetScheduledDateTimes,
   selectSelfIsInAvailabilities,
 } from 'slices/meetingTimes';
-import { assert } from 'utils/misc';
-import { addMinutesToDateTimeString } from 'utils/dates';
-import { selectIsLoggedIn, selectUserID } from './authentication';
+import { assert } from 'utils/misc.utils';
+import { addMinutesToDateTimeString } from 'utils/dates.utils';
+import { selectUserInfoIsPresent, selectUserID } from './authentication';
 
 // TODO: place these fields directly into AvailabilitiesSelectionState
 // and get rid of the type predicate functions
@@ -519,7 +519,7 @@ const editSelfWhenLoggedIn =
 export const editSelf =
   (): AppThunk =>
   (dispatch, getState) => {
-    const isLoggedIn = selectIsLoggedIn(getState());
+    const isLoggedIn = selectUserInfoIsPresent(getState());
     if (isLoggedIn) {
       dispatch(editSelfWhenLoggedIn());
     } else {

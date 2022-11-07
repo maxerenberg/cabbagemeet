@@ -11,7 +11,7 @@ import User from 'src/users/user.entity';
 import { assert } from 'src/misc.utils';
 import { columnsForGetUser } from 'src/users/users.service';
 import type { GoogleOIDCResponse, GoogleDecodedOIDCIDToken, GoogleRefreshTokenResponse, GoogleListEventsResponse, GoogleListEventsResponseItem, GoogleInsertEventResponse } from './oauth2-response-types';
-import { customToISOString, getSecondsSinceUnixEpoch } from 'src/dates.utils';
+import { toISOStringUTC, getSecondsSinceUnixEpoch } from 'src/dates.utils';
 import MeetingsService from 'src/meetings/meetings.service';
 import GoogleCalendarEvents, { GoogleCalendarEvent } from './google-calendar-events.entity';
 import GoogleCalendarCreatedEvent from './google-calendar-created-event.entity';
@@ -268,6 +268,7 @@ export default class OAuth2Service {
       .where('GoogleOAuth2.Sub = :sub', {sub: decodedIDToken.sub})
       .getOne();
     if (userBySub) {
+      // TODO: update access token from response (eager)
       return {user: userBySub, isLinkedToAccountFromOIDCResponse: true};
     }
     const userByEmail: User | null = await this.usersRepository
@@ -386,6 +387,18 @@ export default class OAuth2Service {
     }
   }
 
+  async google_linkAccountFromConfirmation(oauth2Entity: DeepPartial<GoogleOAuth2>) {
+    try {
+      await this.googleOAuth2Repository.insert(oauth2Entity);
+    } catch (err: any) {
+      err = normalizeDBError(err as Error);
+      if (err instanceof UniqueConstraintFailed) {
+        throw new OAuth2AccountAlreadyLinkedError();
+      }
+      throw err;
+    }
+  }
+
   private async google_getOrRefreshCreds(userID: number): Promise<GoogleOAuth2 | null> {
     const creds = await this.googleOAuth2Repository.findOneBy({UserID: userID});
     if (!creds) {
@@ -461,8 +474,8 @@ export default class OAuth2Service {
     return {
       ID: item.id,
       summary: item.summary,
-      start: customToISOString(new Date(item.start.dateTime)),
-      end: customToISOString(new Date(item.end.dateTime)),
+      start: toISOStringUTC(new Date(item.start.dateTime)),
+      end: toISOStringUTC(new Date(item.end.dateTime)),
     };
   }
 

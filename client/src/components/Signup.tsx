@@ -1,18 +1,13 @@
 import React, { useEffect, useRef, useState } from 'react';
 import Form from 'react-bootstrap/Form';
 import { Link, useNavigate } from 'react-router-dom';
-import { useAppDispatch, useAppSelector } from 'app/hooks';
 import BottomOverlay from 'components/BottomOverlay';
 import ContinueWithGoogleButton from 'components/ContinueWithGoogleButton';
 import { useToast } from 'components/Toast';
-import ButtonSpinnerRight from 'components/ButtonSpinnerRight';
 import styles from './Signup.module.css';
-import {
-  selectSignupError,
-  selectSignupState,
-  setAuthRequestToIdle,
-  submitSignupForm,
- } from 'slices/authentication';
+import { useSignup } from 'utils/auth.hooks';
+import { getReqErrorMessage } from 'utils/requests.utils';
+import ButtonWithSpinner from './ButtonWithSpinner';
 
 export default function Signup() {
   return (
@@ -25,26 +20,26 @@ export default function Signup() {
 
 function SignupForm() {
   const [validated, setValidated] = useState(false);
-  const dispatch = useAppDispatch();
   const navigate = useNavigate();
-  const signupState = useAppSelector(selectSignupState);
-  const signupError = useAppSelector(selectSignupError);
+  const [signup, {isLoading, isSuccess, isError, error}] = useSignup();
   const { showToast } = useToast();
   const nameRef = useRef<HTMLInputElement>(null);
   const emailRef = useRef<HTMLInputElement>(null);
   const passwordRef = useRef<HTMLInputElement>(null);
   let onSubmit: React.FormEventHandler<HTMLFormElement> | undefined;
-  const submitBtnDisabled = signupState !== 'idle';
-  if (signupState === 'idle') {
+  const submitBtnDisabled = isLoading;
+  if (!submitBtnDisabled) {
     onSubmit = (ev) => {
       ev.preventDefault();
       const form = ev.currentTarget;
       if (form.checkValidity()) {
-        dispatch(submitSignupForm({
-          name: nameRef.current!.value,
-          email: emailRef.current!.value,
-          password: passwordRef.current!.value,
-        }));
+        signup({
+          localSignupDto: {
+            name: nameRef.current!.value,
+            email: emailRef.current!.value,
+            password: passwordRef.current!.value,
+          }
+        });
       } else {
         setValidated(true);
       }
@@ -52,22 +47,20 @@ function SignupForm() {
   }
 
   useEffect(() => {
-    if (signupState === 'failed') {
+    if (isError) {
       showToast({
-        msg: `An error occurred: ${signupError!.message || 'unknown'}`,
+        msg: `An error occurred: ${getReqErrorMessage(error)}`,
         msgType: 'failure',
       });
-      dispatch(setAuthRequestToIdle());
-    } else if (signupState === 'succeeded') {
-      //dispatch(setAuthRequestToIdle());
+    } else if (isSuccess) {
       navigate('/');
     }
-  }, [signupState, signupError, dispatch, navigate, showToast]);
+  }, [isError, error, isSuccess, navigate, showToast]);
 
   return (
     <Form noValidate className={styles.signupForm} {...{validated, onSubmit}}>
       <h4 className="mb-5">Sign up</h4>
-      <ContinueWithGoogleButton />
+      <ContinueWithGoogleButton reason='signup' />
       <div className="d-flex align-items-center my-4">
         <div className="border-top flex-grow-1"></div>
         <span className="fw-bold mx-2">OR</span>
@@ -117,26 +110,31 @@ function SignupForm() {
 }
 
 function SignUpOrLogin({ disabled } : { disabled: boolean }) {
-  const spinner = disabled && <ButtonSpinnerRight />;
   return (
     <>
       <div className="d-none d-md-flex align-items-center justify-content-between mt-5">
         <Link to="/login" className={`custom-link ${styles.alreadyHaveAccountLink}`}>
           Already have an account?
         </Link>
-        <button type="submit" className="btn btn-outline-primary px-3" disabled={disabled}>
+        <ButtonWithSpinner
+          type="submit"
+          className="btn btn-outline-primary"
+          isLoading={disabled}
+        >
           Sign up
-          {spinner}
-        </button>
+        </ButtonWithSpinner>
       </div>
       <BottomOverlay>
         <Link to="/login" className={`custom-link custom-link-inverted ${styles.alreadyHaveAccountLink}`}>
           Already have an account?
         </Link>
-        <button type="submit" className="btn btn-light ms-auto px-3" disabled={disabled}>
+        <ButtonWithSpinner
+          type="submit"
+          className="btn btn-light ms-auto"
+          isLoading={disabled}
+        >
           Sign up
-          {spinner}
-        </button>
+        </ButtonWithSpinner>
       </BottomOverlay>
     </>
   );

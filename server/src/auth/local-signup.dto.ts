@@ -5,6 +5,8 @@ import {
   IsNotEmpty,
   MinLength,
   MaxLength,
+  IsBoolean,
+  IsOptional,
 } from 'class-validator';
 
 export default class LocalSignupDto {
@@ -22,4 +24,9 @@ export default class LocalSignupDto {
   @MinLength(6)
   @MaxLength(30)
   password: string;
+
+  @ApiProperty()
+  @IsBoolean()
+  @IsOptional()
+  subscribe_to_notifications?: boolean = true;
 }

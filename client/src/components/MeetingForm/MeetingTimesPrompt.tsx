@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import Form from 'react-bootstrap/Form';
-import { to12HourClock, tzAbbr } from 'utils/dates';
-import { range } from 'utils/arrays';
+import { to12HourClock, tzAbbr } from 'utils/dates.utils';
+import { range } from 'utils/arrays.utils';
 
 // startTime and endTime use a 24-hour clock
 export default function MeetingTimesPrompt({

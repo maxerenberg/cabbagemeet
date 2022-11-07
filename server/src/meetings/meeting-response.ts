@@ -1,7 +1,5 @@
 import { ApiProperty } from "@nestjs/swagger";
 
-// TODO: return respondentID for logged in user
-
 export default class MeetingResponse {
   @ApiProperty({example: 1})
   meetingID: number;
@@ -11,6 +9,9 @@ export default class MeetingResponse {
 
   @ApiProperty({example: 'Some meeting description'})
   about: string;
+
+  @ApiProperty({example: 'America/Toronto'})
+  timezone: string;
 
   @ApiProperty({example: 10.5})
   minStartHour: number;
@@ -50,18 +51,4 @@ export default class MeetingResponse {
     example: 1,
   })
   selfRespondentID?: number;
-
-  // TODO: create separate endpoint for external calendar events
-  // @ApiProperty({example: [
-  //   {
-  //     name: 'My event',
-  //     startDateTime: '2022-10-23T10:00:00Z',
-  //     endDateTime: '2022-10-23T10:30:00Z',
-  //   }
-  // ]})
-  // googleCalendarEvents?: {
-  //   name: string;
-  //   startDateTime: string;
-  //   endDateTime: string;
-  // }[];
 }

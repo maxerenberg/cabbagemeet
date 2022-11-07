@@ -3,27 +3,24 @@ import ButtonGroup from 'react-bootstrap/ButtonGroup';
 import { Link, useNavigate } from "react-router-dom";
 import { useAppDispatch, useAppSelector } from "app/hooks";
 import BottomOverlay from "components/BottomOverlay";
-import ButtonSpinnerRight from "components/ButtonSpinnerRight";
 import NonFocusButton from "components/NonFocusButton";
 import {
-  selectGetSelfInfoState,
-  selectLogoutState,
-  selectLogoutError,
-  submitLogout,
-  setAuthRequestToIdle,
   selectUserInfo,
-  selectIsLoggedIn,
+  selectTokenIsPresent,
 } from "slices/authentication";
 import CreatedOrRespondedMeetings from "./CreatedOrRespondedMeetings";
 import styles from './Profile.module.css';
 import { useToast } from "components/Toast";
+import { useLogout, useSelfInfo } from "utils/auth.hooks";
+import { getReqErrorMessage } from "utils/requests.utils";
+import ButtonWithSpinner from "components/ButtonWithSpinner";
 
 export default function Profile() {
-  const getSelfInfoState = useAppSelector(selectGetSelfInfoState);
-  const isLoggedIn = useAppSelector(selectIsLoggedIn);
+  const tokenIsPresent = useAppSelector(selectTokenIsPresent);
+  const {isError} = useSelfInfo();
   const navigate = useNavigate();
   const [seeCreatedMeetings, setSeeCreatedMeetings] = useState(true);
-  const shouldBeRedirectedToHomePage = !isLoggedIn && (getSelfInfoState === 'succeeded' || getSelfInfoState === 'failed');
+  const shouldBeRedirectedToHomePage = !tokenIsPresent || isError;
 
   useEffect(() => {
     if (shouldBeRedirectedToHomePage) {
@@ -47,24 +44,20 @@ export default function Profile() {
 };
 
 function Heading() {
+  const [logout, {isLoading, isError, error}] = useLogout();
   const userInfo = useAppSelector(selectUserInfo);
   const dispatch = useAppDispatch();
-  const onSignoutClick = () => dispatch(submitLogout());
-  const logoutState = useAppSelector(selectLogoutState);
-  const logoutError = useAppSelector(selectLogoutError);
+  const onSignoutClick = () => logout();
   const { showToast } = useToast();
 
   useEffect(() => {
-    if (logoutState === 'succeeded') {
-      dispatch(setAuthRequestToIdle());
-    } else if (logoutState === 'failed') {
+    if (isError) {
       showToast({
-        msg: `Failed to logout: ${logoutError!.message || 'unknown'}`,
+        msg: `Failed to logout: ${getReqErrorMessage(error!)}`,
         msgType: 'failure',
       });
-      dispatch(setAuthRequestToIdle());
     }
-  }, [logoutState, logoutError, dispatch, showToast]);
+  }, [isError, error, dispatch, showToast]);
 
   let visibilityClass = "visible";
   if (userInfo === null) {
@@ -74,39 +67,38 @@ function Heading() {
     visibilityClass = "invisible";
   }
 
-  const signoutBtnDisabled = logoutState === 'loading';
-  const signoutBtnSpinner = signoutBtnDisabled && <ButtonSpinnerRight />;
+  const signoutBtnDisabled = isLoading;
 
   return (
     <div className={`d-flex align-items-center ${visibilityClass}`}>
       <h4 className="mb-0">
         {userInfo?.name}&#39;s meetings
       </h4>
-      <button
-        className="d-none d-md-block btn btn-outline-primary px-3 ms-auto"
-        disabled={signoutBtnDisabled}
+      <ButtonWithSpinner
+        className="d-none d-md-block btn btn-outline-primary ms-auto"
+        isLoading={signoutBtnDisabled}
         onClick={onSignoutClick}
       >
-        Sign out {signoutBtnSpinner}
-      </button>
+        Sign out
+      </ButtonWithSpinner>
       <Link to="/me/settings" className="text-decoration-none">
-        <button className="d-none d-md-block btn btn-primary px-3 ms-3">
+        <button className="d-none d-md-block btn btn-primary custom-btn-min-width ms-3">
           Settings
         </button>
       </Link>
       <BottomOverlay>
         <Link to="/me/settings" className="text-decoration-none">
-          <button className="btn btn-light px-3">
+          <button className="btn btn-light custom-btn-min-width">
             Settings
           </button>
         </Link>
-        <button
-          className="btn btn-light px-3 ms-auto"
-          disabled={signoutBtnDisabled}
+        <ButtonWithSpinner
+          className="btn btn-light ms-auto"
+          isLoading={signoutBtnDisabled}
           onClick={onSignoutClick}
         >
-          Sign out {signoutBtnSpinner}
-        </button>
+          Sign out
+        </ButtonWithSpinner>
       </BottomOverlay>
     </div>
   );

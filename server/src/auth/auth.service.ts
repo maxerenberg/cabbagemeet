@@ -3,8 +3,9 @@ import * as bcrypt from 'bcrypt';
 import { DeepPartial } from 'typeorm';
 import User from 'src/users/user.entity';
 import UsersService from 'src/users/users.service';
+import LocalSignupDto from './local-signup.dto';
 
-const SALT_ROUNDS = 11;
+const SALT_ROUNDS = 10;
 
 @Injectable()
 export default class AuthService {
@@ -25,10 +26,16 @@ export default class AuthService {
     return user;
   }
 
-  async signup(name: string, email: string, password: string): Promise<User> {
+  async signup({
+    name,
+    email,
+    password,
+    subscribe_to_notifications
+  }: LocalSignupDto): Promise<User> {
     const user: DeepPartial<User> = {
       Name: name,
       Email: email,
+      IsSubscribedToNotifications: subscribe_to_notifications,
       PasswordHash: await bcrypt.hash(password, SALT_ROUNDS),
     };
     return this.usersService.create(user);

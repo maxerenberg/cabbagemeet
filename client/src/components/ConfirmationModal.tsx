@@ -1,5 +1,5 @@
-import ButtonSpinnerRight from "components/ButtonSpinnerRight";
 import Modal from "components/Modal";
+import ButtonWithSpinner from "./ButtonWithSpinner";
 import styles from './ConfirmationModal.module.css';
 
 export default function ConfirmationModal({
@@ -17,7 +17,6 @@ export default function ConfirmationModal({
   confirmationButtonText: string,
   isLoading: boolean,
 }) {
-  const spinner = isLoading && <ButtonSpinnerRight />;
   return (
     <Modal className={styles.modal}>
       <div className="d-flex justify-content-between align-items-center">
@@ -35,20 +34,19 @@ export default function ConfirmationModal({
       <div className="d-flex justify-content-end mt-4">
         <button
           type="button"
-          className="btn btn-outline-secondary px-4"
+          className="btn btn-outline-secondary custom-btn-min-width"
           onClick={onClose}
           disabled={isLoading}
         >
           Cancel
         </button>
-        <button
-          type="button"
-          className="btn btn-outline-primary ms-4 px-4"
+        <ButtonWithSpinner
+          className="btn btn-outline-primary ms-4"
           onClick={onConfirm}
-          disabled={isLoading}
+          isLoading={isLoading}
         >
-          {confirmationButtonText} {spinner}
-        </button>
+          {confirmationButtonText}
+        </ButtonWithSpinner>
       </div>
     </Modal>
   );

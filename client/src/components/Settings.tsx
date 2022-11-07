@@ -1,36 +1,28 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import Form from 'react-bootstrap/Form';
 import { useNavigate } from "react-router-dom";
-import { useAppDispatch, useAppSelector } from "app/hooks";
-import ButtonSpinnerRight from "components/ButtonSpinnerRight";
+import { useAppSelector } from "app/hooks";
 import NonFocusButton from "components/NonFocusButton";
 import DeleteAccountModal from "./DeleteAccountModal";
 import {
-  editName,
-  resetEditNameStatus,
-  selectEditNameError,
-  selectEditNameState,
-  selectGetSelfInfoState,
-  selectIsLoggedIn,
-  selectSubscribeToNotificationsState,
-  selectSubscribeToNotificationsError,
+  selectTokenIsPresent,
   selectUserInfo,
-  subscribeToNotifications,
-  resetSubscribeToNotificationsStatus,
-  unlinkGoogleCalendar,
-  selectUnlinkGoogleCalendarState,
-  selectUnlinkGoogleCalendarError,
-  resetUnlinkGoogleCalendarStatus,
+  selectUserInfoIsPresent,
 } from "slices/authentication";
-import { assert } from "utils/misc";
+import { useEditUser, useSelfInfo, useUnlinkGoogleCalendar } from "utils/auth.hooks";
+import { assert } from "utils/misc.utils";
 import { useToast } from "./Toast";
 import styles from './Settings.module.css';
 import GenericSpinner from "./GenericSpinner";
+import { getReqErrorMessage } from "utils/requests.utils";
+import { useLinkGoogleCalendarMutation } from "slices/api";
+import ButtonWithSpinner from "./ButtonWithSpinner";
 
 export default function Settings() {
-  const getSelfInfoState = useAppSelector(selectGetSelfInfoState);
-  const isLoggedIn = useAppSelector(selectIsLoggedIn);
-  const shouldBeRedirectedToHomePage = !isLoggedIn && (getSelfInfoState === 'succeeded' || getSelfInfoState === 'failed');
+  const userInfoIsPresent = useAppSelector(selectUserInfoIsPresent);
+  const tokenIsPresent = useAppSelector(selectTokenIsPresent);
+  const {isError} = useSelfInfo();
+  const shouldBeRedirectedToHomePage = !tokenIsPresent || isError;
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -43,7 +35,7 @@ export default function Settings() {
     return null;
   }
 
-  if (!isLoggedIn) {
+  if (!userInfoIsPresent) {
     return <GenericSpinner />;
   }
 
@@ -60,36 +52,36 @@ export default function Settings() {
 function GeneralSettings() {
   const userInfo = useAppSelector(selectUserInfo);
   assert(userInfo !== null);
+  const [editUser, {isSuccess, isLoading, isError, error}] = useEditUser();
   const [isEditing, setIsEditing] = useState(false);
   const [name, setName] = useState(userInfo.name);
-  const dispatch = useAppDispatch();
-  const editStatus = useAppSelector(selectEditNameState);
-  const editError = useAppSelector(selectEditNameError);
   const {showToast} = useToast();
   const onCancelClick = useCallback(() => {
     setIsEditing(false);
     setName(userInfo.name);
   }, [userInfo.name]);
   useEffect(() => {
-    if (editStatus === 'succeeded') {
+    if (isSuccess) {
       showToast({
         msg: 'Successfully updated name',
         msgType: 'success',
         autoClose: true,
       });
-      dispatch(resetEditNameStatus());
-      onCancelClick();
-    } else if (editStatus === 'failed') {
+    } else if (isError) {
       showToast({
-        msg: `Failed to update name: ${editError?.message ?? 'unknown'}`,
+        msg: `Failed to update name: ${getReqErrorMessage(error)}`,
         msgType: 'failure',
       });
-      dispatch(resetEditNameStatus());
     }
-  }, [editStatus, showToast, dispatch, onCancelClick, editError]);
-  const onSaveClick = () => dispatch(editName(name));
-  const isLoading = editStatus === 'loading';
-  const spinner = isLoading && <ButtonSpinnerRight />;
+  }, [isSuccess, isError, error, showToast]);
+  useEffect(() => {
+    if (isSuccess) {
+      onCancelClick();
+    }
+  }, [isSuccess, onCancelClick]);
+  const onSaveClick = () => editUser({
+    editUserDto: {name},
+  });
   return (
     <div>
       <h4>General Settings</h4>
@@ -102,25 +94,24 @@ function GeneralSettings() {
             <>
               <button
                 type="button"
-                className="btn btn-outline-secondary ms-auto px-4"
+                className="btn btn-outline-secondary ms-auto custom-btn-min-width"
                 onClick={onCancelClick}
                 disabled={isLoading}
               >
                 Cancel
               </button>
-              <button
-                type="button"
-                className="btn btn-primary ms-4 px-4"
+              <ButtonWithSpinner
+                className="btn btn-primary ms-4"
                 onClick={onSaveClick}
-                disabled={isLoading}
+                isLoading={isLoading}
               >
-                Save {spinner}
-              </button>
+                Save
+              </ButtonWithSpinner>
             </>
           ) : (
             <button
               type="button"
-              className="btn btn-outline-primary ms-auto px-4"
+              className="btn btn-outline-primary ms-auto custom-btn-min-width"
               onClick={() => setIsEditing(true)}
             >
               Edit
@@ -148,29 +139,61 @@ function GeneralSettings() {
 function LinkedAccounts() {
   const userInfo = useAppSelector(selectUserInfo);
   assert(userInfo !== null);
-  const unlinkGoogleCalendarState = useAppSelector(selectUnlinkGoogleCalendarState);
-  const unlinkGoogleCalendarError = useAppSelector(selectUnlinkGoogleCalendarError);
-  const dispatch = useAppDispatch();
+  const hasLinkedGoogleAccount = userInfo.hasLinkedGoogleAccount;
+  const [
+    unlinkCalendar,
+    {
+      isSuccess: unlink_isSuccess,
+      isLoading: unlink_isLoading,
+      isError: unlink_isError,
+      error: unlink_error
+    }
+  ] = useUnlinkGoogleCalendar();
+  const [
+    linkCalendar,
+    {
+      data: link_data,
+      isSuccess: link_isSuccess,
+      isLoading: link_isLoading,
+      isError: link_isError,
+      error: link_error
+    }
+  ] = useLinkGoogleCalendarMutation();
   const {showToast} = useToast();
   useEffect(() => {
-    if (unlinkGoogleCalendarState === 'succeeded') {
-      dispatch(resetUnlinkGoogleCalendarStatus());
-    } else if (unlinkGoogleCalendarState === 'failed') {
+    if (unlink_isSuccess) {
       showToast({
-        msg: `Failed to unlink Google account: ${unlinkGoogleCalendarError?.message ?? 'unknown'}`,
+        msg: 'Successfully unlinked Google account',
+        msgType: 'success',
+        autoClose: true,
+      });
+    } else if (unlink_isError) {
+      showToast({
+        msg: `Failed to unlink Google account: ${getReqErrorMessage(unlink_error)}`,
         msgType: 'failure',
       });
-      dispatch(resetUnlinkGoogleCalendarStatus());
     }
-  }, [unlinkGoogleCalendarState, unlinkGoogleCalendarError, dispatch, showToast]);
-  const hasLinkedGoogleAccount = userInfo.hasLinkedGoogleAccount;
+  }, [unlink_isSuccess, unlink_isError, unlink_error, showToast]);
+  useEffect(() => {
+    if (link_isSuccess) {
+      window.location.href = link_data!.redirect;
+    } else if (link_isError) {
+      showToast({
+        msg: `Failed to link Google account: ${getReqErrorMessage(link_error!)}`,
+        msgType: 'failure',
+      });
+    }
+  }, [link_data, link_isSuccess, link_isError, link_error, showToast]);
   const buttonVariant = hasLinkedGoogleAccount ? 'secondary' : 'primary';
   let onClick: React.MouseEventHandler<HTMLButtonElement> | undefined;
   if (hasLinkedGoogleAccount) {
-    onClick = () => dispatch(unlinkGoogleCalendar());
+    onClick = () => unlinkCalendar();
+  } else {
+    onClick = () => linkCalendar({
+      linkExternalCalendarDto: {post_redirect: window.location.pathname}
+    });
   }
-  const isLoading = unlinkGoogleCalendarState === 'loading';
-  const spinner = isLoading && <ButtonSpinnerRight />;
+  const btnDisabled = link_isLoading || link_isSuccess || unlink_isLoading;
   return (
     <div>
       <h4>Linked Accounts</h4>
@@ -187,14 +210,15 @@ function LinkedAccounts() {
           </small>
         </div>
         <div className="flex-md-shrink-0">
-          <NonFocusButton
-            type="button"
+          <ButtonWithSpinner
+            as="NonFocusButton"
             style={{minWidth: 'max-content'}}
             className={`btn btn-outline-${buttonVariant} w-100 w-md-auto mt-3 mt-md-0`}
             onClick={onClick}
+            isLoading={btnDisabled}
           >
-            {hasLinkedGoogleAccount ? 'Unlink' : 'Link'} Google Calendar {spinner}
-          </NonFocusButton>
+            {hasLinkedGoogleAccount ? 'Unlink' : 'Link'} Google Calendar
+          </ButtonWithSpinner>
         </div>
       </div>
     </div>
@@ -205,37 +229,37 @@ function NotificationSettings() {
   const userInfo = useAppSelector(selectUserInfo);
   assert(userInfo !== null);
   const isSubscribed = userInfo.isSubscribedToNotifications;
-  const dispatch = useAppDispatch();
-  const requestState = useAppSelector(selectSubscribeToNotificationsState);
-  const error = useAppSelector(selectSubscribeToNotificationsError);
+  // The ref is used to avoid running the useEffect hook twice upon a
+  // successful request
+  const isSubscribedRef = useRef(isSubscribed);
+  const [editUser, {isSuccess, isLoading, isError, error}] = useEditUser();
   const {showToast} = useToast();
   useEffect(() => {
-    if (requestState === 'succeeded') {
+    if (isSuccess) {
       showToast({
         msg: (
-          isSubscribed
-            ? 'Successfully subscribed to notifications'
-            : 'Successfully unsubscribed from notifications'
+          isSubscribedRef.current
+            ? 'Successfully unsubscribed from notifications'
+            : 'Successfully subscribed to notifications'
         ),
         msgType: 'success',
         autoClose: true,
       });
-      dispatch(resetSubscribeToNotificationsStatus());
-    } else if (requestState === 'failed') {
+      isSubscribedRef.current = !isSubscribedRef.current;
+    } else if (isError) {
       showToast({
         msg: (
-          isSubscribed
-            ? `Failed to unsubscribe from notifications: ${error?.message ?? 'unknown'}`
-            : `Failed to subscribe from notifications: ${error?.message ?? 'unknown'}`
+          isSubscribedRef.current
+            ? `Failed to subscribe to notifications: ${getReqErrorMessage(error)}`
+            : `Failed to unsubscribe from notifications: ${getReqErrorMessage(error)}`
         ),
         msgType: 'failure',
       });
-      dispatch(resetSubscribeToNotificationsStatus());
     }
-  }, [requestState, showToast, isSubscribed, dispatch, error]);
-  const isLoading = requestState === 'loading';
-  const onClick = () => dispatch(subscribeToNotifications(!isSubscribed));
-  const spinner = isLoading && <ButtonSpinnerRight />;
+  }, [isSuccess, isError, error, showToast]);
+  const onClick = () => editUser({
+    editUserDto: {subscribe_to_notifications: !isSubscribed}
+  });
   return (
     <div>
       <h4>Notification Settings</h4>
@@ -251,16 +275,15 @@ function NotificationSettings() {
           </p>
         </div>
         <div className="flex-md-shrink-0">
-          <NonFocusButton
-            type="button"
+          <ButtonWithSpinner
+            as="NonFocusButton"
             style={{minWidth: 'max-content'}}
             className="btn btn-outline-primary w-100 w-md-auto mt-3 mt-md-0"
             onClick={onClick}
-            disabled={isLoading}
+            isLoading={isLoading}
           >
             {isSubscribed ? 'Unsubscribe from updates' : 'Subscribe to updates'}
-            {spinner}
-          </NonFocusButton>
+          </ButtonWithSpinner>
         </div>
       </div>
     </div>
@@ -285,8 +308,7 @@ function AccountSettings() {
         <div className="flex-md-shrink-0">
           <NonFocusButton
             type="button"
-            style={{minWidth: 'max-content'}}
-            className="btn btn-outline-danger px-4 w-100 w-md-auto mt-3 mt-md-0"
+            className="btn btn-outline-danger custom-btn-min-width w-100 w-md-auto mt-3 mt-md-0"
             onClick={onDeleteClick}
           >
             Delete

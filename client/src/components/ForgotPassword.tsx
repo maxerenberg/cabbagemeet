@@ -2,8 +2,6 @@ import React, { useEffect, useState } from 'react';
 import Form from 'react-bootstrap/Form';
 import { useAppDispatch, useAppSelector } from 'app/hooks';
 import BottomOverlay from 'components/BottomOverlay';
-import ButtonSpinnerRight from 'components/ButtonSpinnerRight';
-import NonFocusButton from 'components/NonFocusButton';
 import { useToast } from 'components/Toast';
 import {
   resetPassword,
@@ -12,6 +10,7 @@ import {
   setResetPasswordStateToIdle,
  } from 'slices/resetPassword';
  import styles from './ForgotPassword.module.css';
+import ButtonWithSpinner from './ButtonWithSpinner';
 
  export default function ForgotPassword() {
   const [email, setEmail] = useState('');
@@ -102,26 +101,25 @@ function ForgotPasswordForm({
 }
 
 function ResetButtons({ disabled } : { disabled: boolean }) {
-  const spinner = disabled && <ButtonSpinnerRight />;
   return (
     <>
-      <NonFocusButton
-        className="d-none d-md-block btn btn-outline-primary px-3 mt-4"
+      <ButtonWithSpinner
+        as="NonFocusButton"
+        className="d-none d-md-block btn btn-outline-primary mt-4"
         type="submit"
-        disabled={disabled}
+        isLoading={disabled}
       >
         Reset
-        {spinner}
-      </NonFocusButton>
+      </ButtonWithSpinner>
       <BottomOverlay>
-        <NonFocusButton
-          className="btn btn-light px-3 ms-auto"
+        <ButtonWithSpinner
+          as="NonFocusButton"
+          className="btn btn-light ms-auto"
           type="submit"
-          disabled={disabled}
+          isLoading={disabled}
         >
           Reset
-          {spinner}
-        </NonFocusButton>
+        </ButtonWithSpinner>
       </BottomOverlay>
     </>
   )
@@ -183,26 +181,25 @@ function ResendButtons({
   disabled: boolean,
   onClick: React.MouseEventHandler | undefined,
 }) {
-  const spinner = disabled && <ButtonSpinnerRight />;
   return (
     <>
-      <NonFocusButton
-        className="d-none d-md-block btn btn-outline-primary px-3 mt-4"
-        disabled={disabled}
+      <ButtonWithSpinner
+        as="NonFocusButton"
+        className="d-none d-md-block btn btn-outline-primary mt-4"
+        isLoading={disabled}
         onClick={onClick}
       >
         Resend
-        {spinner}
-      </NonFocusButton>
+      </ButtonWithSpinner>
       <BottomOverlay>
-        <NonFocusButton
-          className="btn btn-light px-3 ms-auto"
-          disabled={disabled}
+        <ButtonWithSpinner
+          as="NonFocusButton"
+          className="btn btn-light ms-auto"
+          isLoading={disabled}
           onClick={onClick}
         >
           Resend
-          {spinner}
-        </NonFocusButton>
+        </ButtonWithSpinner>
       </BottomOverlay>
     </>
   )

@@ -1,3 +1,6 @@
+import {DateTime} from 'luxon';
+import { assert } from './misc.utils';
+
 // change this as desired for testing etc.
 export const today = new Date();
 export const todayString = getDateString(today);
@@ -12,9 +15,10 @@ export const tzAbbr = today.toLocaleTimeString('en-us', {timeZoneName: 'short'})
 
 // This is the offset from UTC time for the local time. For example, if the local
 // timezone is EDT, then this would be -4.
-// This value is not necessarily an integer, but it will be multiple of 0.25.
+// This value is not necessarily an integer, but it will be a multiple of 0.25.
 // This value must be SUBTRACTED from the local time to obtain a UTC time.
 // This value must be ADDED to UTC time to obtain a local time.
+// TODO: only accept a Date
 export function getUTCOffsetHours(date: Date | string): number {
   if (typeof date === 'string') {
     date = getDateFromString(date);
@@ -94,6 +98,10 @@ export function getYearMonthDayFromDateString(date: string): [number, number, nu
   return date.split('-').map(s => parseInt(s)) as [number, number, number];
 }
 
+export function getLocalYearMonthDayFromDate(date: Date): [number, number, number] {
+  return [date.getFullYear(), date.getMonth() + 1, date.getDate()];
+}
+
 export function to12HourClock(n: number) {
   return (n === 0 || n === 12) ? 12 : (n % 12);
 }
@@ -123,46 +131,51 @@ export function addMinutesToDateTimeString(dateTime: string, numMinutes: number)
   return customToISOString(date);
 }
 
-/**
- * Adjusts the startTime, endTime and dates by the given time zone offset.
- * @param param0.startTime The earliest meeting starting time (hours)
- * @param param0.endTime The latest meeting ending time (hours)
- * @param param0.dates The eligible meeting dates
- * @param offsetHours The offset, in hours, to add to each time
- * @returns the new values for the arguments after the offset has been added
- */
- export function addOffsetToDateTimes(
+export function convertOtherTzToLocal(
   {
-    startTime,
-    endTime,
+    startHour,
+    endHour,
     dates,
+    timezone,
   }: {
-    startTime: number,
-    endTime: number,
-    dates: string[],
+    startHour: number,
+    endHour: number,
+    dates: string[],  // YYYY-MM-DD
+    timezone: string,  // e.g. "America/Toronto"
   },
-  offsetHours: number,
 ) {
-  startTime += offsetHours;
-  endTime += offsetHours;
-  if (startTime < 0) {
-    startTime += 24;
+  // copy
+  dates = [...dates];
+  dates.sort();
+  // I only see one reasonable option to convert the startHour and endHour
+  // to local time, and that is to take the TZ offset of the first date.
+  // Unfortunately this will give incorrect start/end times if e.g. the person
+  // who created the meeting follows DST, but the current user does not.
+  // I don't think there's anything we can do in that scenario. :/
+  const HH = String(startHour).padStart(2, '0');
+  const dt = DateTime.fromISO(`${dates[0]}T${HH}:00:00`, {zone: timezone});
+  assert(dt.isValid);
+  const offsetHours = getUTCOffsetHours(getDateFromString(dates[0])) - dt.offset / 60;
+  startHour += offsetHours;
+  endHour += offsetHours;
+  if (startHour < 0) {
+    startHour += 24;
     // Decrement each day by 1
     dates = dates.map(date => addDaysToDateString(date, -1));
-  } else if (startTime >= 24) {
-    startTime -= 24;
+  } else if (startHour >= 24) {
+    startHour -= 24;
     // Increment each day by 1
     dates = dates.map(date => addDaysToDateString(date, 1));
   }
   // Each date represents a day when each startTime can start.
   // So we don't need to update the dates if the endTime is adjusted.
-  if (endTime < 0) {
-    endTime += 24;
-  } else if (endTime >= 24) {
-    endTime -= 24;
+  if (endHour < 0) {
+    endHour += 24;
+  } else if (endHour >= 24) {
+    endHour -= 24;
   }
 
-  return { startTime, endTime, dates };
+  return { startHour, endHour, dates };
 }
 
 /**

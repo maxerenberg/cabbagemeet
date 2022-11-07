@@ -1,40 +1,32 @@
 import { useEffect } from "react";
-import { useAppDispatch, useAppSelector } from "app/hooks";
+import { useAppDispatch } from "app/hooks";
 import ConfirmationModal from "components/ConfirmationModal";
 import { useToast } from "components/Toast";
-import {
-  deleteAccount,
-  resetDeleteAccountStatus,
-  selectDeleteAccountError,
-  selectDeleteAccountState,
-} from "slices/authentication";
+import { useDeleteAccount } from "utils/auth.hooks";
+import { getReqErrorMessage } from "utils/requests.utils";
 
 export default function DeleteAccountModal({onClose}: {onClose: () => void}) {
-  const deleteAccountStatus = useAppSelector(selectDeleteAccountState);
-  const error = useAppSelector(selectDeleteAccountError);
-  const isLoading = deleteAccountStatus === 'loading';
+  const [deleteAccount, {isSuccess, isLoading, isError, error}] = useDeleteAccount();
   const dispatch = useAppDispatch();
   const {showToast} = useToast();
-  const onDeleteClick = () => dispatch(deleteAccount());
+  const onDeleteClick = () => deleteAccount();
 
   useEffect(() => {
-    if (deleteAccountStatus === 'succeeded') {
+    if (isSuccess) {
       showToast({
         msg: 'Successfully deleted account',
         msgType: 'success',
         autoClose: true,
       });
-      dispatch(resetDeleteAccountStatus());
       // The user will automatically get redirected to the homepage when the
       // userInfo is deleted from the Redux store (see Settings.tsx)
-    } else if (deleteAccountStatus === 'failed') {
+    } else if (isError) {
       showToast({
-        msg: `Failed to delete account: ${error?.message ?? 'unknown'}`,
+        msg: `Failed to delete account: ${getReqErrorMessage(error)}`,
         msgType: 'failure',
       });
-      dispatch(resetDeleteAccountStatus());
     }
-  }, [deleteAccountStatus, showToast, dispatch, error]);
+  }, [isSuccess, isError, error, showToast, dispatch]);
 
   return (
     <ConfirmationModal

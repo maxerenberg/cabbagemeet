@@ -1,12 +1,12 @@
 import React, { useMemo, useReducer } from 'react';
 import { useAppSelector } from 'app/hooks';
 import { LeftArrow as SVGLeftArrow, RightArrow as SVGRightArrow } from 'components/Arrows';
-import { getDateFromString, getDayOfWeekAbbr, getMonthAbbrFromDate } from 'utils/dates';
+import { getDateFromString, getDayOfWeekAbbr, getMonthAbbrFromDate } from 'utils/dates.utils';
 import AvailabilitiesRow from './AvailabilitiesRow';
 import MeetingGridBodyCells from './MeetingGridBodyCells';
 import MeetingRespondents from './MeetingRespondents';
-import { range } from 'utils/arrays';
-import { assert } from 'utils/misc';
+import { range } from 'utils/arrays.utils';
+import { assert } from 'utils/misc.utils';
 
 /**
  * Returns a string which can be used in the CSS grid-template-areas property

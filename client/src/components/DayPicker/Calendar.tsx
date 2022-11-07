@@ -1,12 +1,12 @@
 import React, { useState } from 'react';
 import { LeftArrow as SVGLeftArrow, RightArrow as SVGRightArrow } from 'components/Arrows';
-import { range } from 'utils/arrays'
+import { range } from 'utils/arrays.utils'
 import {
   addDaysToDateString,
   daysOfWeekAbbr,
   today,
   todayString,
- } from 'utils/dates';
+ } from 'utils/dates.utils';
 import CalendarCell from './CalendarCell';
 
 export default function Calendar() {

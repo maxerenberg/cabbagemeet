@@ -2,7 +2,7 @@ import { createSlice } from '@reduxjs/toolkit';
 import type { PayloadAction } from '@reduxjs/toolkit';
 import type { RootState } from 'app/store';
 import type { DateSet } from 'common/types';
-import { getDateString, today } from 'utils/dates';
+import { getDateString, today } from 'utils/dates.utils';
 
 export type SelectedDatesType = {
   // These are the dates which the user has selected from the calendar

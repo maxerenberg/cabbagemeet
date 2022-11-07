@@ -1,14 +1,13 @@
 import { useState, useEffect } from 'react';
 import Form from 'react-bootstrap/Form';
 import { useAppDispatch, useAppSelector } from 'app/hooks';
-import ButtonSpinnerRight from 'components/ButtonSpinnerRight';
 import Modal from 'components/Modal';
-import NonFocusButton from 'components/NonFocusButton';
 import {
   selectSelModeAndDateTimes,
   submitSelfAsGuest,
 } from 'slices/availabilitiesSelection';
 import './SaveTimesModal.css';
+import ButtonWithSpinner from 'components/ButtonWithSpinner';
 
 function SaveTimesModal({
   onClose,
@@ -47,7 +46,6 @@ function SaveTimesModal({
   const isSubmitting = selMode.type === 'submittingSelf';
   const submitBtnDisabled = isSubmitting || name === '';
   const closeBtnDisabled = isSubmitting;
-  const spinner = isSubmitting && <ButtonSpinnerRight />;
   return (
     <Modal>
       <Form noValidate className="saveTimesModal--content" {...{validated, onSubmit}}>
@@ -94,13 +92,14 @@ function SaveTimesModal({
           <div className="already-have-account">
             Already have an account?
           </div>
-          <NonFocusButton
+          <ButtonWithSpinner
+            as="NonFocusButton"
             type="submit"
             className="btn btn-primary"
-            disabled={submitBtnDisabled}
+            isLoading={submitBtnDisabled}
           >
-            Submit {spinner}
-          </NonFocusButton>
+            Submit
+          </ButtonWithSpinner>
         </div>
         {
           errorMsg && (

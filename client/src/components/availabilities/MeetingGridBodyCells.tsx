@@ -15,9 +15,9 @@ import {
 } from 'slices/availabilitiesSelection';
 import type { MouseState } from 'slices/availabilitiesSelection';
 import { useToast } from 'components/Toast';
-import { flatGridCoords } from 'utils/arrays';
-import { addDaysToDateString, customToISOString } from 'utils/dates';
-import { assertIsNever } from 'utils/misc';
+import { flatGridCoords } from 'utils/arrays.utils';
+import { addDaysToDateString, customToISOString } from 'utils/dates.utils';
+import { assertIsNever } from 'utils/misc.utils';
 import { useEffect } from 'react';
 import { selectMeetingIsScheduled, selectScheduledDateTimes } from 'slices/meetingTimes';
 

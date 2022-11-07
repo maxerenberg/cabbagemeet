@@ -1,7 +1,5 @@
 import { MiddlewareConsumer, Module } from '@nestjs/common';
 import * as morgan from 'morgan';
-import { AppController } from './app.controller';
-import { AppService } from './app.service';
 import getCommonImports from './common-imports';
 import { AuthModule } from './auth/auth.module';
 import UsersModule from './users/users.module';
@@ -20,8 +18,6 @@ import OAuth2Module from './oauth2/oauth2.module';
     OAuth2Module,
     CustomJwtModule,
   ],
-  controllers: [AppController],
-  providers: [AppService],
 })
 export class AppModule {
   async configure(consumer: MiddlewareConsumer) {

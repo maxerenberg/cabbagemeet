@@ -4,6 +4,21 @@ import MeetingRespondent from './meeting-respondent.entity';
 import GoogleCalendarEvents from '../oauth2/google-calendar-events.entity';
 import GoogleCalendarCreatedEvent from '../oauth2/google-calendar-created-event.entity';
 
+/*
+It is necessary to store the timezone of the person who created
+a meeting because timezone offsets (e.g. -04:00) for a given location
+can change due to Daylight Savings Time.
+If the client simply assumed that the minStartHour and maxEndHour values
+are in UTC, they would calculate incorrect times for date ranges which
+overlap with DST changes.
+For example, let's say I want a meeting to be between 09:00 and 17:00
+in Toronto on Nov. 5th or Nov. 6th. DST ends on Nov. 6th. Assuming that
+the meeting was created on or before Nov. 5th, these times would be stored
+on the server as 13:00 and 21:00 in UTC. If the client only saw these times,
+then they would calculate the meeting times to be 09:00 to 17:00 on
+Nov. 5th (EDT) and 08:00 to 16:00 on Nov. 6th (EST). But that would be wrong.
+*/
+
 @Entity('Meeting')
 export default class Meeting {
   @PrimaryGeneratedColumn()
@@ -15,9 +30,15 @@ export default class Meeting {
   @Column()
   About: string;
 
+  // Must be an IANA tz database name, e.g. "America/Toronto"
+  @Column()
+  Timezone: string;
+
+  // Must be a multiple of 0.25 and be between [0, 24)
   @Column('decimal', { precision: 4, scale: 2 })
   MinStartHour: number;
 
+  // Must be a multiple of 0.25 and be between [0, 24)
   @Column('decimal', { precision: 4, scale: 2 })
   MaxEndHour: number;
 

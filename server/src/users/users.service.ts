@@ -54,4 +54,9 @@ export default class UsersService {
     await this.oauth2Service.google_unlinkAccount(userID);
     await this.userRepository.delete(userID);
   }
+
+  async editUser(userID: number, userInfo: DeepPartial<User>): Promise<User> {
+    await this.userRepository.update({ID: userID}, userInfo);
+    return this.findOneByID(userID);
+  }
 }

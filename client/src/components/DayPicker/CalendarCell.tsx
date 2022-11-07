@@ -6,7 +6,7 @@ import {
   getYearMonthDayFromDateString,
   today,
   todayString,
-} from 'utils/dates';
+} from 'utils/dates.utils';
 import { useAppDispatch, useAppSelector } from 'app/hooks';
 import { addDate, removeDate, selectSelectedDates } from 'slices/selectedDates';
 

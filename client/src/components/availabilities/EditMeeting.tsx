@@ -2,17 +2,17 @@ import React, { useCallback, useEffect, useState } from "react";
 import Form from "react-bootstrap/Form";
 import { useAppDispatch, useAppSelector } from 'app/hooks';
 import BottomOverlay from "components/BottomOverlay";
-import ButtonSpinnerRight from 'components/ButtonSpinnerRight';
 import MeetingAboutPrompt from "components/MeetingForm/MeetingAboutPrompt";
 import MeetingTimesPrompt from "components/MeetingForm/MeetingTimesPrompt";
 import Calendar from "components/DayPicker/Calendar";
 import 'components/DayPicker/DayPicker.css';
 import 'components/MeetingForm/MeetingForm.css';
 import { resetSelectedDates, selectSelectedDates, setSelectedDates } from "slices/selectedDates";
-import { arrayToObject } from "utils/arrays";
+import { arrayToObject } from "utils/arrays.utils";
 import { editMeeting, resetEditMeetingStatus } from "slices/meetingTimes";
 import { useToast } from "components/Toast";
 import DeleteMeetingModal from "./DeleteMeetingModal";
+import ButtonWithSpinner from "components/ButtonWithSpinner";
 
 // TODO: reduce code duplication with MeetingForm
 
@@ -79,7 +79,6 @@ export default function EditMeeting({
   };
 
   const isLoading = editMeetingStatus === 'loading';
-  const spinner = isLoading && <ButtonSpinnerRight />;
   return (
     <Form className="edit-meeting">
       <MeetingNamePrompt {...{meetingName, setMeetingName, setIsEditing, onSave}} />
@@ -91,14 +90,14 @@ export default function EditMeeting({
       <div className="d-md-flex align-items-md-end">
         <MeetingTimesPrompt {...{startTime, setStartTime, endTime, setEndTime}} />
         <div className="ms-auto me-3 d-none d-md-block">
-          <button
-            type="button"
-            className="btn btn-primary px-5"
+          <ButtonWithSpinner
+            className="btn btn-primary"
             onClick={onSave}
             disabled={meetingName === '' || isLoading}
+            isLoading={isLoading}
           >
-            Save {spinner}
-          </button>
+            Save
+          </ButtonWithSpinner>
         </div>
       </div>
     </Form>
@@ -124,7 +123,6 @@ function MeetingNamePrompt({
   const onDeleteModalClose = useCallback(() => setShowDeleteModal(false), []);
   const onDeleteClick = () => setShowDeleteModal(true);
   const onCancelClick = () => setIsEditing(false);
-  const saveButtonSpinner = isSaveLoading && <ButtonSpinnerRight />;
   return (
     <>
       {showDeleteModal && <DeleteMeetingModal onClose={onDeleteModalClose} />}
@@ -154,15 +152,16 @@ function MeetingNamePrompt({
         >
           Cancel
         </button>
-        <button
-          className="btn btn-primary px-4 ms-md-4 d-none d-md-flex align-items-md-center"
+        <ButtonWithSpinner
+          className="btn btn-primary ms-md-4 d-none d-md-block"
           tabIndex={-1}
           type="submit"
           onClick={onSave}
           disabled={meetingName === '' || isSaveLoading}
+          isLoading={isSaveLoading}
         >
-          Save {saveButtonSpinner}
-        </button>
+          Save
+        </ButtonWithSpinner>
         <BottomOverlay>
           <button
             className="btn btn-outline-light px-4"
@@ -173,15 +172,16 @@ function MeetingNamePrompt({
           >
             Cancel
           </button>
-          <button
-            className="btn btn-light px-4 ms-auto create-meeting-button"
+          <ButtonWithSpinner
+            className="btn btn-light ms-auto create-meeting-button"
             tabIndex={-1}
             type="submit"
             onClick={onSave}
             disabled={meetingName === '' || isSaveLoading}
+            isLoading={isSaveLoading}
           >
-            Save {saveButtonSpinner}
-          </button>
+            Save
+          </ButtonWithSpinner>
         </BottomOverlay>
       </Form.Group>
     </>

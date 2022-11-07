@@ -2,7 +2,7 @@ export function getSecondsSinceUnixEpoch(): number {
   return Math.floor(Date.now() / 1000);
 }
 
-export function customToISOString(date: Date): string {
+export function toISOStringUTC(date: Date): string {
   const year = date.getUTCFullYear();
   const month = date.getUTCMonth() + 1;
   const day = date.getUTCDate();

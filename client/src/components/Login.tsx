@@ -1,18 +1,13 @@
 import React, { useEffect, useRef, useState } from 'react';
 import Form from 'react-bootstrap/Form';
 import { Link, useNavigate } from 'react-router-dom';
-import { useAppDispatch, useAppSelector } from 'app/hooks';
 import BottomOverlay from 'components/BottomOverlay';
 import ContinueWithGoogleButton from 'components/ContinueWithGoogleButton';
 import { useToast } from 'components/Toast';
-import ButtonSpinnerRight from 'components/ButtonSpinnerRight';
-import {
-  selectLoginError,
-  selectLoginState,
-  setAuthRequestToIdle,
-  submitLoginForm,
- } from 'slices/authentication';
  import styles from './Login.module.css';
+import { useLogin } from 'utils/auth.hooks';
+import { getReqErrorMessage } from "utils/requests.utils";
+import ButtonWithSpinner from './ButtonWithSpinner';
 
 // TODO: reduce code duplication with Signup.tsx
 
@@ -26,24 +21,24 @@ export default function Login() {
 
 function LoginForm() {
   const [validated, setValidated] = useState(false);
-  const dispatch = useAppDispatch();
   const navigate = useNavigate();
-  const loginState = useAppSelector(selectLoginState);
-  const loginError = useAppSelector(selectLoginError);
+  const [login, {isUninitialized, isLoading, isSuccess, isError, error}] = useLogin();
   const { showToast } = useToast();
   const emailRef = useRef<HTMLInputElement>(null);
   const passwordRef = useRef<HTMLInputElement>(null);
   let onSubmit: React.FormEventHandler<HTMLFormElement> | undefined;
-  const submitBtnDisabled = loginState !== 'idle';
-  if (loginState === 'idle') {
+  const submitBtnDisabled = isLoading;
+  if (isUninitialized || isError) {
     onSubmit = (ev) => {
       ev.preventDefault();
       const form = ev.currentTarget;
       if (form.checkValidity()) {
-        dispatch(submitLoginForm({
-          email: emailRef.current!.value,
-          password: passwordRef.current!.value,
-        }));
+        login({
+          localLoginDto: {
+            email: emailRef.current!.value,
+            password: passwordRef.current!.value,
+          }
+        });
       } else {
         setValidated(true);
       }
@@ -51,22 +46,20 @@ function LoginForm() {
   }
 
   useEffect(() => {
-    if (loginState === 'failed') {
+    if (isError) {
       showToast({
-        msg: `An error occurred: ${loginError!.message || 'unknown'}`,
+        msg: `An error occurred: ${getReqErrorMessage(error!)}`,
         msgType: 'failure',
       });
-      dispatch(setAuthRequestToIdle());
-    } else if (loginState === 'succeeded') {
-      //dispatch(setAuthRequestToIdle());
+    } else if (isSuccess) {
       navigate('/');
     }
-  }, [loginState, loginError, dispatch, navigate, showToast]);
+  }, [isError, error, isSuccess, navigate, showToast]);
 
   return (
     <Form noValidate className={styles.loginForm} {...{validated, onSubmit}}>
       <h4 className="mb-5">Login</h4>
-      <ContinueWithGoogleButton />
+      <ContinueWithGoogleButton reason='login' />
       <div className="d-flex align-items-center my-4">
         <div className="border-top flex-grow-1"></div>
         <span className="fw-bold mx-2">OR</span>
@@ -109,26 +102,31 @@ function LoginForm() {
 }
 
 function SignUpOrLogin({ disabled } : { disabled: boolean }) {
-  const spinner = disabled && <ButtonSpinnerRight />;
   return (
     <>
       <div className="d-none d-md-flex align-items-center justify-content-between mt-5">
         <Link to="/signup" className={`custom-link ${styles.dontHaveAccountLink}`}>
           Don't have an account yet?
         </Link>
-        <button type="submit" className="btn btn-outline-primary px-3" disabled={disabled}>
+        <ButtonWithSpinner
+          type="submit"
+          className="btn btn-outline-primary"
+          isLoading={disabled}
+        >
           Log in
-          {spinner}
-        </button>
+        </ButtonWithSpinner>
       </div>
       <BottomOverlay>
         <Link to="/signup" className={`custom-link custom-link-inverted ${styles.dontHaveAccountLink}`}>
         Don't have an account yet?
         </Link>
-        <button type="submit" className="btn btn-light ms-auto px-3" disabled={disabled}>
+        <ButtonWithSpinner
+          type="submit"
+          className="btn btn-light ms-auto"
+          isLoading={disabled}
+        >
           Log in
-          {spinner}
-        </button>
+        </ButtonWithSpinner>
       </BottomOverlay>
     </>
   );

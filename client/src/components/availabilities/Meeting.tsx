@@ -8,7 +8,7 @@ import WeeklyViewTimePicker from './WeeklyTimeViewPicker';
 import './Meeting.css';
 import EditMeeting from './EditMeeting';
 import { useToast } from 'components/Toast';
-import { selectIsLoggedIn } from 'slices/authentication';
+import { selectUserInfoIsPresent } from 'slices/authentication';
 import useEffectOnce from 'utils/useEffectOnce.hook';
 
 export default function Meeting() {
@@ -61,7 +61,7 @@ const MeetingTitleRow = React.memo(function MeetingTitleRow({
   setIsEditingMeeting: (val: boolean) => void,
 }) {
   const name = useAppSelector(state => state.meetingTimes.name);
-  const isLoggedIn = useAppSelector(selectIsLoggedIn);
+  const isLoggedIn = useAppSelector(selectUserInfoIsPresent);
   const { showToast } = useToast();
   const onClickEditButton = () => {
     if (isLoggedIn) {

@@ -1,17 +1,16 @@
 import { nanoid } from '@reduxjs/toolkit';
-import { range } from 'utils/arrays';
-import { getDateString, addDaysToDateString, today } from 'utils/dates';
-import { assert } from 'utils/misc';
+import { range } from 'utils/arrays.utils';
+import { getDateString, addDaysToDateString, today } from 'utils/dates.utils';
+import { assert } from 'utils/misc.utils';
 import type { PeopleDateTimesFlat, PeopleInfo } from 'common/types';
 
 export type UserInfo = {
   userID: string;
   name: string;
+  email: string;
   hasLinkedGoogleAccount: boolean;
   isSubscribedToNotifications: boolean;
 };
-
-export type GetSelfInfoResponse = UserInfo | null;
 
 export type ExternalCalendarEvent = {
   name: string;
@@ -60,14 +59,6 @@ export type SubmitAvailabilitiesResponse = {
   people: PeopleInfo,
 };
 
-export type LoginResponse = UserInfo;
-
-export type SignupResponse = UserInfo;
-
-export type LogoutResponse = {
-  status: 'OK';
-};
-
 export type ResetPasswordResponse = {
   status: 'OK';
 };
@@ -96,11 +87,6 @@ export type EditMeetingResponse = {
 export type DeleteMeetingResponse = {
   status: 'OK';
 };
-
-export type EditNameResponse = { status: 'OK' };
-export type SubscribeToNotificationsResponse = { status: 'OK' };
-export type DeleteAccountResponse = { status: 'OK' };
-export type UnlinkGoogleCalendarResponse = { status: 'OK' };
 
 const dateString1 = getDateString(today);
 const dateString2 = addDaysToDateString(dateString1, 1);
@@ -233,121 +219,7 @@ class Client {
     });
   }
 
-  getSelfInfo(): Promise<GetSelfInfoResponse> {
-    return new Promise((resolve, reject) => {
-      setTimeout(() => {
-        if (false) {
-          resolve({
-            name: 'Bob',
-            userID: 'bob123',
-            hasLinkedGoogleAccount: true,
-            isSubscribedToNotifications: true,
-          });
-        } else if (true) {
-          resolve(null);
-        } else {
-          reject(new Error('boom!'));
-        }
-      }, 1000);
-    });
-  }
-
-  signup(name: string, email: string, password: string): Promise<SignupResponse> {
-    return new Promise((resolve, reject) => {
-      setTimeout(() => {
-        if (true) {
-          resolve({
-            name: 'John Smith',
-            userID: nanoid(),
-            hasLinkedGoogleAccount: false,
-            isSubscribedToNotifications: true,
-          });
-        } else {
-          reject(new Error('boom!'));
-        }
-      }, 1000);
-    });
-  }
-
-  login(email: string, password: string): Promise<LoginResponse> {
-    return new Promise((resolve, reject) => {
-      setTimeout(() => {
-        if (true) {
-          resolve({
-            name: 'John Smith',
-            userID: nanoid(),
-            hasLinkedGoogleAccount: false,
-            isSubscribedToNotifications: true,
-          });
-        } else {
-          reject(new Error('boom!'));
-        }
-      }, 1000);
-    });
-  }
-
-  logout(): Promise<LogoutResponse> {
-    return new Promise((resolve, reject) => {
-      setTimeout(() => {
-        if (true) {
-          resolve({status: 'OK'});
-        } else {
-          reject(new Error('boom!'));
-        }
-      }, 1000);
-    });
-  }
-
   resetPassword(email: string): Promise<ResetPasswordResponse> {
-    return new Promise((resolve, reject) => {
-      setTimeout(() => {
-        if (true) {
-          resolve({status: 'OK'});
-        } else {
-          reject(new Error('boom!'));
-        }
-      }, 1000);
-    });
-  }
-
-  editName(newName: string): Promise<EditNameResponse> {
-    return new Promise((resolve, reject) => {
-      setTimeout(() => {
-        if (true) {
-          resolve({status: 'OK'});
-        } else {
-          reject(new Error('boom!'));
-        }
-      }, 1000);
-    });
-  }
-
-  subscribeToNotifications(subscribe: boolean): Promise<SubscribeToNotificationsResponse> {
-    return new Promise((resolve, reject) => {
-      setTimeout(() => {
-        if (true) {
-          resolve({status: 'OK'});
-        } else {
-          reject(new Error('boom!'));
-        }
-      }, 1000);
-    });
-  }
-
-  unlinkGoogleCalendar(): Promise<UnlinkGoogleCalendarResponse> {
-    return new Promise((resolve, reject) => {
-      setTimeout(() => {
-        if (true) {
-          resolve({status: 'OK'});
-        } else {
-          reject(new Error('boom!'));
-        }
-      }, 1000);
-    });
-  }
-
-  deleteAccount(): Promise<DeleteAccountResponse> {
-    // TODO: clear the saved userID
     return new Promise((resolve, reject) => {
       setTimeout(() => {
         if (true) {
@@ -382,71 +254,6 @@ class Client {
       setTimeout(() => {
         if (true) {
           resolve({status: 'OK'});
-        } else {
-          reject(new Error('boom!'));
-        }
-      }, 1000);
-    });
-  }
-
-  // TODO: support pagination
-  getCreatedMeetings(): Promise<ServerMeetingShort[]> {
-    const todayString = getDateString(today);
-    return new Promise((resolve, reject) => {
-      setTimeout(() => {
-        if (true) {
-          resolve([
-            {
-              id: '1',
-              name: 'Meeting 1',
-              startTime: 13.5,
-              endTime: 14,
-              scheduledDay: todayString,
-            },
-            {
-              id: '2',
-              name: 'Meeting 2',
-              startTime: 13.5,
-              endTime: 14,
-              dates: [todayString, addDaysToDateString(todayString, 1)],
-            },
-            {
-              id: '3',
-              name: 'Meeting 3',
-              startTime: 13.5,
-              endTime: 14,
-              dates: [todayString, addDaysToDateString(todayString, 1), addDaysToDateString(todayString, 3)],
-            },
-          ]);
-        } else {
-          reject(new Error('boom!'));
-        }
-      }, 1000);
-    });
-  }
-
-  // TODO: support pagination
-  getRespondedMeetings(): Promise<ServerMeetingShort[]> {
-    const todayString = getDateString(today);
-    return new Promise((resolve, reject) => {
-      setTimeout(() => {
-        if (true) {
-          resolve([
-            {
-              id: '4',
-              name: 'Meeting 5',
-              startTime: 2,
-              endTime: 2.5,
-              dates: [todayString, addDaysToDateString(todayString, 3)],
-            },
-            {
-              id: '5',
-              name: 'Meeting 5',
-              startTime: 13.5,
-              endTime: 14,
-              scheduledDay: addDaysToDateString(todayString, 2),
-            },
-          ]);
         } else {
           reject(new Error('boom!'));
         }

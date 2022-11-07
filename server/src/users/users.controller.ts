@@ -1,17 +1,25 @@
-import { Body, Controller, Delete, Get, HttpCode, NotFoundException, ParseIntPipe, Post, Query, Redirect, UseGuards } from '@nestjs/common';
+import { BadRequestException, Body, Controller, Delete, Get, HttpCode, HttpStatus, NotFoundException, ParseIntPipe, Patch, Post, Query, Redirect, UseGuards } from '@nestjs/common';
 import { ModuleRef } from '@nestjs/core';
 import { ApiCookieAuth, ApiOperation, ApiResponse, ApiTags, ApiUnauthorizedResponse } from '@nestjs/swagger';
-import { GoogleCalendarEvent } from 'src/oauth2/google-calendar-events.entity';
+import type { DeepPartial } from 'typeorm';
+import { GoogleCalendarEvent } from '../oauth2/google-calendar-events.entity';
 import { AuthUser } from '../auth/auth-user.decorator';
 import JwtAuthGuard from '../auth/jwt-auth.guard';
-import { NotFoundResponse, UnauthorizedResponse } from '../common-responses';
-import MeetingsService, { MeetingShort, NoSuchMeetingError } from '../meetings/meetings.service';
+import {
+  NotFoundResponse,
+  UnauthorizedResponse,
+  CustomRedirectResponse,
+} from '../common-responses';
+import { meetingToMeetingShortResponse } from '../meetings/meetings.controller';
+import MeetingsService, { NoSuchMeetingError } from '../meetings/meetings.service';
 import OAuth2Service, { OAuth2Provider, OAuth2NotConfiguredError, OAuth2Reason } from '../oauth2/oauth2.service';
+import EditUserDto from './edit-user.dto';
 import GoogleCalendarEventsResponse from './google-calendar-events.response';
 import LinkExternalCalendarDto from './link-external-calendar.dto';
-import MeetingShortResponse from './meeting-short-response';
+import { MeetingsShortResponse } from '../meetings/meeting-short-response';
 import UserResponse from './user-response';
 import User from './user.entity';
+import UsersService from './users.service';
 
 export function UserToUserResponse(user: User): UserResponse {
   return {
@@ -33,6 +41,7 @@ export class UsersController {
 
   constructor(
     private meetingsService: MeetingsService,
+    private usersService: UsersService,
     private moduleRef: ModuleRef,
   ) {}
 
@@ -41,25 +50,10 @@ export class UsersController {
     this.oauth2Service = this.moduleRef.get(OAuth2Service, {strict: false});
   }
 
-  private meetingsShortToMeetingsShortResponse(meetings: MeetingShort[]): MeetingShortResponse[] {
-    return meetings.map(meeting => {
-      const resp: MeetingShortResponse = {
-        meetingID: meeting.ID,
-        name: meeting.Name,
-        minStartHour: meeting.MinStartHour,
-        maxEndHour: meeting.MaxEndHour,
-        tentativeDates: JSON.parse(meeting.TentativeDates),
-      };
-      if (meeting.ScheduledStartDateTime) {
-        resp.scheduledStartDateTime = meeting.ScheduledStartDateTime;
-      }
-      return resp;
-    });
-  }
-
   @ApiOperation({
     summary: 'Get user information',
     description: 'Get information for the user who is currently logged in',
+    operationId: 'getSelfInfo',
   })
   @Get()
   getUserInfo(@AuthUser() user: User): UserResponse {
@@ -67,23 +61,61 @@ export class UsersController {
   }
 
   @ApiOperation({
+    summary: 'Edit user information',
+    description: 'Edit information for the user who is currently logged in',
+    operationId: 'editUser',
+  })
+  @Patch()
+  async updateUserInfo(
+    @AuthUser() user: User,
+    @Body() body: EditUserDto
+  ): Promise<UserResponse> {
+    const updateInfo: DeepPartial<User> = {};
+    if (body.name) updateInfo.Name = body.name;
+    if (body.email) updateInfo.Email = body.email;
+    if (body.hasOwnProperty('subscribe_to_notifications')) updateInfo.IsSubscribedToNotifications = body.subscribe_to_notifications;
+    if (Object.keys(updateInfo).length === 0) {
+      throw new BadRequestException('at least one property must be present');
+    }
+    const updatedUser = await this.usersService.editUser(user.ID, updateInfo);
+    return UserToUserResponse(updatedUser);
+  }
+
+  @ApiOperation({
+    summary: 'Delete user',
+    description: 'Delete the account of the user who is currently logged in',
+    operationId: 'deleteUser',
+  })
+  @Delete()
+  @HttpCode(HttpStatus.NO_CONTENT)
+  async deleteUser(@AuthUser() user: User) {
+    await this.usersService.deleteUser(user.ID);
+  }
+
+  @ApiOperation({
     summary: 'Get created meetings',
     description: 'Get meetings created by the user who is currently logged in',
+    operationId: 'getCreatedMeetings',
   })
   @Get('created-meetings')
-  async getCreatedMeetings(@AuthUser() user: User): Promise<MeetingShortResponse[]> {
+  async getCreatedMeetings(@AuthUser() user: User): Promise<MeetingsShortResponse> {
     const meetings = await this.meetingsService.getMeetingsCreatedBy(user.ID);
-    return this.meetingsShortToMeetingsShortResponse(meetings);
+    return {
+      meetings: meetings.map(meetingToMeetingShortResponse)
+    };
   }
 
   @ApiOperation({
     summary: 'Get responded meetings',
     description: 'Get meetings to which the user who is currently logged in has responded',
+    operationId: 'getRespondedMeetings',
   })
   @Get('responded-meetings')
-  async getRespondedMeetings(@AuthUser() user: User): Promise<MeetingShortResponse[]> {
+  async getRespondedMeetings(@AuthUser() user: User): Promise<MeetingsShortResponse> {
     const meetings = await this.meetingsService.getMeetingsRespondedToBy(user.ID);
-    return this.meetingsShortToMeetingsShortResponse(meetings);
+    return {
+      meetings: meetings.map(meetingToMeetingShortResponse)
+    };
   }
 
   private redirectToGoogle(userID: number, reason: OAuth2Reason, postRedirect: string): string {
@@ -101,16 +133,22 @@ export class UsersController {
 
   @ApiOperation({
     summary: 'Link Google calendar',
-    description: 'Link Google calendar events to the account of the user who is logged in',
+    description: (
+      'Link Google calendar events to the account of the user who is logged in.'
+      + ' The client should navigate to the returned OAuth2 consent page URL.'
+    ),
+    operationId: 'linkGoogleCalendar',
   })
   @ApiResponse({type: NotFoundResponse})
   @Post('link-google-calendar')
-  @Redirect()
-  async linkGoogleCalendar(
+  @HttpCode(HttpStatus.OK)
+  linkGoogleCalendar(
     @AuthUser() user: User,
     @Body() body: LinkExternalCalendarDto,
-  ) {
-    return {url: this.redirectToGoogle(user.ID, 'link', body.post_redirect)};
+  ): CustomRedirectResponse {
+    return {
+      redirect: this.redirectToGoogle(user.ID, 'link', body.post_redirect)
+    };
   }
 
   @ApiOperation({
@@ -119,9 +157,10 @@ export class UsersController {
       'Unlink the Google account which is linked to the account of the user who is logged in.'
       + ' The OAuth2 access token will be revoked.'
     ),
+    operationId: 'unlinkGoogleCalendar',
   })
   @Delete('link-google-calendar')
-  @HttpCode(204)
+  @HttpCode(HttpStatus.NO_CONTENT)
   async unlinkGoogleCalendar(@AuthUser() user: User) {
     await this.oauth2Service.google_unlinkAccount(user.ID);
   }
@@ -132,6 +171,7 @@ export class UsersController {
       'Get a list of Google calendar events whose dates overlap with'
       + ' the tentative dates of a meeting'
     ),
+    operationId: 'getGoogleCalendarEvents',
   })
   @Get('google-calendar-events')
   async getGoogleCalendarEvents(
