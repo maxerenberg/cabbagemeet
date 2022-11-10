@@ -5,9 +5,9 @@ import BottomOverlay from 'components/BottomOverlay';
 import ContinueWithGoogleButton from 'components/ContinueWithGoogleButton';
 import { useToast } from 'components/Toast';
  import styles from './Login.module.css';
-import { useLogin } from 'utils/auth.hooks';
 import { getReqErrorMessage } from "utils/requests.utils";
 import ButtonWithSpinner from './ButtonWithSpinner';
+import { useLoginMutation } from 'slices/api';
 
 // TODO: reduce code duplication with Signup.tsx
 
@@ -22,7 +22,7 @@ export default function Login() {
 function LoginForm() {
   const [validated, setValidated] = useState(false);
   const navigate = useNavigate();
-  const [login, {isUninitialized, isLoading, isSuccess, isError, error}] = useLogin();
+  const [login, {isUninitialized, isLoading, isSuccess, isError, error}] = useLoginMutation();
   const { showToast } = useToast();
   const emailRef = useRef<HTMLInputElement>(null);
   const passwordRef = useRef<HTMLInputElement>(null);
@@ -34,10 +34,8 @@ function LoginForm() {
       const form = ev.currentTarget;
       if (form.checkValidity()) {
         login({
-          localLoginDto: {
-            email: emailRef.current!.value,
-            password: passwordRef.current!.value,
-          }
+          email: emailRef.current!.value,
+          password: passwordRef.current!.value,
         });
       } else {
         setValidated(true);

@@ -16,6 +16,7 @@ const config: ConfigFile = {
   outputFile: './src/slices/api.ts',
   exportName: 'api',
   hooks: true,
+  flattenArg: true,
 };
 
 export default config;

@@ -1,8 +1,7 @@
 import { useEffect, useState } from 'react';
 import Form from 'react-bootstrap/Form';
 import { useNavigate } from 'react-router-dom';
-import { resetSelectedDates } from 'slices/selectedDates';
-import { createMeeting, resetCreateMeetingStatus } from 'slices/meetingTimes';
+import { resetSelectedDates, selectSelectedDates } from 'slices/selectedDates';
 import { setVisitedDayPicker } from 'slices/visitedDayPicker';
 import { useAppDispatch, useAppSelector } from 'app/hooks';
 import { useToast } from 'components/Toast';
@@ -10,7 +9,9 @@ import './MeetingForm.css';
 import MeetingNamePrompt from './MeetingNamePrompt';
 import MeetingAboutPrompt from './MeetingAboutPrompt';
 import MeetingTimesPrompt from './MeetingTimesPrompt';
-import { assert } from 'utils/misc.utils';
+import { useCreateMeetingMutation } from 'slices/api';
+import { getReqErrorMessage } from 'utils/requests.utils';
+import { ianaTzName } from 'utils/dates.utils';
 
 export default function MeetingForm() {
   const [meetingName, setMeetingName] = useState('');
@@ -18,58 +19,45 @@ export default function MeetingForm() {
   const [startTime, setStartTime] = useState(9);
   const [endTime, setEndTime] = useState(17);
   const dispatch = useAppDispatch();
+  const dates = useAppSelector(selectSelectedDates);
   const visitedDayPicker = useAppSelector(state => state.visitedDayPicker);
-  const createMeetingStatus = useAppSelector(state => state.meetingTimes.createMeetingStatus);
-  const createMeetingError = useAppSelector(state => state.meetingTimes.error);
-  const createdMeetingID = useAppSelector(state => state.meetingTimes.id);
-  const error = useAppSelector(state => state.meetingTimes.error);
+  const [createMeeting, {data, isUninitialized, isLoading, isSuccess, isError, error}] = useCreateMeetingMutation();
   const navigate = useNavigate();
   const { showToast } = useToast();
 
   useEffect(() => {
     // If the user didn't select any dates, redirect them to the home page.
     //
-    // The createdMeetingID === null check is necessary because visitedDayPicker
+    // The isUninitialized check is necessary because visitedDayPicker
     // gets reset to false when we call dispatch(setVisitedDayPicker(false)).
     // FIXME: this kind of check shouldn't be necessary, it's too complicated
-    if (!visitedDayPicker && createdMeetingID === null) {
+    if (!visitedDayPicker && isUninitialized) {
       navigate('/');
     }
-  }, [navigate, visitedDayPicker, createdMeetingID]);
+  }, [navigate, visitedDayPicker, isUninitialized]);
 
   useEffect(() => {
-    if (createMeetingStatus === 'succeeded') {
-      // sanity check
-      assert(createdMeetingID !== null);
+    if (isSuccess) {
       showToast({
         msg: 'Successfully created new meeting',
         msgType: 'success',
         autoClose: true,
       });
       // FIXME: we shouldn't need multiple dispatches here...
-      dispatch(resetCreateMeetingStatus());
       dispatch(resetSelectedDates());
       dispatch(setVisitedDayPicker(false));
-      navigate('/m/' + createdMeetingID);
-    } else if (createMeetingStatus === 'failed') {
+      navigate('/m/' + data!.meetingID);
+    } else if (isError) {
       showToast({
-        msg: `Failed to create meeting: ${createMeetingError || 'unknown'}`,
+        msg: `Failed to create meeting: ${getReqErrorMessage(error!)}`,
         msgType: 'failure',
-        autoClose: true,
       });
-      dispatch(resetCreateMeetingStatus());
     }
-  }, [createMeetingStatus, createdMeetingID, createMeetingError, dispatch, navigate, showToast]);
+  }, [data, isSuccess, isError, error, dispatch, navigate, showToast]);
 
-  if (createMeetingStatus === 'succeeded') {
+  if (isSuccess) {
     // we're about to switch to a different URL
     return null;
-  } else if (createMeetingStatus === 'failed') {
-    return (
-      <div className="create-meeting-page">
-        An error occurred while creating the meeting: {error}
-      </div>
-    );
   }
   const onSubmit: React.FormEventHandler<HTMLFormElement> = (ev) => {
     ev.preventDefault();
@@ -77,18 +65,21 @@ export default function MeetingForm() {
       // TODO: use form validation to provide visual feedback
       return;
     }
-    dispatch(createMeeting({
-      startTime,
-      endTime,
+    createMeeting({
       name: meetingName,
       about: meetingAbout,
-    }));
+      timezone: ianaTzName,
+      minStartHour: startTime,
+      maxEndHour: endTime,
+      tentativeDates: Object.keys(dates),
+    });
   };
   return (
     <Form className="create-meeting-page" onSubmit={onSubmit}>
       <MeetingNamePrompt
         meetingName={meetingName}
         setMeetingName={setMeetingName}
+        isLoading={isLoading}
       />
       <MeetingAboutPrompt
         meetingAbout={meetingAbout}

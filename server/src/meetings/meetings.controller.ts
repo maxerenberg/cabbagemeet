@@ -64,6 +64,17 @@ export function meetingToMeetingResponse(
   return response;
 }
 
+function meetingDtoToMeetingEntity(body: Partial<CreateMeetingDto>): DeepPartial<Meeting> {
+  const meeting: DeepPartial<Meeting> = {};
+    if (body.hasOwnProperty('name')) meeting.Name = body.name;
+    if (body.hasOwnProperty('about')) meeting.About = body.about;
+    if (body.hasOwnProperty('timezone')) meeting.Timezone = body.timezone;
+    if (body.hasOwnProperty('minStartHour')) meeting.MinStartHour = body.minStartHour;
+    if (body.hasOwnProperty('maxEndHour')) meeting.MaxEndHour = body.maxEndHour;
+    if (body.hasOwnProperty('tentativeDates')) meeting.TentativeDates = JSON.stringify(body.tentativeDates.sort());
+    return meeting;
+}
+
 @ApiTags('meetings')
 @Controller('meetings')
 export class MeetingsController {
@@ -82,7 +93,7 @@ export class MeetingsController {
   private async checkIfRespondentExistsAndClientIsAllowedToModifyThem(
     respondentID: number,
     maybeUser: User | null
-  ): Promise<void> {
+  ) {
     const existingRespondent = await this.meetingsService.getRespondent(respondentID);
     if (!existingRespondent) {
       throw new NotFoundException();
@@ -95,7 +106,7 @@ export class MeetingsController {
   private async checkIfMeetingExistsAndClientIsAllowedToModifyIt(
     meetingID: number,
     maybeUser: User | null
-  ): Promise<void> {
+  ) {
     const meeting = await this.meetingsService.getMeetingWithRespondents(meetingID);
     if (!meeting) {
       throw new NotFoundException();
@@ -121,14 +132,7 @@ export class MeetingsController {
     @Body() body: CreateMeetingDto,
     @MaybeAuthUser() maybeUser: User | null,
   ): Promise<MeetingResponse> {
-    const partialMeeting: DeepPartial<Meeting> = {
-      Name: body.name,
-      About: body.about,
-      Timezone: body.timezone,
-      MinStartHour: body.minStartHour,
-      MaxEndHour: body.maxEndHour,
-      TentativeDates: JSON.stringify(body.tentativeDates),
-    };
+    const partialMeeting= meetingDtoToMeetingEntity(body);
     if (maybeUser) {
       partialMeeting.CreatorID = maybeUser.ID;
     }
@@ -175,12 +179,7 @@ export class MeetingsController {
     @MaybeAuthUser() maybeUser: User | null,
   ): Promise<MeetingResponse> {
     await this.checkIfMeetingExistsAndClientIsAllowedToModifyIt(meetingID, maybeUser);
-    const updatedInfo: DeepPartial<Meeting> = {};
-    if (body.name) updatedInfo.Name = body.name;
-    if (body.about) updatedInfo.About = body.about;
-    if (body.minStartHour) updatedInfo.MinStartHour = body.minStartHour;
-    if (body.maxEndHour) updatedInfo.MaxEndHour = body.maxEndHour;
-    if (body.tentativeDates) updatedInfo.TentativeDates = JSON.stringify(body.tentativeDates);
+    const updatedInfo = meetingDtoToMeetingEntity(body);
     if (Object.keys(updatedInfo).length === 0) {
       throw new BadRequestException('At least one property must be specified');
     }
@@ -265,9 +264,6 @@ export class MeetingsController {
     await this.meetingsService.deleteMeeting(meetingID);
   }
 
-  // TODO: return the updated meeting after adding/updating a respondent
-  // so that the client doesn't need to make an extra request
-
   // TODO: email notifications for when people add availabilities or meeting
   // is scheduled
 
@@ -277,11 +273,14 @@ export class MeetingsController {
     operationId: 'addGuestRespondent',
   })
   @Post(':id/respondents/guest')
+  @HttpCode(HttpStatus.OK)
   async addGuestRespondent(
     @Param('id', ParseIntPipe) meetingID: number,
     @Body() body: AddGuestRespondentDto,
-  ): Promise<void> {
+  ): Promise<MeetingResponse> {
     await this.meetingsService.addRespondent(meetingID, body.availabilities, body.name, body.email);
+    const updatedMeeting = await this.meetingsService.getMeetingWithRespondents(meetingID);
+    return meetingToMeetingResponse(updatedMeeting!);
   }
 
   @ApiOperation({
@@ -297,13 +296,15 @@ export class MeetingsController {
     @Param('id', ParseIntPipe) meetingID: number,
     @AuthUser() user: User,
     @Body() body: PutRespondentDto,
-  ): Promise<void> {
+  ): Promise<MeetingResponse> {
     const existingRespondent = await this.meetingsService.getRespondent(meetingID, user.ID);
     if (existingRespondent) {
       await this.meetingsService.updateRespondent(existingRespondent.RespondentID, body.availabilities);
     } else {
       await this.meetingsService.addRespondent(meetingID, body.availabilities, user.ID);
     }
+    const updatedMeeting = await this.meetingsService.getMeetingWithRespondents(meetingID);
+    return meetingToMeetingResponse(updatedMeeting!);
   }
 
   @ApiOperation({
@@ -322,9 +323,11 @@ export class MeetingsController {
     @Param('respondentID', ParseIntPipe) respondentID: number,
     @MaybeAuthUser() maybeUser: User | null,
     @Body() body: PutRespondentDto,
-  ): Promise<void> {
+  ): Promise<MeetingResponse> {
     await this.checkIfRespondentExistsAndClientIsAllowedToModifyThem(respondentID, maybeUser);
     await this.meetingsService.updateRespondent(respondentID, body.availabilities);
+    const updatedMeeting = await this.meetingsService.getMeetingWithRespondents(meetingID);
+    return meetingToMeetingResponse(updatedMeeting!);
   }
 
   @ApiOperation({
@@ -341,8 +344,10 @@ export class MeetingsController {
     @Param('id', ParseIntPipe) meetingID: number,
     @Param('respondentID', ParseIntPipe) respondentID: number,
     @MaybeAuthUser() maybeUser: User | null,
-  ): Promise<void> {
+  ): Promise<MeetingResponse> {
     await this.checkIfRespondentExistsAndClientIsAllowedToModifyThem(respondentID, maybeUser);
     await this.meetingsService.deleteRespondent(respondentID);
+    const updatedMeeting = await this.meetingsService.getMeetingWithRespondents(meetingID);
+    return meetingToMeetingResponse(updatedMeeting!);
   }
 }

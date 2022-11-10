@@ -6,22 +6,20 @@ import NonFocusButton from "components/NonFocusButton";
 import DeleteAccountModal from "./DeleteAccountModal";
 import {
   selectTokenIsPresent,
-  selectUserInfo,
-  selectUserInfoIsPresent,
 } from "slices/authentication";
-import { useEditUser, useSelfInfo, useUnlinkGoogleCalendar } from "utils/auth.hooks";
 import { assert } from "utils/misc.utils";
 import { useToast } from "./Toast";
 import styles from './Settings.module.css';
 import GenericSpinner from "./GenericSpinner";
 import { getReqErrorMessage } from "utils/requests.utils";
-import { useLinkGoogleCalendarMutation } from "slices/api";
+import { useEditUserMutation, useGetSelfInfoQuery, useLinkGoogleCalendarMutation, useUnlinkGoogleCalendarMutation } from "slices/api";
 import ButtonWithSpinner from "./ButtonWithSpinner";
+import { useGetSelfInfoIfTokenIsPresent } from "utils/auth.hooks";
 
 export default function Settings() {
-  const userInfoIsPresent = useAppSelector(selectUserInfoIsPresent);
   const tokenIsPresent = useAppSelector(selectTokenIsPresent);
-  const {isError} = useSelfInfo();
+  const {data: userInfo, isError} = useGetSelfInfoQuery(undefined, {skip: !tokenIsPresent});
+  const userInfoIsPresent = !!userInfo;
   const shouldBeRedirectedToHomePage = !tokenIsPresent || isError;
   const navigate = useNavigate();
 
@@ -50,9 +48,9 @@ export default function Settings() {
 };
 
 function GeneralSettings() {
-  const userInfo = useAppSelector(selectUserInfo);
-  assert(userInfo !== null);
-  const [editUser, {isSuccess, isLoading, isError, error}] = useEditUser();
+  const {data: userInfo} = useGetSelfInfoIfTokenIsPresent();
+  assert(userInfo !== undefined);
+  const [editUser, {isSuccess, isLoading, isError, error}] = useEditUserMutation();
   const [isEditing, setIsEditing] = useState(false);
   const [name, setName] = useState(userInfo.name);
   const {showToast} = useToast();
@@ -69,7 +67,7 @@ function GeneralSettings() {
       });
     } else if (isError) {
       showToast({
-        msg: `Failed to update name: ${getReqErrorMessage(error)}`,
+        msg: `Failed to update name: ${getReqErrorMessage(error!)}`,
         msgType: 'failure',
       });
     }
@@ -79,9 +77,7 @@ function GeneralSettings() {
       onCancelClick();
     }
   }, [isSuccess, onCancelClick]);
-  const onSaveClick = () => editUser({
-    editUserDto: {name},
-  });
+  const onSaveClick = () => editUser({name});
   return (
     <div>
       <h4>General Settings</h4>
@@ -137,8 +133,8 @@ function GeneralSettings() {
 }
 
 function LinkedAccounts() {
-  const userInfo = useAppSelector(selectUserInfo);
-  assert(userInfo !== null);
+  const {data: userInfo} = useGetSelfInfoIfTokenIsPresent();
+  assert(userInfo !== undefined);
   const hasLinkedGoogleAccount = userInfo.hasLinkedGoogleAccount;
   const [
     unlinkCalendar,
@@ -148,7 +144,7 @@ function LinkedAccounts() {
       isError: unlink_isError,
       error: unlink_error
     }
-  ] = useUnlinkGoogleCalendar();
+  ] = useUnlinkGoogleCalendarMutation();
   const [
     linkCalendar,
     {
@@ -169,7 +165,7 @@ function LinkedAccounts() {
       });
     } else if (unlink_isError) {
       showToast({
-        msg: `Failed to unlink Google account: ${getReqErrorMessage(unlink_error)}`,
+        msg: `Failed to unlink Google account: ${getReqErrorMessage(unlink_error!)}`,
         msgType: 'failure',
       });
     }
@@ -190,7 +186,7 @@ function LinkedAccounts() {
     onClick = () => unlinkCalendar();
   } else {
     onClick = () => linkCalendar({
-      linkExternalCalendarDto: {post_redirect: window.location.pathname}
+      post_redirect: window.location.pathname
     });
   }
   const btnDisabled = link_isLoading || link_isSuccess || unlink_isLoading;
@@ -226,13 +222,13 @@ function LinkedAccounts() {
 }
 
 function NotificationSettings() {
-  const userInfo = useAppSelector(selectUserInfo);
-  assert(userInfo !== null);
+  const {data: userInfo} = useGetSelfInfoIfTokenIsPresent();
+  assert(userInfo !== undefined);
   const isSubscribed = userInfo.isSubscribedToNotifications;
   // The ref is used to avoid running the useEffect hook twice upon a
   // successful request
   const isSubscribedRef = useRef(isSubscribed);
-  const [editUser, {isSuccess, isLoading, isError, error}] = useEditUser();
+  const [editUser, {isSuccess, isLoading, isError, error}] = useEditUserMutation();
   const {showToast} = useToast();
   useEffect(() => {
     if (isSuccess) {
@@ -250,15 +246,15 @@ function NotificationSettings() {
       showToast({
         msg: (
           isSubscribedRef.current
-            ? `Failed to subscribe to notifications: ${getReqErrorMessage(error)}`
-            : `Failed to unsubscribe from notifications: ${getReqErrorMessage(error)}`
+            ? `Failed to subscribe to notifications: ${getReqErrorMessage(error!)}`
+            : `Failed to unsubscribe from notifications: ${getReqErrorMessage(error!)}`
         ),
         msgType: 'failure',
       });
     }
   }, [isSuccess, isError, error, showToast]);
   const onClick = () => editUser({
-    editUserDto: {subscribe_to_notifications: !isSubscribed}
+    subscribe_to_notifications: !isSubscribed
   });
   return (
     <div>

@@ -1,6 +1,7 @@
 import React, { ReactElement, useMemo } from 'react';
 import { useAppSelector, useAppDispatch } from 'app/hooks';
 import type { PeopleDateTimes, Style } from 'common/types';
+import { useGetCurrentMeetingWithSelector } from 'utils/meetings.hooks';
 import {
   selectSelMode,
   selectSelectedTimes,
@@ -16,10 +17,11 @@ import {
 import type { MouseState } from 'slices/availabilitiesSelection';
 import { useToast } from 'components/Toast';
 import { flatGridCoords } from 'utils/arrays.utils';
-import { addDaysToDateString, customToISOString } from 'utils/dates.utils';
-import { assertIsNever } from 'utils/misc.utils';
+import { addDaysToDateString, customToISOString, startAndEndDateTimeToDateTimesFlat } from 'utils/dates.utils';
+import { assert, assertIsNever } from 'utils/misc.utils';
 import { useEffect } from 'react';
-import { selectMeetingIsScheduled, selectScheduledDateTimes } from 'slices/meetingTimes';
+import { useGetGoogleCalendarEventsQuery } from 'slices/api';
+import { selectCurrentMeetingID } from 'slices/currentMeeting';
 
 // TODO: deal with decimal start/end times
 
@@ -137,9 +139,21 @@ function MeetingGridBodyCells({
 }: {
   numRows: number, numCols: number, startHour: number, dateStrings: string[],
 }) {
-  const availabilities = useAppSelector(state => state.meetingTimes.availabilities);
-  const totalPeople = Object.keys(availabilities).length;
-  const dateTimePeople = useMemo(() => createDateTimePeople(availabilities), [availabilities]);
+  const {respondents, scheduledDateTimes} = useGetCurrentMeetingWithSelector(
+    ({data: meeting}) => ({
+      respondents: meeting?.respondents,
+      scheduledDateTimes: meeting?.scheduledDateTimes,
+    })
+  );
+  assert(respondents !== undefined);
+  const totalPeople = Object.keys(respondents).length;
+  const dateTimePeople = useMemo(() => {
+    const availabilities: PeopleDateTimes = {};
+    for (const [respondentID, respondent] of Object.entries(respondents)) {
+      availabilities[respondentID] = respondent.availabilities;
+    }
+    return createDateTimePeople(availabilities);
+  }, [respondents]);
   const gridCoords = useMemo(() => flatGridCoords(numRows, numCols), [numRows, numCols]);
   const dateTimes = useMemo((): string[][] => {
     const rows: string[][] = [];
@@ -164,8 +178,10 @@ function MeetingGridBodyCells({
     }
     return rows;
   }, [numRows, numCols, dateStrings, startHour]);
-  const scheduleSet = useAppSelector(selectScheduledDateTimes);
-  const externalEvents = useAppSelector(state => state.meetingTimes.externalCalendarEvents);
+  const scheduleSet = useMemo(() => scheduledDateTimes || {}, [scheduledDateTimes]);
+  const meetingID = useAppSelector(selectCurrentMeetingID);
+  assert(meetingID !== undefined);
+  const {data: externalEvents} = useGetGoogleCalendarEventsQuery(meetingID);
   // Take the first event of each dateTime, and take the first dateTime of each event
   const dateTimesToExternalEventInfo = useMemo(() => {
     const result: {
@@ -177,14 +193,13 @@ function MeetingGridBodyCells({
     if (externalEvents === undefined) {
       return result;
     }
-    for (const {name, dateTimes} of externalEvents) {
+    for (const {summary, startDateTime, endDateTime} of externalEvents.events) {
+      const dateTimes = startAndEndDateTimeToDateTimesFlat(startDateTime, endDateTime);
       for (const dateTime of dateTimes) {
-        if (!result.hasOwnProperty(dateTime)) {
-          result[dateTime] = {
-            eventName: name,
-            isStartOfEvent: dateTime === dateTimes[0]
-          };
-        }
+        result[dateTime] = {
+          eventName: summary,
+          isStartOfEvent: dateTime === startDateTime
+        };
       }
     }
     return result;
@@ -206,8 +221,10 @@ function MeetingGridBodyCells({
           const isEarliestScheduled = dateTime === earliestScheduledDateTime;
           const externalEventName = dateTimesToExternalEventInfo[dateTime]?.eventName;
           const isFirstDateTimeOfExternalEvent = dateTimesToExternalEventInfo[dateTime]?.isStartOfEvent ?? false;
-          const hoverUserIsAvailableAtThisTime = somebodyIsHovered && availabilities[hoverUser][dateTime];
-          const selectedUserIsAvailableAtThisTime = selMode.type === 'selectedUser' && availabilities[selMode.selectedUserID][dateTime];
+          const hoverUserIsAvailableAtThisTime = somebodyIsHovered && respondents[hoverUser].availabilities[dateTime];
+          const selectedUserIsAvailableAtThisTime =
+            selMode.type === 'selectedUser'
+            && respondents[selMode.selectedUserID].availabilities[dateTime];
           const numPeopleAvailableAtThisTime = dateTimePeople[dateTime]?.length ?? 0;
           return (
             <Cell key={i} {...{
@@ -264,7 +281,9 @@ const Cell = React.memo(function Cell({
 }) {
   const selMode = useAppSelector(selectSelMode);
   const isSelected = useAppSelector(state => !!selectSelectedTimes(state)[dateTime]);
-  const meetingIsScheduled = useAppSelector(selectMeetingIsScheduled);
+  const {meetingIsScheduled} = useGetCurrentMeetingWithSelector(
+    ({data: meeting}) => ({meetingIsScheduled: meeting?.scheduledDateTimes !== undefined})
+  )
   const mouseStateType = useAppSelector((state) => selectMouseState(state)?.type);
   const isInMouseSelectionArea = useAppSelector((state) => {
     const mouseState = selectMouseState(state);
@@ -294,24 +313,14 @@ const Cell = React.memo(function Cell({
   const style: Style = {gridArea: `c${cellIdx}`};
   let rgb: string | undefined;
   let alpha = '100%';
-  if (
-    selMode.type === 'editingSelf'
-    || selMode.type === 'submittingSelf'
-    || selMode.type === 'submittedSelf'
-    || selMode.type === 'rejectedSelf'
-  ) {
+  if (selMode.type === 'editingSelf') {
     if (
       (isInMouseSelectionArea && mouseSelectionAreaIsAddingDateTimes)
       || (!isInMouseSelectionArea && isSelected)
     ) {
       rgb = 'var(--custom-primary-rgb)';
     }
-  } else if (
-    selMode.type === 'editingSchedule'
-    || selMode.type === 'submittingSchedule'
-    || selMode.type === 'submittedSchedule'
-    || selMode.type === 'rejectedSchedule'
-  ) {
+  } else if (selMode.type === 'editingSchedule') {
     if (isInMouseSelectionColumn || isSelected) {
       rgb = 'var(--custom-scheduled-cell-rgb)';
     } else if (numPeopleAvailableAtThisTime > 0) {
@@ -322,24 +331,14 @@ const Cell = React.memo(function Cell({
     if (selectedUserIsAvailableAtThisTime) {
       rgb = 'var(--custom-primary-rgb)';
     }
-  } else if (
-    selMode.type === 'editingOther'
-    || selMode.type === 'submittingOther'
-    || selMode.type === 'submittedOther'
-    || selMode.type === 'rejectedOther'
-  ) {
+  } else if (selMode.type === 'editingOther') {
     if (
       (isInMouseSelectionArea && mouseSelectionAreaIsAddingDateTimes)
       || (!isInMouseSelectionArea && isSelected)
     ) {
       rgb = 'var(--custom-primary-rgb)';
     }
-  } else if (
-    selMode.type === 'none'
-    || selMode.type === 'submittingUnschedule'
-    || selMode.type === 'submittedUnschedule'
-    || selMode.type === 'rejectedUnschedule'
-  ) {
+  } else if (selMode.type === 'none') {
     if (somebodyIsHovered) {
       if (hoverUserIsAvailableAtThisTime) {
         rgb = 'var(--custom-primary-rgb)';
@@ -357,13 +356,7 @@ const Cell = React.memo(function Cell({
   if (
     (
       selMode.type === 'editingSelf'
-      || selMode.type === 'submittingSelf'
-      || selMode.type === 'submittedSelf'
-      || selMode.type === 'rejectedSelf'
       || selMode.type === 'editingOther'
-      || selMode.type === 'submittingOther'
-      || selMode.type === 'submittedOther'
-      || selMode.type === 'rejectedOther'
     )
     && externalEventName !== undefined
     && !meetingIsScheduled
@@ -377,12 +370,7 @@ const Cell = React.memo(function Cell({
 
   let scheduledTimeBox: ReactElement<HTMLDivElement> | undefined;
   if (
-    (
-      selMode.type === 'none'
-      || selMode.type === 'submittingUnschedule'
-      || selMode.type === 'submittedUnschedule'
-      || selMode.type === 'rejectedUnschedule'
-    )
+    selMode.type === 'none'
     && isScheduled
   ) {
     scheduledTimeBox = (

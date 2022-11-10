@@ -9,10 +9,14 @@ import 'components/DayPicker/DayPicker.css';
 import 'components/MeetingForm/MeetingForm.css';
 import { resetSelectedDates, selectSelectedDates, setSelectedDates } from "slices/selectedDates";
 import { arrayToObject } from "utils/arrays.utils";
-import { editMeeting, resetEditMeetingStatus } from "slices/meetingTimes";
 import { useToast } from "components/Toast";
 import DeleteMeetingModal from "./DeleteMeetingModal";
 import ButtonWithSpinner from "components/ButtonWithSpinner";
+import { useEditMeetingMutation } from "slices/api";
+import { getReqErrorMessage } from "utils/requests.utils";
+import { ianaTzName } from "utils/dates.utils";
+import { useGetCurrentMeetingWithSelector } from "utils/meetings.hooks";
+import { assert } from "utils/misc.utils";
 
 // TODO: reduce code duplication with MeetingForm
 
@@ -21,14 +25,16 @@ export default function EditMeeting({
 }: {
   setIsEditing: (val: boolean) => void,
 }) {
-  const meeting = useAppSelector(state => state.meetingTimes);
-  const [meetingName, setMeetingName] = useState(meeting.name!);
-  const [meetingAbout, setMeetingAbout] = useState(meeting.about!);
-  const [startTime, setStartTime] = useState(Math.floor(meeting.startTime!));
-  const [endTime, setEndTime] = useState(Math.ceil(meeting.endTime!));
+  const {meeting} = useGetCurrentMeetingWithSelector(
+    ({data: meeting}) => ({meeting})
+  );
+  assert(meeting !== undefined);
+  const [meetingName, setMeetingName] = useState(meeting.name);
+  const [meetingAbout, setMeetingAbout] = useState(meeting.about);
+  const [startTime, setStartTime] = useState(Math.floor(meeting.minStartHour));
+  const [endTime, setEndTime] = useState(Math.ceil(meeting.maxEndHour));
   const selectedDates = useAppSelector(selectSelectedDates);
-  const editMeetingStatus = useAppSelector(state => state.meetingTimes.editMeetingStatus);
-  const editMeetingError = useAppSelector(state => state.meetingTimes.error);
+  const [editMeeting, {isLoading, isSuccess, isError, error}] = useEditMeetingMutation();
   const dispatch = useAppDispatch();
   const { showToast } = useToast();
 
@@ -41,26 +47,24 @@ export default function EditMeeting({
 
   // FIXME: This seems to run twice during the first render
   useEffect(() => {
-    dispatch(setSelectedDates(arrayToObject(meeting.dates)));
-  }, [dispatch, meeting.dates]);
+    dispatch(setSelectedDates(arrayToObject(meeting.tentativeDates)));
+  }, [dispatch, meeting.tentativeDates]);
 
   useEffect(() => {
-    if (editMeetingStatus === 'succeeded') {
+    if (isSuccess) {
       showToast({
         msg: 'Meeting successfully edited',
         msgType: 'success',
         autoClose: true,
       });
-      dispatch(resetEditMeetingStatus());
       setIsEditing(false);
-    } else if (editMeetingStatus === 'failed') {
+    } else if (isError) {
       showToast({
-        msg: `Failed to edit meeting: ${editMeetingError || 'unknown'}`,
+        msg: `Failed to edit meeting: ${getReqErrorMessage(error!)}`,
         msgType: 'failure',
       });
-      dispatch(resetEditMeetingStatus());
     }
-  }, [editMeetingStatus, showToast, setIsEditing, dispatch, editMeetingError]);
+  }, [isSuccess, isError, error, showToast, setIsEditing]);
 
   const onSave: React.MouseEventHandler<HTMLButtonElement> = (ev) => {
     ev.preventDefault();
@@ -68,20 +72,22 @@ export default function EditMeeting({
       // TODO: use Form validation
       return;
     }
-    dispatch(editMeeting({
-      id: meeting.id!,
-      name: meetingName,
-      about: meetingAbout,
-      dates: Object.keys(selectedDates),
-      startTime,
-      endTime,
-    }));
+    editMeeting({
+      id: meeting.meetingID,
+      editMeetingDto: {
+        name: meetingName,
+        about: meetingAbout,
+        tentativeDates: Object.keys(selectedDates),
+        minStartHour: startTime,
+        maxEndHour: endTime,
+        timezone: ianaTzName,
+      }
+    });
   };
 
-  const isLoading = editMeetingStatus === 'loading';
   return (
     <Form className="edit-meeting">
-      <MeetingNamePrompt {...{meetingName, setMeetingName, setIsEditing, onSave}} />
+      <MeetingNamePrompt {...{meetingName, setMeetingName, setIsEditing, onSave, isLoading}} />
       <MeetingAboutPrompt {...{meetingAbout, setMeetingAbout}} />
       <div className="create-meeting-form-group">
         <p className="fs-5">On which days would you like to meet?</p>
@@ -109,13 +115,14 @@ function MeetingNamePrompt({
   setMeetingName,
   setIsEditing,
   onSave,
+  isLoading,
 }: {
   meetingName: string,
   setMeetingName: (name: string) => void,
   setIsEditing: (val: boolean) => void,
   onSave: React.MouseEventHandler<HTMLButtonElement>,
+  isLoading: boolean,
 }) {
-  const isSaveLoading = useAppSelector(state => state.meetingTimes.editMeetingStatus === 'loading');
   const onMeetingNameChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setMeetingName(e.target.value);
   };
@@ -139,7 +146,7 @@ function MeetingNamePrompt({
           tabIndex={-1}
           type="button"
           onClick={onDeleteClick}
-          disabled={isSaveLoading}
+          disabled={isLoading}
         >
           Delete
         </button>
@@ -148,7 +155,7 @@ function MeetingNamePrompt({
           tabIndex={-1}
           type="button"
           onClick={onCancelClick}
-          disabled={isSaveLoading}
+          disabled={isLoading}
         >
           Cancel
         </button>
@@ -157,8 +164,8 @@ function MeetingNamePrompt({
           tabIndex={-1}
           type="submit"
           onClick={onSave}
-          disabled={meetingName === '' || isSaveLoading}
-          isLoading={isSaveLoading}
+          disabled={meetingName === '' || isLoading}
+          isLoading={isLoading}
         >
           Save
         </ButtonWithSpinner>
@@ -168,7 +175,7 @@ function MeetingNamePrompt({
             tabIndex={-1}
             type="button"
             onClick={onCancelClick}
-            disabled={isSaveLoading}
+            disabled={isLoading}
           >
             Cancel
           </button>
@@ -177,8 +184,8 @@ function MeetingNamePrompt({
             tabIndex={-1}
             type="submit"
             onClick={onSave}
-            disabled={meetingName === '' || isSaveLoading}
-            isLoading={isSaveLoading}
+            disabled={meetingName === '' || isLoading}
+            isLoading={isLoading}
           >
             Save
           </ButtonWithSpinner>

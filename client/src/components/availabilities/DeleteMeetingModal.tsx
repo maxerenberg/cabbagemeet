@@ -1,45 +1,41 @@
 import { useEffect } from "react";
-import { useAppSelector, useAppDispatch } from "app/hooks";
-import { deleteMeeting, resetDeleteMeetingStatus } from "slices/meetingTimes";
+import { useAppSelector } from "app/hooks";
 import ConfirmationModal from "components/ConfirmationModal";
 import { useNavigate } from "react-router-dom";
 import { useToast } from "components/Toast";
+import { useDeleteMeetingMutation } from "slices/api";
+import { getReqErrorMessage } from "utils/requests.utils";
+import { selectCurrentMeetingID } from "slices/currentMeeting";
+import { assert } from "utils/misc.utils";
 
 export default function DeleteMeetingModal({
   onClose,
 }: {
   onClose: () => void,
 }) {
-  const meetingID = useAppSelector(state => state.meetingTimes.id!);
-  const deleteMeetingStatus = useAppSelector(state => state.meetingTimes.deleteMeetingStatus);
-  const error = useAppSelector(state => state.meetingTimes.error);
-  const isDeleteLoading = deleteMeetingStatus === 'loading';
-  const dispatch = useAppDispatch();
+  const meetingID = useAppSelector(selectCurrentMeetingID);
+  assert(meetingID !== undefined);
+  const [deleteMeeting, {isLoading, isSuccess, isError, error}] = useDeleteMeetingMutation();
   const navigate = useNavigate();
   const {showToast} = useToast();
-  const onDeleteClick = () => dispatch(deleteMeeting(meetingID));
+  // TODO: don't store meeting ID as string
+  const onDeleteClick = () => deleteMeeting(meetingID);
 
   useEffect(() => {
-    if (deleteMeetingStatus === 'succeeded') {
+    if (isSuccess) {
       showToast({
         msg: 'Successfully deleted meeting',
         msgType: 'success',
         autoClose: true,
       });
-      // This is racy because resetDeleteMeetingStatus causes the Meeting
-      // component to unmount this modal (because it wants to show the spinner).
-      // TODO: maybe it would be better to handle this case in the Meeting
-      // component itself?
-      dispatch(resetDeleteMeetingStatus());
       navigate('/me');
-    } else if (deleteMeetingStatus === 'failed') {
+    } else if (isError) {
       showToast({
-        msg: `Failed to delete meeting: ${error || 'unknown'}`,
+        msg: `Failed to delete meeting: ${getReqErrorMessage(error!)}`,
         msgType: 'failure',
       });
-      dispatch(resetDeleteMeetingStatus());
     }
-  }, [deleteMeetingStatus, showToast, dispatch, navigate, error]);
+  }, [isSuccess, isError, error, showToast, navigate]);
 
   return (
     <ConfirmationModal
@@ -48,7 +44,7 @@ export default function DeleteMeetingModal({
       title="Delete meeting?"
       bodyText="Are you sure you want to delete this meeting? This action is irreversible."
       confirmationButtonText="Delete"
-      isLoading={isDeleteLoading}
+      isLoading={isLoading}
     />
   );
 };

@@ -2,11 +2,11 @@ import { useEffect } from "react";
 import { useAppDispatch } from "app/hooks";
 import ConfirmationModal from "components/ConfirmationModal";
 import { useToast } from "components/Toast";
-import { useDeleteAccount } from "utils/auth.hooks";
 import { getReqErrorMessage } from "utils/requests.utils";
+import { useDeleteUserMutation } from "slices/api";
 
 export default function DeleteAccountModal({onClose}: {onClose: () => void}) {
-  const [deleteAccount, {isSuccess, isLoading, isError, error}] = useDeleteAccount();
+  const [deleteAccount, {isSuccess, isLoading, isError, error}] = useDeleteUserMutation();
   const dispatch = useAppDispatch();
   const {showToast} = useToast();
   const onDeleteClick = () => deleteAccount();
@@ -22,7 +22,7 @@ export default function DeleteAccountModal({onClose}: {onClose: () => void}) {
       // userInfo is deleted from the Redux store (see Settings.tsx)
     } else if (isError) {
       showToast({
-        msg: `Failed to delete account: ${getReqErrorMessage(error)}`,
+        msg: `Failed to delete account: ${getReqErrorMessage(error!)}`,
         msgType: 'failure',
       });
     }

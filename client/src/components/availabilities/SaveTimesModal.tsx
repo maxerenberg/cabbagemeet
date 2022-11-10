@@ -1,21 +1,27 @@
 import { useState, useEffect } from 'react';
 import Form from 'react-bootstrap/Form';
-import { useAppDispatch, useAppSelector } from 'app/hooks';
+import type { SerializedError } from '@reduxjs/toolkit';
+import type { FetchBaseQueryError } from '@reduxjs/toolkit/dist/query';
 import Modal from 'components/Modal';
-import {
-  selectSelModeAndDateTimes,
-  submitSelfAsGuest,
-} from 'slices/availabilitiesSelection';
 import './SaveTimesModal.css';
 import ButtonWithSpinner from 'components/ButtonWithSpinner';
+import { getReqErrorMessage } from 'utils/requests.utils';
 
 function SaveTimesModal({
   onClose,
+  submitAsGuest,
+  isSuccess,
+  isLoading: isSubmitting,
+  isError,
+  error,
 }: {
   onClose: () => void,
+  submitAsGuest: (name: string, email?: string) => void,
+  isSuccess: boolean,
+  isLoading: boolean,
+  isError: boolean,
+  error: FetchBaseQueryError | SerializedError | undefined,
 }) {
-  const dispatch = useAppDispatch();
-  const selMode = useAppSelector(state => selectSelModeAndDateTimes(state).selMode);
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [errorMsg, setErrorMsg] = useState('');
@@ -25,13 +31,13 @@ function SaveTimesModal({
     // The AvailabilitiesRow component takes care of showing a toast and resetting
     // the Redux state. We just need to take care of closing the modal (or showing
     // an error in the modal).
-    if (selMode.type === 'submittedSelf') {
+    if (isSuccess) {
       // automatically close the modal if the request succeeds
       onClose();
-    } else if (selMode.type === 'rejectedSelf') {
-      setErrorMsg(selMode.error.message ?? 'unknown');
+    } else if (isError) {
+      setErrorMsg(getReqErrorMessage(error!));
     }
-  }, [selMode, onClose]);
+  }, [isSuccess, isError, error, onClose]);
 
   const onSubmit: React.FormEventHandler<HTMLFormElement> = (ev) => {
     ev.preventDefault();
@@ -40,10 +46,9 @@ function SaveTimesModal({
       setValidated(true);
       return;
     }
-    dispatch(submitSelfAsGuest(name, email || undefined));
+    submitAsGuest(name, email || undefined);
   };
 
-  const isSubmitting = selMode.type === 'submittingSelf';
   const submitBtnDisabled = isSubmitting || name === '';
   const closeBtnDisabled = isSubmitting;
   return (

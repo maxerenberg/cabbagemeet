@@ -3,24 +3,26 @@ import ButtonGroup from 'react-bootstrap/ButtonGroup';
 import { Link, useNavigate } from "react-router-dom";
 import { useAppDispatch, useAppSelector } from "app/hooks";
 import BottomOverlay from "components/BottomOverlay";
+import ButtonWithSpinner from "components/ButtonWithSpinner";
+import GenericSpinner from "components/GenericSpinner";
 import NonFocusButton from "components/NonFocusButton";
 import {
-  selectUserInfo,
   selectTokenIsPresent,
 } from "slices/authentication";
 import CreatedOrRespondedMeetings from "./CreatedOrRespondedMeetings";
 import styles from './Profile.module.css';
 import { useToast } from "components/Toast";
-import { useLogout, useSelfInfo } from "utils/auth.hooks";
+import { useGetSelfInfoQuery, useLogoutMutation } from "slices/api";
+import { useGetSelfInfoIfTokenIsPresent } from "utils/auth.hooks";
 import { getReqErrorMessage } from "utils/requests.utils";
-import ButtonWithSpinner from "components/ButtonWithSpinner";
 
 export default function Profile() {
   const tokenIsPresent = useAppSelector(selectTokenIsPresent);
-  const {isError} = useSelfInfo();
+  const {data: userInfo, isError} = useGetSelfInfoQuery(undefined, {skip: !tokenIsPresent});
+  const userInfoIsPresent = !!userInfo;
+  const shouldBeRedirectedToHomePage = !tokenIsPresent || isError;
   const navigate = useNavigate();
   const [seeCreatedMeetings, setSeeCreatedMeetings] = useState(true);
-  const shouldBeRedirectedToHomePage = !tokenIsPresent || isError;
 
   useEffect(() => {
     if (shouldBeRedirectedToHomePage) {
@@ -30,6 +32,10 @@ export default function Profile() {
 
   if (shouldBeRedirectedToHomePage) {
     return null;
+  }
+
+  if (!userInfoIsPresent) {
+    return <GenericSpinner />;
   }
 
   return (
@@ -44,8 +50,8 @@ export default function Profile() {
 };
 
 function Heading() {
-  const [logout, {isLoading, isError, error}] = useLogout();
-  const userInfo = useAppSelector(selectUserInfo);
+  const [logout, {isLoading, isError, error}] = useLogoutMutation();
+  const {data: userInfo} = useGetSelfInfoIfTokenIsPresent();
   const dispatch = useAppDispatch();
   const onSignoutClick = () => logout();
   const { showToast } = useToast();

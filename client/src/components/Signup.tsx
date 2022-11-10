@@ -5,9 +5,9 @@ import BottomOverlay from 'components/BottomOverlay';
 import ContinueWithGoogleButton from 'components/ContinueWithGoogleButton';
 import { useToast } from 'components/Toast';
 import styles from './Signup.module.css';
-import { useSignup } from 'utils/auth.hooks';
 import { getReqErrorMessage } from 'utils/requests.utils';
 import ButtonWithSpinner from './ButtonWithSpinner';
+import { useSignupMutation } from 'slices/api';
 
 export default function Signup() {
   return (
@@ -21,7 +21,7 @@ export default function Signup() {
 function SignupForm() {
   const [validated, setValidated] = useState(false);
   const navigate = useNavigate();
-  const [signup, {isLoading, isSuccess, isError, error}] = useSignup();
+  const [signup, {isLoading, isSuccess, isError, error}] = useSignupMutation();
   const { showToast } = useToast();
   const nameRef = useRef<HTMLInputElement>(null);
   const emailRef = useRef<HTMLInputElement>(null);
@@ -34,11 +34,9 @@ function SignupForm() {
       const form = ev.currentTarget;
       if (form.checkValidity()) {
         signup({
-          localSignupDto: {
-            name: nameRef.current!.value,
-            email: emailRef.current!.value,
-            password: passwordRef.current!.value,
-          }
+          name: nameRef.current!.value,
+          email: emailRef.current!.value,
+          password: passwordRef.current!.value,
         });
       } else {
         setValidated(true);
@@ -49,7 +47,7 @@ function SignupForm() {
   useEffect(() => {
     if (isError) {
       showToast({
-        msg: `An error occurred: ${getReqErrorMessage(error)}`,
+        msg: `An error occurred: ${getReqErrorMessage(error!)}`,
         msgType: 'failure',
       });
     } else if (isSuccess) {

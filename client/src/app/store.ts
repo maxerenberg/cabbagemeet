@@ -2,7 +2,7 @@ import { configureStore, ThunkAction, Action } from '@reduxjs/toolkit';
 import { enhancedApi } from 'slices/enhancedApi';
 import authenticationReducer from 'slices/authentication';
 import availabilitiesSelectionReducer from 'slices/availabilitiesSelection';
-import meetingTimesReducer from 'slices/meetingTimes';
+import currentMeetingReducer from 'slices/currentMeeting';
 import resetPasswordReducer from 'slices/resetPassword';
 import selectedDatesReducer from 'slices/selectedDates';
 import visitedDayPickerReducer from 'slices/visitedDayPicker';
@@ -12,7 +12,7 @@ export const store = configureStore({
     [enhancedApi.reducerPath]: enhancedApi.reducer,
     authentication: authenticationReducer,
     availabilitiesSelection: availabilitiesSelectionReducer,
-    meetingTimes: meetingTimesReducer,
+    currentMeeting: currentMeetingReducer,
     resetPassword: resetPasswordReducer,
     selectedDates: selectedDatesReducer,
     visitedDayPicker: visitedDayPickerReducer,

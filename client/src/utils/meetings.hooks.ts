@@ -1,45 +1,21 @@
-import { convertOtherTzToLocal } from "utils/dates.utils";
-import { MeetingsShortResponse, useGetCreatedMeetingsQuery, useGetRespondedMeetingsQuery } from "slices/api";
-import type { MeetingShortResponse } from 'slices/api';
-import { QueryWrapper } from "./requests.utils";
+import { useAppSelector } from "app/hooks";
+import { selectCurrentMeetingID } from "slices/currentMeeting";
+import { useGetMeetingQuery } from "slices/enhancedApi";
+import { TransformedMeetingResponse } from "./response-transforms";
 
-function convertMeetingTimesAndDatesToLocal(meeting: MeetingShortResponse): MeetingShortResponse {
-  const {
-    startHour: localStartHour,
-    endHour: localEndHour,
-    dates: localDates,
-  } = convertOtherTzToLocal({
-    startHour: meeting.minStartHour,
-    endHour: meeting.maxEndHour,
-    dates: meeting.tentativeDates,
-    timezone: meeting.timezone,
+export function useGetCurrentMeeting() {
+  const meetingID = useAppSelector(selectCurrentMeetingID);
+  const queryInfo = useGetMeetingQuery(meetingID || 0, {skip: meetingID === undefined});
+  return queryInfo;
+}
+
+export function useGetCurrentMeetingWithSelector<T extends Record<string, any>>(
+  select: ({data}: {data?: TransformedMeetingResponse}) => T,
+) {
+  const meetingID = useAppSelector(selectCurrentMeetingID);
+  const queryInfo = useGetMeetingQuery(meetingID ?? 0, {
+    skip: meetingID === undefined,
+    selectFromResult: select,
   });
-  return {
-    ...meeting,
-    minStartHour: localStartHour,
-    maxEndHour: localEndHour,
-    tentativeDates: localDates,
-  };
-}
-
-export function useCreatedMeetings({skip}: {skip: boolean}): QueryWrapper<MeetingsShortResponse> {
-  let {data, ...rest} = useGetCreatedMeetingsQuery(undefined, {skip});
-  const {isSuccess} = rest;
-  if (isSuccess) {
-    data = {
-      meetings: data!.meetings.map(convertMeetingTimesAndDatesToLocal)
-    };
-  }
-  return {data, ...rest};
-}
-
-export function useRespondedMeetings({skip}: {skip: boolean}): QueryWrapper<MeetingsShortResponse> {
-  let {data, ...rest} = useGetRespondedMeetingsQuery(undefined, {skip});
-  const {isSuccess} = rest;
-  if (isSuccess) {
-    data = {
-      meetings: data!.meetings.map(convertMeetingTimesAndDatesToLocal)
-    };
-  }
-  return {data, ...rest};
+  return queryInfo;
 }

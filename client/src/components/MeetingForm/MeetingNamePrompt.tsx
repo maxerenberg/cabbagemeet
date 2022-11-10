@@ -1,17 +1,17 @@
 import React from 'react';
 import Form from 'react-bootstrap/Form';
 import BottomOverlay from 'components/BottomOverlay';
-import { useAppSelector } from 'app/hooks';
 import ButtonWithSpinner from 'components/ButtonWithSpinner';
 
 export default function MeetingNamePrompt({
   meetingName,
   setMeetingName,
+  isLoading,
 }: {
   meetingName: string,
   setMeetingName: (name: string) => void,
+  isLoading: boolean,
 }) {
-  const isLoading = useAppSelector(state => state.meetingTimes.createMeetingStatus === 'loading');
   const onMeetingNameChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setMeetingName(e.target.value);
   };

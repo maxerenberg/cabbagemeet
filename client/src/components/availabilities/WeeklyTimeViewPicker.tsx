@@ -1,5 +1,4 @@
 import React, { useMemo, useReducer } from 'react';
-import { useAppSelector } from 'app/hooks';
 import { LeftArrow as SVGLeftArrow, RightArrow as SVGRightArrow } from 'components/Arrows';
 import { getDateFromString, getDayOfWeekAbbr, getMonthAbbrFromDate } from 'utils/dates.utils';
 import AvailabilitiesRow from './AvailabilitiesRow';
@@ -7,6 +6,7 @@ import MeetingGridBodyCells from './MeetingGridBodyCells';
 import MeetingRespondents from './MeetingRespondents';
 import { range } from 'utils/arrays.utils';
 import { assert } from 'utils/misc.utils';
+import { useGetCurrentMeetingWithSelector } from 'utils/meetings.hooks';
 
 /**
  * Returns a string which can be used in the CSS grid-template-areas property
@@ -86,11 +86,17 @@ function pageNumberReducer(page: number, action: 'inc' | 'dec'): number {
 }
 
 export default function WeeklyViewTimePicker() {
-  const startTime = useAppSelector(state => state.meetingTimes.startTime);
-  const endTime = useAppSelector(state => state.meetingTimes.endTime);
+  const {startTime, endTime, dates} = useGetCurrentMeetingWithSelector(
+    ({data: meeting}) => ({
+      startTime: meeting?.minStartHour,
+      endTime: meeting?.maxEndHour,
+      dates: meeting?.tentativeDates,
+    })
+  );
   // If the meeting data hasn't been loaded yet, then this component
   // shouldn't even be loaded
-  assert(startTime !== null && endTime !== null);
+  console.log(startTime, endTime, dates);
+  assert(startTime !== undefined && endTime !== undefined && dates !== undefined);
   // startTime/endTime can be fractional (e.g. 9.5) if someone's timezone offset (in hours)
   // is not an integer, e.g. St. John's
   // !!!!!!!!!!
@@ -103,7 +109,6 @@ export default function WeeklyViewTimePicker() {
   // e.g. 9:30.
   const startHour = Math.floor(startTime);
   const endHour = Math.ceil(endTime);
-  const dates = useAppSelector(state => state.meetingTimes.dates);
   const [page, pageDispatch] = useReducer(pageNumberReducer, 0);
   const numDaysDisplayed = Math.min(dates.length - page*7, 7);
   const datesDisplayed = useMemo(

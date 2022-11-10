@@ -12,6 +12,6 @@ class GoogleCalendarEventsResponseItem {
 }
 
 export default class GoogleCalendarEventsResponse {
-  @ApiProperty()
+  @ApiProperty({type: () => GoogleCalendarEventsResponseItem, isArray: true})
   events: GoogleCalendarEventsResponseItem[];
 }

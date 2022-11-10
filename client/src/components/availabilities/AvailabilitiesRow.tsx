@@ -1,27 +1,24 @@
-import React, { useState, useCallback, useEffect, useMemo } from 'react';
+import React, { useState, useCallback, useEffect, useMemo, useRef } from 'react';
 import BottomOverlay from 'components/BottomOverlay';
 import {
   selectSelMode,
   resetSelection,
-  editSelf,
-  goBackToEditingSelf,
-  goBackToEditingOther,
-  editSelectedUser,
-  submitOther,
+  useEditSelf,
+  useEditSelectedUser,
   createSchedule,
-  goBackToEditingSchedule,
-  submitSelfWhenLoggedIn,
-  submitSchedule,
-  submitUnschedule,
+  selectSelectedTimes,
 } from 'slices/availabilitiesSelection';
 import { useAppSelector, useAppDispatch } from 'app/hooks';
 import SaveTimesModal from './SaveTimesModal';
 import { useToast } from 'components/Toast';
-import { assertIsNever } from 'utils/misc.utils';
-import { selectMeetingIsScheduled, selectSelfIsInAvailabilities } from 'slices/meetingTimes';
-import { selectUserID } from 'slices/authentication';
+import { assert, assertIsNever } from 'utils/misc.utils';
 import { addMinutesToDateTimeString, daysOfWeek, months, to12HourClock } from 'utils/dates.utils';
 import ButtonWithSpinner from 'components/ButtonWithSpinner';
+import { useGetCurrentMeetingWithSelector } from 'utils/meetings.hooks';
+import { selectTokenIsPresent } from 'slices/authentication';
+import { useAddGuestRespondentMutation, useAddSelfRespondentMutation, useScheduleMeetingMutation, useUnscheduleMeetingMutation, useUpdateAvailabilitiesMutation } from 'slices/api';
+import { getReqErrorMessage } from 'utils/requests.utils';
+import { selectCurrentMeetingID } from 'slices/currentMeeting';
 
 function AvailabilitiesRow({
   moreDaysToRight,
@@ -31,9 +28,20 @@ function AvailabilitiesRow({
   pageDispatch: React.Dispatch<'inc' | 'dec'>,
 }) {
   const selMode = useAppSelector(selectSelMode);
-  const selfIsInAvailabilities = useAppSelector(selectSelfIsInAvailabilities);
-  const isScheduled = useAppSelector(selectMeetingIsScheduled);
-  const scheduledDateTimes = useAppSelector(state => state.meetingTimes.scheduledDateTimes);
+  const selectedTimes = useAppSelector(selectSelectedTimes);
+  const meetingID = useAppSelector(selectCurrentMeetingID);
+  const {respondents, selfRespondentID, scheduledDateTimes} = useGetCurrentMeetingWithSelector(
+    ({data: meeting}) => ({
+      respondents: meeting?.respondents,
+      selfRespondentID: meeting?.selfRespondentID,
+      scheduledDateTimes: meeting?.scheduledDateTimes,
+    })
+  );
+  assert(meetingID !== undefined && respondents !== undefined);
+  // The ref is necessary to avoid showing the toast twice when submitting availabilities
+  // for the user who is currently logged in for the first time
+  const selfRespondentIDRef = useRef(selfRespondentID);
+  const isScheduled = scheduledDateTimes !== undefined;
   const scheduledDateTimeTitle = useMemo(() => {
     if (scheduledDateTimes === undefined) return null;
     const scheduledDateTimesFlat = Object.keys(scheduledDateTimes).sort();
@@ -44,9 +52,43 @@ function AvailabilitiesRow({
     endDateTime = addMinutesToDateTimeString(endDateTime, 30);
     return createTitleWithSchedule(startDateTime, endDateTime);
   }, [scheduledDateTimes]);
-  const peopleInfos = useAppSelector(state => state.meetingTimes.people);
-  const selfUserID = useAppSelector(selectUserID);
-  const isLoggedIn = selfUserID !== null;
+  // optimistic - assume that if token is present, user info will be successfully fetched
+  const isLoggedIn = useAppSelector(selectTokenIsPresent);
+  const editSelf = useEditSelf(isLoggedIn);
+  const editSelectedUser = useEditSelectedUser();
+  // submitSelf is ONLY used for adding or updating one's availabilities when logged in
+  const [
+    submitSelf,
+    {isSuccess: submitSelf_isSuccess, isLoading: submitSelf_isLoading, isError: submitSelf_isError, error: submitSelf_error}
+  ] = useAddSelfRespondentMutation();
+  // updateRespondent is used for updating some existing respondent, who may be the current
+  // user who is logged in
+  const [
+    updateRespondent,
+    {isSuccess: updateRespondent_isSuccess, isLoading: updateRespondent_isLoading, isError: updateRespondent_isError, error: updateRespondent_error}
+  ] = useUpdateAvailabilitiesMutation();
+  const [
+    addGuest,
+    {isSuccess: addGuest_isSuccess, isLoading: addGuest_isLoading, isError: addGuest_isError, error: addGuest_error}
+  ] = useAddGuestRespondentMutation();
+  const [
+    schedule,
+    {isSuccess: schedule_isSuccess, isLoading: schedule_isLoading, isError: schedule_isError, error: schedule_error}
+  ] = useScheduleMeetingMutation();
+  const [
+    unschedule,
+    {isSuccess: unschedule_isSuccess, isLoading: unschedule_isLoading, isError: unschedule_isError, error: unschedule_error}
+  ] = useUnscheduleMeetingMutation();
+  const addGuest_wrapper = useCallback((name: string, email?: string) => {
+    addGuest({
+      id: meetingID,
+      addGuestRespondentDto: {
+        availabilities: Object.keys(selectedTimes),
+        name,
+        email,
+      },
+    });
+  }, [meetingID, selectedTimes, addGuest]);
   const dispatch = useAppDispatch();
   const { showToast } = useToast();
   const [shouldShowModal, setShouldShowModal] = useState(false);
@@ -60,91 +102,98 @@ function AvailabilitiesRow({
   let title = 'Availabilities';
   let selectedUserName: string | undefined;
 
-  // TODO: write a selector for this
   if (selMode.type === 'selectedUser') {
-    selectedUserName = peopleInfos[selMode.selectedUserID].name;
-  } else if (
-    selMode.type === 'editingOther'
-    || selMode.type === 'submittingOther'
-    || selMode.type === 'submittedOther'
-    || selMode.type === 'rejectedOther'
-  ) {
-    selectedUserName = peopleInfos[selMode.otherUserID].name;
+    selectedUserName = respondents[selMode.selectedUserID].name;
+  } else if (selMode.type === 'editingOther') {
+    selectedUserName = respondents[selMode.otherUserID].name;
   }
   if (scheduledDateTimeTitle !== null) {
     title = scheduledDateTimeTitle;
   }
 
   useEffect(() => {
-    if (selMode.type === 'submittedSelf') {
+    if (submitSelf_isSuccess) {
+      const verb = selfRespondentIDRef.current === undefined ? 'added' : 'updated';
       showToast({
-        msg: 'Successfully updated availabilities',
+        msg: `Successfully ${verb} availabilities`,
         msgType: 'success',
         autoClose: true,
       });
       dispatch(resetSelection());
-    } else if (selMode.type === 'rejectedSelf') {
-      // The modal will show its own error message, so we don't want to show a
-      // toast as well
-      if (!shouldShowModal) {
-        showToast({
-          msg: `Failed to update availabilities: ${selMode.error.message ?? 'unknown'}`,
-          msgType: 'failure',
-        });
-        dispatch(goBackToEditingSelf());
-      }
-    } else if (selMode.type === 'submittedOther') {
+    } else if (submitSelf_isError) {
+      showToast({
+        msg: `Failed to update availabilities: ${getReqErrorMessage(submitSelf_error!)}`,
+        msgType: 'failure',
+      });
+    }
+  }, [submitSelf_isSuccess, submitSelf_isError, submitSelf_error, showToast, dispatch]);
+
+  // Make sure this runs AFTER the hook which shows the toast, above
+  useEffect(() => {
+    selfRespondentIDRef.current = selfRespondentID;
+  }, [selfRespondentID]);
+
+  useEffect(() => {
+    if (updateRespondent_isSuccess) {
       showToast({
         msg: `${selectedUserName}'s availabilities successfully updated`,
         msgType: 'success',
         autoClose: true,
       });
       dispatch(resetSelection());
-    } else if (selMode.type === 'rejectedOther') {
-      const mainMsg = `Error updating ${selectedUserName}'s availabilities`;
+    } else if (updateRespondent_isError) {
       showToast({
-        msg: `${mainMsg}: ${selMode.error.message ?? 'unknown'}`,
+        msg: `Error updating ${selectedUserName}'s availabilities: ${getReqErrorMessage(updateRespondent_error!)}`,
         msgType: 'failure',
       });
-      dispatch(goBackToEditingOther());
-    } else if (selMode.type === 'submittedSchedule') {
+    }
+  }, [updateRespondent_isSuccess, updateRespondent_isError, updateRespondent_error, showToast, selectedUserName, dispatch])
+
+  useEffect(() => {
+    if (schedule_isSuccess) {
       showToast({
-        msg: `Schedule successfully submitted`,
+        msg: 'Successfully scheduled meeting',
         msgType: 'success',
         autoClose: true,
       });
       dispatch(resetSelection());
-    } else if (selMode.type === 'rejectedSchedule') {
+    } else if (schedule_isError) {
       showToast({
-        msg: `Error submitting schedule: ${selMode.error.message ?? 'unknown'}`,
+        msg: `Error submitting schedule: ${getReqErrorMessage(schedule_error!)}`,
         msgType: 'failure',
       });
-      dispatch(goBackToEditingSchedule());
-    } else if (selMode.type === 'submittedUnschedule') {
+    }
+  }, [schedule_isSuccess, schedule_isError, schedule_error, showToast, dispatch]);
+
+  useEffect(() => {
+    if (unschedule_isSuccess) {
       showToast({
         msg: `Schedule successfully removed`,
         msgType: 'success',
         autoClose: true,
       });
       dispatch(resetSelection());
-    } else if (selMode.type === 'rejectedUnschedule') {
+    } else if (unschedule_isError) {
       showToast({
-        msg: `Error removing schedule: ${selMode.error.message ?? 'unknown'}`,
+        msg: `Error removing schedule: ${getReqErrorMessage(unschedule_error!)}`,
         msgType: 'failure',
       });
-      dispatch(resetSelection());
     }
-  }, [selMode, selectedUserName, selfUserID, shouldShowModal, showToast, dispatch]);
+  }, [unschedule_isSuccess, unschedule_isError, unschedule_error, showToast, dispatch]);
+
+  if (submitSelf_isLoading || updateRespondent_isLoading || schedule_isLoading || unschedule_isLoading) {
+    leftBtnDisabled = rightBtnDisabled = true;
+  }
 
   if (selMode.type === 'none') {
-    if (selfIsInAvailabilities) {
+    if (selfRespondentID !== undefined) {
       rightBtnText = 'Edit availability';
     } else {
       rightBtnText = 'Add availability';
     }
-    onRightBtnClick = () => dispatch(editSelf());
+    onRightBtnClick = () => editSelf();
   } else if (selMode.type === 'editingSelf') {
-    if (selfIsInAvailabilities) {
+    if (selfRespondentID !== undefined) {
       title = 'Edit your availability';
     } else {
       title = 'Add your availability';
@@ -154,7 +203,12 @@ function AvailabilitiesRow({
       onRightBtnClick = () => pageDispatch('inc');
     } else {
       if (isLoggedIn) {
-        onRightBtnClick = () => dispatch(submitSelfWhenLoggedIn());
+        onRightBtnClick = () => submitSelf({
+          id: meetingID,
+          putRespondentDto: {
+            availabilities: Object.keys(selectedTimes),
+          },
+        });
       } else {
         onRightBtnClick = () => setShouldShowModal(true);
       }
@@ -165,49 +219,53 @@ function AvailabilitiesRow({
     if (moreDaysToRight) {
       onRightBtnClick = () => pageDispatch('inc');
     } else {
-      onRightBtnClick = () =>  dispatch(submitOther());
+      onRightBtnClick = () => updateRespondent({
+        id: meetingID,
+        respondentId: selMode.otherUserID,
+        putRespondentDto: {
+          availabilities: Object.keys(selectedTimes),
+        },
+      });
     }
   } else if (selMode.type === 'editingSchedule') {
     title = 'Schedule your meeting';
     rightBtnText = 'Save';
-    onRightBtnClick = () => dispatch(submitSchedule());;
+    onRightBtnClick = () => {
+      const selectedTimesFlat = Object.keys(selectedTimes).sort();
+      if (selectedTimesFlat.length === 0) {
+        showToast({
+          msg: 'At least one time needs to be selected',
+          msgType: 'failure',
+          autoClose: true,
+        });
+        return;
+      }
+      schedule({
+        id: meetingID,
+        scheduleMeetingDto: {
+          startDateTime: selectedTimesFlat[0],
+          endDateTime: selectedTimesFlat[selectedTimesFlat.length - 1],
+        }
+      });
+    };
   } else if (selMode.type === 'selectedUser') {
-    if (selfUserID === selMode.selectedUserID) {
+    if (selfRespondentID === selMode.selectedUserID) {
       title = 'Your availability';
       rightBtnText = 'Edit availability';
     } else {
       title = `${selectedUserName}'s availability`;
       rightBtnText = `Edit ${selectedUserName}'s availability`;
     }
-    onRightBtnClick = () => dispatch(editSelectedUser());
-  } else if (selMode.type === 'submittingOther' || selMode.type === 'submittedOther' || selMode.type === 'rejectedOther') {
-    title = `Edit ${selMode.otherUserID}'s availability`;
-    rightBtnText = 'Next';
-    rightBtnDisabled = true;
-  } else if (selMode.type === 'submittingSelf' || selMode.type === 'submittedSelf' || selMode.type === 'rejectedSelf') {
-    if (selfIsInAvailabilities) {
-      title = 'Edit your availability';
-    } else {
-      title = 'Add your availability';
-    }
-    rightBtnText = 'Continue';
-    rightBtnDisabled = true;
-  } else if (selMode.type === 'submittingSchedule' || selMode.type === 'submittedSchedule' || selMode.type === 'rejectedSchedule') {
-    title = 'Schedule your meeting';
-    rightBtnText = 'Save';
-    rightBtnDisabled = true;
-  } else if (selMode.type === 'submittingUnschedule' || selMode.type === 'submittedUnschedule' || selMode.type === 'rejectedUnschedule') {
-    rightBtnText = 'Add availability';
-    leftBtnDisabled = true;
+    onRightBtnClick = () => editSelectedUser();
   } else {
     // Make sure that we caught all the cases
     assertIsNever(selMode);
   }
 
-  if (selMode.type === 'none' || selMode.type === 'submittingUnschedule' || selMode.type === 'submittedUnschedule' || selMode.type === 'rejectedUnschedule') {
+  if (selMode.type === 'none') {
     if (isScheduled) {
       leftBtnText = 'Unschedule';
-      onLeftBtnClick = () => dispatch(submitUnschedule());
+      onLeftBtnClick = () => unschedule(meetingID);
     } else {
       leftBtnText = 'Schedule';
       onLeftBtnClick = () => dispatch(createSchedule());
@@ -228,7 +286,16 @@ function AvailabilitiesRow({
       }}>
         <div style={{fontSize: '1.3em'}}>{title}</div>
         <div className="d-none d-md-flex">
-          {leftBtnText && (
+          {leftBtnText && leftBtnText === 'Cancel' ? (
+            <button
+              type="button"
+              className="btn btn-outline-primary meeting-avl-button"
+              onClick={onLeftBtnClick}
+              disabled={leftBtnDisabled}
+            >
+              {leftBtnText}
+            </button>
+          ) : (
             <ButtonWithSpinner
               as="NonFocusButton"
               className="btn btn-outline-primary meeting-avl-button"
@@ -268,7 +335,16 @@ function AvailabilitiesRow({
           {rightBtnText}
         </ButtonWithSpinner>
       </BottomOverlay>
-      {shouldShowModal && <SaveTimesModal onClose={closeModal} />}
+      {shouldShowModal && (
+        <SaveTimesModal
+          onClose={closeModal}
+          submitAsGuest={addGuest_wrapper}
+          isSuccess={addGuest_isSuccess}
+          isLoading={addGuest_isLoading}
+          isError={addGuest_isError}
+          error={addGuest_error}
+        />
+      )}
     </>
   );
 }

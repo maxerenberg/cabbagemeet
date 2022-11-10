@@ -8,6 +8,8 @@ import {
   resetSelection,
   selectUser,
 } from 'slices/availabilitiesSelection';
+import { useGetCurrentMeetingWithSelector } from 'utils/meetings.hooks';
+import { assert } from 'utils/misc.utils';
 
 type DateTimePeopleSet = {
   [dateTime: string]: {
@@ -16,31 +18,33 @@ type DateTimePeopleSet = {
 };
 
 function MeetingRespondents() {
-  const availabilities = useAppSelector(state => state.meetingTimes.availabilities);
-  const userInfos = useAppSelector(state => state.meetingTimes.people);
-  const userIDs = Object.keys(availabilities);
+  const {respondents} = useGetCurrentMeetingWithSelector(
+    ({data: meeting}) => ({respondents: meeting?.respondents})
+  );
+  assert(respondents !== undefined);
+  const respondentIDs = Object.keys(respondents).map(s => +s);
   const dateTimePeople: DateTimePeopleSet = useMemo(() => {
     const result: DateTimePeopleSet = {};
-    for (const [person, dateTimes] of Object.entries(availabilities)) {
-      for (const dateTime of Object.keys(dateTimes)) {
+    for (const [respondentID, respondent] of Object.entries(respondents)) {
+      for (const dateTime of Object.keys(respondent.availabilities)) {
         if (!result.hasOwnProperty(dateTime)) {
           result[dateTime] = {};
         }
-        result[dateTime][person] = true;
+        result[dateTime][respondentID] = true;
       }
     }
     return result;
-  }, [availabilities]);
+  }, [respondents]);
   const selMode = useAppSelector(selectSelMode);
   // TODO: ignore hoverDateTime if selMode is not relevant
   const hoverDateTime = useAppSelector(selectHoverDateTime);
   const dispatch = useAppDispatch();
 
-  if (userIDs.length === 0) return null;
-  let selectedUserID: string | undefined;
+  if (respondentIDs.length === 0) return null;
+  let selectedUserID: number | undefined;
   if (selMode.type === 'selectedUser') {
     selectedUserID = selMode.selectedUserID;
-  } else if (selMode.type === 'editingOther' || selMode.type === 'submittingOther') {
+  } else if (selMode.type === 'editingOther') {
     selectedUserID = selMode.otherUserID;
   }
   const numPeopleForHover =
@@ -57,14 +61,14 @@ function MeetingRespondents() {
       }}>
         Respondents (
           {(!selectedUserID && hoverDateTime) ? numPeopleForHover + '/' : ''}
-          {userIDs.length}
+          {respondentIDs.length}
         )
       </div>
       <ul>
         {
-          userIDs.map(userID => {
+          respondentIDs.map(respondentID => {
             const style: Style = {};
-            if (userID === selectedUserID) {
+            if (respondentID === selectedUserID) {
               style.color = 'var(--custom-primary)';
             }
             let className = '';
@@ -73,33 +77,33 @@ function MeetingRespondents() {
               && hoverDateTime !== null
               && !(
                 dateTimePeople.hasOwnProperty(hoverDateTime)
-                && dateTimePeople[hoverDateTime][userID]
+                && dateTimePeople[hoverDateTime][respondentID]
               )
             ) {
               className = 'unavailable';
             }
             let onClick: React.MouseEventHandler | undefined;
-            if (userID === selectedUserID) {
+            if (respondentID === selectedUserID) {
               onClick = () => dispatch(resetSelection());
             } else {
-              onClick = () => dispatch(selectUser({userID}));
+              onClick = () => dispatch(selectUser({userID: respondentID}));
             }
             let onMouseEnter: React.MouseEventHandler | undefined;
             let onMouseLeave: React.MouseEventHandler | undefined;
             if (selMode.type === 'none') {
-              onMouseEnter = () => dispatch(setHoverUser(userID));
+              onMouseEnter = () => dispatch(setHoverUser(respondentID));
               onMouseLeave = () => dispatch(setHoverUser(null));
             }
             return (
               <li
-                key={userID}
+                key={respondentID}
                 className={className}
                 style={style}
                 onMouseEnter={onMouseEnter}
                 onMouseLeave={onMouseLeave}
                 onClick={onClick}
               >
-                {userInfos[userID].name}
+                {respondents[respondentID].name}
               </li>
             );
           })

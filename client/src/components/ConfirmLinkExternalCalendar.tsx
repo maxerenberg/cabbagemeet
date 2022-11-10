@@ -2,13 +2,14 @@ import { useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import GoogleLogo from 'assets/google-g-logo.svg';
 import { useAppSelector } from 'app/hooks';
-import { selectTokenIsPresent, selectUserInfo } from 'slices/authentication';
+import { selectTokenIsPresent } from 'slices/authentication';
 import GenericSpinner from './GenericSpinner';
 import { Link } from 'react-router-dom';
 import { useToast } from './Toast';
 import { getReqErrorMessage } from 'utils/requests.utils';
-import { useConfirmLinkGoogleAccount } from 'utils/auth.hooks';
 import ButtonWithSpinner from './ButtonWithSpinner';
+import { useGetSelfInfoIfTokenIsPresent } from 'utils/auth.hooks';
+import { useConfirmLinkGoogleAccountMutation } from 'slices/api';
 
 // TODO: add Microsoft
 type OAuth2Provider = 'google';
@@ -16,9 +17,9 @@ type OAuth2Provider = 'google';
 export default function ConfirmLinkExternalCalendar({provider}: {provider: OAuth2Provider}) {
   const capitalizedProvider = provider.charAt(0).toUpperCase() + provider.slice(1);
   const tokenIsPresent = useAppSelector(selectTokenIsPresent);
-  const userInfo = useAppSelector(selectUserInfo);
+  const {data: userInfo} = useGetSelfInfoIfTokenIsPresent();
   const navigate = useNavigate();
-  const [confirmLinkAccount, {isSuccess, isLoading, isError, error}] = useConfirmLinkGoogleAccount();
+  const [confirmLinkAccount, {isSuccess, isLoading, isError, error}] = useConfirmLinkGoogleAccountMutation();
   const {showToast} = useToast();
   const [searchParams] = useSearchParams();
   // The token will be removed from the URL and stored in the Redux store from
@@ -57,11 +58,9 @@ export default function ConfirmLinkExternalCalendar({provider}: {provider: OAuth
     return <GenericSpinner />;
   }
   const onClick = () => confirmLinkAccount({
-    confirmLinkAccountDto: {
-      encrypted_entity: encryptedEntity,
-      iv,
-      salt,
-    }
+    encrypted_entity: encryptedEntity,
+    iv,
+    salt,
   });
   const btnDisabled = isLoading;
   return (

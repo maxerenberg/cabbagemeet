@@ -26,7 +26,7 @@ import Settings from 'components/Settings';
 import { selectTokenIsPresent } from 'slices/authentication';
 import { useEffect } from 'react';
 import { useToast } from 'components/Toast';
-import { useExtractTokenFromQueryParams, useSelfInfo } from 'utils/auth.hooks';
+import { useExtractTokenFromQueryParams, useGetSelfInfoIfTokenIsPresent } from 'utils/auth.hooks';
 import { getReqErrorMessage } from 'utils/requests.utils';
 import ErrorPage from 'components/ErrorPage';
 import ConfirmLinkExternalCalendar from 'components/ConfirmLinkExternalCalendar';
@@ -58,7 +58,7 @@ export default function App() {
 
 function AppRoot() {
   const {showToast} = useToast();
-  const {isError, error} = useSelfInfo();
+  const {isError, error} = useGetSelfInfoIfTokenIsPresent();
   useEffect(() => {
     if (isError) {
       showToast({

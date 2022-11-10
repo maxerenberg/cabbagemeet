@@ -5,14 +5,14 @@ const injectedRtkApi = api.injectEndpoints({
       query: (queryArg) => ({
         url: `/api/signup`,
         method: "POST",
-        body: queryArg.localSignupDto,
+        body: queryArg,
       }),
     }),
     login: build.mutation<LoginApiResponse, LoginApiArg>({
       query: (queryArg) => ({
         url: `/api/login`,
         method: "POST",
-        body: queryArg.localLoginDto,
+        body: queryArg,
       }),
     }),
     logout: build.mutation<LogoutApiResponse, LogoutApiArg>({
@@ -30,19 +30,6 @@ const injectedRtkApi = api.injectEndpoints({
     >({
       query: () => ({ url: `/api/signup-with-google`, method: "POST" }),
     }),
-    oauth2ControllerGoogleRedirect: build.query<
-      Oauth2ControllerGoogleRedirectApiResponse,
-      Oauth2ControllerGoogleRedirectApiArg
-    >({
-      query: (queryArg) => ({
-        url: `/redirect/google`,
-        params: {
-          code: queryArg.code,
-          state: queryArg.state,
-          error: queryArg.error,
-        },
-      }),
-    }),
     confirmLinkGoogleAccount: build.mutation<
       ConfirmLinkGoogleAccountApiResponse,
       ConfirmLinkGoogleAccountApiArg
@@ -50,7 +37,7 @@ const injectedRtkApi = api.injectEndpoints({
       query: (queryArg) => ({
         url: `/api/confirm-link-google-account`,
         method: "POST",
-        body: queryArg.confirmLinkAccountDto,
+        body: queryArg,
       }),
     }),
     getSelfInfo: build.query<GetSelfInfoApiResponse, GetSelfInfoApiArg>({
@@ -60,7 +47,7 @@ const injectedRtkApi = api.injectEndpoints({
       query: (queryArg) => ({
         url: `/api/me`,
         method: "PATCH",
-        body: queryArg.editUserDto,
+        body: queryArg,
       }),
     }),
     deleteUser: build.mutation<DeleteUserApiResponse, DeleteUserApiArg>({
@@ -85,7 +72,7 @@ const injectedRtkApi = api.injectEndpoints({
       query: (queryArg) => ({
         url: `/api/me/link-google-calendar`,
         method: "POST",
-        body: queryArg.linkExternalCalendarDto,
+        body: queryArg,
       }),
     }),
     unlinkGoogleCalendar: build.mutation<
@@ -100,7 +87,7 @@ const injectedRtkApi = api.injectEndpoints({
     >({
       query: (queryArg) => ({
         url: `/api/me/google-calendar-events`,
-        params: { meetingID: queryArg.meetingId },
+        params: { meetingID: queryArg },
       }),
     }),
     createMeeting: build.mutation<
@@ -110,11 +97,11 @@ const injectedRtkApi = api.injectEndpoints({
       query: (queryArg) => ({
         url: `/api/meetings`,
         method: "POST",
-        body: queryArg.createMeetingDto,
+        body: queryArg,
       }),
     }),
     getMeeting: build.query<GetMeetingApiResponse, GetMeetingApiArg>({
-      query: (queryArg) => ({ url: `/api/meetings/${queryArg.id}` }),
+      query: (queryArg) => ({ url: `/api/meetings/${queryArg}` }),
     }),
     editMeeting: build.mutation<EditMeetingApiResponse, EditMeetingApiArg>({
       query: (queryArg) => ({
@@ -128,7 +115,7 @@ const injectedRtkApi = api.injectEndpoints({
       DeleteMeetingApiArg
     >({
       query: (queryArg) => ({
-        url: `/api/meetings/${queryArg.id}`,
+        url: `/api/meetings/${queryArg}`,
         method: "DELETE",
       }),
     }),
@@ -147,7 +134,7 @@ const injectedRtkApi = api.injectEndpoints({
       UnscheduleMeetingApiArg
     >({
       query: (queryArg) => ({
-        url: `/api/meetings/${queryArg.id}/schedule`,
+        url: `/api/meetings/${queryArg}/schedule`,
         method: "DELETE",
       }),
     }),
@@ -195,13 +182,9 @@ const injectedRtkApi = api.injectEndpoints({
 });
 export { injectedRtkApi as api };
 export type SignupApiResponse = /** status 201  */ UserResponseWithToken;
-export type SignupApiArg = {
-  localSignupDto: LocalSignupDto;
-};
+export type SignupApiArg = LocalSignupDto;
 export type LoginApiResponse = /** status 200  */ UserResponseWithToken;
-export type LoginApiArg = {
-  localLoginDto: LocalLoginDto;
-};
+export type LoginApiArg = LocalLoginDto;
 export type LogoutApiResponse = unknown;
 export type LogoutApiArg = void;
 export type LoginWithGoogleApiResponse =
@@ -210,22 +193,12 @@ export type LoginWithGoogleApiArg = void;
 export type SignupWithGoogleApiResponse =
   /** status 200  */ CustomRedirectResponse;
 export type SignupWithGoogleApiArg = void;
-export type Oauth2ControllerGoogleRedirectApiResponse = unknown;
-export type Oauth2ControllerGoogleRedirectApiArg = {
-  code: string;
-  state: string;
-  error: string;
-};
 export type ConfirmLinkGoogleAccountApiResponse = unknown;
-export type ConfirmLinkGoogleAccountApiArg = {
-  confirmLinkAccountDto: ConfirmLinkAccountDto;
-};
+export type ConfirmLinkGoogleAccountApiArg = ConfirmLinkAccountDto;
 export type GetSelfInfoApiResponse = /** status 200  */ UserResponse;
 export type GetSelfInfoApiArg = void;
 export type EditUserApiResponse = /** status 200  */ UserResponse;
-export type EditUserApiArg = {
-  editUserDto: EditUserDto;
-};
+export type EditUserApiArg = EditUserDto;
 export type DeleteUserApiResponse = /** status 204  */ undefined;
 export type DeleteUserApiArg = void;
 export type GetCreatedMeetingsApiResponse =
@@ -236,59 +209,48 @@ export type GetRespondedMeetingsApiResponse =
 export type GetRespondedMeetingsApiArg = void;
 export type LinkGoogleCalendarApiResponse =
   /** status 200  */ CustomRedirectResponse;
-export type LinkGoogleCalendarApiArg = {
-  linkExternalCalendarDto: LinkExternalCalendarDto;
-};
-export type UnlinkGoogleCalendarApiResponse = /** status 204  */ undefined;
+export type LinkGoogleCalendarApiArg = LinkExternalCalendarDto;
+export type UnlinkGoogleCalendarApiResponse = /** status 200  */ UserResponse;
 export type UnlinkGoogleCalendarApiArg = void;
 export type GetGoogleCalendarEventsApiResponse =
   /** status 200  */ GoogleCalendarEventsResponse;
-export type GetGoogleCalendarEventsApiArg = {
-  meetingId: number;
-};
+export type GetGoogleCalendarEventsApiArg = number;
 export type CreateMeetingApiResponse = /** status 201  */ MeetingResponse;
-export type CreateMeetingApiArg = {
-  createMeetingDto: CreateMeetingDto;
-};
+export type CreateMeetingApiArg = CreateMeetingDto;
 export type GetMeetingApiResponse = /** status 200  */ MeetingResponse;
-export type GetMeetingApiArg = {
-  id: number;
-};
+export type GetMeetingApiArg = number;
 export type EditMeetingApiResponse = /** status 200  */ MeetingResponse;
 export type EditMeetingApiArg = {
   id: number;
   editMeetingDto: EditMeetingDto;
 };
 export type DeleteMeetingApiResponse = /** status 204  */ undefined;
-export type DeleteMeetingApiArg = {
-  id: number;
-};
+export type DeleteMeetingApiArg = number;
 export type ScheduleMeetingApiResponse = /** status 200  */ MeetingResponse;
 export type ScheduleMeetingApiArg = {
   id: number;
   scheduleMeetingDto: ScheduleMeetingDto;
 };
 export type UnscheduleMeetingApiResponse = /** status 200  */ MeetingResponse;
-export type UnscheduleMeetingApiArg = {
-  id: number;
-};
-export type AddGuestRespondentApiResponse = unknown;
+export type UnscheduleMeetingApiArg = number;
+export type AddGuestRespondentApiResponse = /** status 200  */ MeetingResponse;
 export type AddGuestRespondentApiArg = {
   id: number;
   addGuestRespondentDto: AddGuestRespondentDto;
 };
-export type AddSelfRespondentApiResponse = /** status 200  */ undefined;
+export type AddSelfRespondentApiResponse = /** status 200  */ MeetingResponse;
 export type AddSelfRespondentApiArg = {
   id: number;
   putRespondentDto: PutRespondentDto;
 };
-export type UpdateAvailabilitiesApiResponse = /** status 200  */ undefined;
+export type UpdateAvailabilitiesApiResponse =
+  /** status 200  */ MeetingResponse;
 export type UpdateAvailabilitiesApiArg = {
   id: number;
   respondentId: number;
   putRespondentDto: PutRespondentDto;
 };
-export type DeleteRespondentApiResponse = unknown;
+export type DeleteRespondentApiResponse = /** status 200  */ MeetingResponse;
 export type DeleteRespondentApiArg = {
   id: number;
   respondentId: number;
@@ -352,8 +314,8 @@ export type MeetingShortResponse = {
   minStartHour: number;
   maxEndHour: number;
   tentativeDates: string[];
-  scheduledStartDateTime: string;
-  scheduledEndDateTime: string;
+  scheduledStartDateTime?: string;
+  scheduledEndDateTime?: string;
 };
 export type MeetingsShortResponse = {
   meetings: MeetingShortResponse[];
@@ -361,8 +323,18 @@ export type MeetingsShortResponse = {
 export type LinkExternalCalendarDto = {
   post_redirect: string;
 };
+export type GoogleCalendarEventsResponseItem = {
+  summary: string;
+  startDateTime: string;
+  endDateTime: string;
+};
 export type GoogleCalendarEventsResponse = {
-  events: string[];
+  events: GoogleCalendarEventsResponseItem[];
+};
+export type MeetingRespondent = {
+  respondentID: number;
+  name: string;
+  availabilities: string[];
 };
 export type MeetingResponse = {
   meetingID: number;
@@ -372,10 +344,10 @@ export type MeetingResponse = {
   minStartHour: number;
   maxEndHour: number;
   tentativeDates: string[];
-  scheduledStartDateTime: string;
-  scheduledEndDateTime: string;
-  respondents: string[];
-  selfRespondentID: number;
+  scheduledStartDateTime?: string;
+  scheduledEndDateTime?: string;
+  respondents: MeetingRespondent[];
+  selfRespondentID?: number;
 };
 export type CreateMeetingDto = {
   name: string;
@@ -415,7 +387,6 @@ export const {
   useLogoutMutation,
   useLoginWithGoogleMutation,
   useSignupWithGoogleMutation,
-  useOauth2ControllerGoogleRedirectQuery,
   useConfirmLinkGoogleAccountMutation,
   useGetSelfInfoQuery,
   useEditUserMutation,

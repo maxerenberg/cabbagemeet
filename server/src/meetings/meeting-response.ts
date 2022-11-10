@@ -1,4 +1,15 @@
-import { ApiProperty } from "@nestjs/swagger";
+import { ApiProperty, ApiPropertyOptional } from "@nestjs/swagger";
+
+export class MeetingRespondent {
+  @ApiProperty({example: 1})
+  respondentID: number;
+
+  @ApiProperty({example: 'John Doe'})
+  name: string;
+
+  @ApiProperty({example: ['2022-10-23T10:00:00Z', '2022-10-23T10:30:00Z']})
+  availabilities: string[];
+}
 
 export default class MeetingResponse {
   @ApiProperty({example: 1})
@@ -25,23 +36,15 @@ export default class MeetingResponse {
   tentativeDates: string[];
 
   @ApiProperty({example: '2022-10-23T10:00:00Z'})
+  @ApiPropertyOptional()
   scheduledStartDateTime?: string;
 
   @ApiProperty({example: '2022-10-23T10:30:00Z'})
+  @ApiPropertyOptional()
   scheduledEndDateTime?: string;
 
-  @ApiProperty({example: [
-    {
-      respondentID: 1,
-      name: 'John Doe',
-      availabilities: ['2022-10-23T10:00:00Z', '2022-10-23T10:30:00Z'],
-    }
-  ]})
-  respondents: {
-    respondentID: number;
-    name: string;
-    availabilities: string[];
-  }[];
+  @ApiProperty({type: () => MeetingRespondent, isArray: true})
+  respondents: MeetingRespondent[];
 
   @ApiProperty({
     description: (
@@ -50,5 +53,6 @@ export default class MeetingResponse {
     ),
     example: 1,
   })
+  @ApiPropertyOptional()
   selfRespondentID?: number;
 }

@@ -2,13 +2,13 @@ import { Link } from "react-router-dom";
 import GenericSpinner from 'components/GenericSpinner';
 import { addDaysToDateString, getLocalYearMonthDayFromDate, getMonthAbbr, getYearMonthDayFromDateString, tzAbbr } from "utils/dates.utils";
 import styles from './Profile.module.css';
-import { useCreatedMeetings, useRespondedMeetings } from "utils/meetings.hooks";
 import { getReqErrorMessage } from "utils/requests.utils";
-import type { MeetingShortResponse } from "slices/api";
+import { useGetCreatedMeetingsQuery, useGetRespondedMeetingsQuery } from 'slices/enhancedApi';
+import type { TransformedMeetingShortResponse } from "utils/response-transforms";
 
 export default function CreatedMeetings({showCreatedMeetings}: {showCreatedMeetings: boolean}) {
-  const createdMeetingsReqInfo = useCreatedMeetings({skip: !showCreatedMeetings});
-  const respondedMeetingsReqInfo = useRespondedMeetings({skip: showCreatedMeetings});
+  const createdMeetingsReqInfo = useGetCreatedMeetingsQuery(undefined, {skip: !showCreatedMeetings});
+  const respondedMeetingsReqInfo = useGetRespondedMeetingsQuery(undefined, {skip: showCreatedMeetings});
   const {
     data,
     isError,
@@ -88,7 +88,7 @@ export default function CreatedMeetings({showCreatedMeetings}: {showCreatedMeeti
   );
 };
 
-function ScheduleInfo({meeting}: {meeting: MeetingShortResponse}) {
+function ScheduleInfo({meeting}: {meeting: TransformedMeetingShortResponse}) {
   if (!meeting.scheduledStartDateTime) {
     return (
       <h4 className="my-auto pe-4">
@@ -132,7 +132,7 @@ function shortTimeString(hour: number): string {
   return `${HH}:${mm} ${amOrPm}`;
 }
 
-function meetingTimesRangeString(meeting: MeetingShortResponse): string {
+function meetingTimesRangeString(meeting: TransformedMeetingShortResponse): string {
   return `${shortTimeString(meeting.minStartHour)} - ${shortTimeString(meeting.maxEndHour)}`;
 }
 

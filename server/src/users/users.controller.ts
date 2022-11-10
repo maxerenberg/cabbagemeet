@@ -160,9 +160,11 @@ export class UsersController {
     operationId: 'unlinkGoogleCalendar',
   })
   @Delete('link-google-calendar')
-  @HttpCode(HttpStatus.NO_CONTENT)
-  async unlinkGoogleCalendar(@AuthUser() user: User) {
+  @HttpCode(HttpStatus.OK)
+  async unlinkGoogleCalendar(@AuthUser() user: User): Promise<UserResponse> {
     await this.oauth2Service.google_unlinkAccount(user.ID);
+    const updatedUser = await this.usersService.findOneByID(user.ID);
+    return UserToUserResponse(updatedUser);
   }
 
   @ApiOperation({

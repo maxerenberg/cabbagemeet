@@ -8,6 +8,8 @@ export const todayString = getDateString(today);
 // TODO: what should we show when there are two dates displayed
 // with different time zones (due to Daylight Savings Time)?
 export const tzAbbr = today.toLocaleTimeString('en-us', {timeZoneName: 'short'}).split(' ')[2];
+// e.g. "America/Toronto"
+export const ianaTzName = Intl.DateTimeFormat().resolvedOptions().timeZone;
 
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 // TODO: test Daylight Savings Time
@@ -177,6 +179,24 @@ export function convertOtherTzToLocal(
 
   return { startHour, endHour, dates };
 }
+
+/**
+ * Returns a sorted array of the starting times of the 30-minute intervals between
+ * [startDateTime, endDateTime).
+ *
+ * e.g. startAndEndDateTimeToDateTimesFlat('2022-10-10T14:00:00Z', '2022-10-10T15:30:00Z')
+ *      => ['2022-10-10T14:00:00Z', '2022-10-10T14:30:00Z', '2022-10-10T15:00:00Z']
+ * @param startDateTime YYYY-MM-DDTHH:mm:ssZ
+ * @param endDateTime YYYY-MM-DDTHH:mm:ssZ
+ */
+ export function startAndEndDateTimeToDateTimesFlat(startDateTime: string, endDateTime: string): string[] {
+  assert(startDateTime <= endDateTime);
+  const result: string[] = [];
+  for (let dateTime = startDateTime; dateTime < endDateTime; dateTime = addMinutesToDateTimeString(dateTime, 30)) {
+    result.push(dateTime);
+  }
+  return result;
+};
 
 /**
  * Returns the three-letter abbreviation of the given month
