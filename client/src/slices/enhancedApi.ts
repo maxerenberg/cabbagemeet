@@ -5,7 +5,7 @@ import type {
   TransformedMeetingResponse,
   TransformedMeetingsShortResponse,
 } from 'utils/response-transforms';
-import { api, GetSelfInfoApiResponse } from './api';
+import { api } from './api';
 import type {
   MeetingResponse,
   GetMeetingApiArg,
@@ -13,6 +13,8 @@ import type {
   GetRespondedMeetingsApiArg,
   EditUserApiResponse,
   UserResponseWithToken,
+  DeleteMeetingApiResponse,
+  GetSelfInfoApiResponse,
 } from './api';
 import { setCurrentMeetingID } from './currentMeeting';
 
@@ -79,30 +81,39 @@ export const enhancedApi = replacedApi.enhanceEndpoints({
       onQueryStarted: getMeeting_onQueryStarted,
     },
     addGuestRespondent: {
-      invalidatesTags: ['currentMeeting'],
+      //invalidatesTags: ['currentMeeting'],
       onQueryStarted: upsertMeeting_onQueryStarted,
     },
-    addSelfRespondent: {
-      invalidatesTags: ['currentMeeting'],
+    putSelfRespondent: {
+      //invalidatesTags: ['currentMeeting'],
+      onQueryStarted: upsertMeeting_onQueryStarted,
+    },
+    updateAvailabilities: {
+      //invalidatesTags: ['currentMeeting'],
+      onQueryStarted: upsertMeeting_onQueryStarted,
+    },
+    deleteRespondent: {
+      //invalidatesTags: ['currentMeeting'],
       onQueryStarted: upsertMeeting_onQueryStarted,
     },
     createMeeting: {
-      invalidatesTags: ['createdMeetings', 'respondedMeetings', 'currentMeeting'],
+      invalidatesTags: ['createdMeetings', 'respondedMeetings', /* 'currentMeeting' */],
       onQueryStarted: upsertMeeting_onQueryStarted,
     },
     editMeeting: {
-      invalidatesTags: ['createdMeetings', 'respondedMeetings', 'currentMeeting'],
+      invalidatesTags: ['createdMeetings', 'respondedMeetings', /* 'currentMeeting' */],
       onQueryStarted: upsertMeeting_onQueryStarted,
     },
     deleteMeeting: {
-      invalidatesTags: ['createdMeetings', 'respondedMeetings', 'currentMeeting'],
+      invalidatesTags: ['createdMeetings', 'respondedMeetings', /* 'currentMeeting' */],
+      onQueryStarted: deleteMeeting_onQueryStarted,
     },
     scheduleMeeting: {
-      invalidatesTags: ['createdMeetings', 'respondedMeetings', 'currentMeeting'],
+      invalidatesTags: ['createdMeetings', 'respondedMeetings', /* 'currentMeeting' */],
       onQueryStarted: upsertMeeting_onQueryStarted,
     },
     unscheduleMeeting: {
-      invalidatesTags: ['createdMeetings', 'respondedMeetings', 'currentMeeting'],
+      invalidatesTags: ['createdMeetings', 'respondedMeetings', /* 'currentMeeting' */],
       onQueryStarted: upsertMeeting_onQueryStarted,
     },
     getCreatedMeetings: {
@@ -184,5 +195,15 @@ async function getMeeting_onQueryStarted(
   try {
     const {data: meeting} = await queryFulfilled;
     dispatch(setCurrentMeetingID(meeting.meetingID));
+  } catch {}
+}
+
+async function deleteMeeting_onQueryStarted(
+  arg: number,
+  {dispatch, queryFulfilled}: QueryLifecycleApi<any, any, DeleteMeetingApiResponse, 'api'>,
+) {
+  try {
+    await queryFulfilled;
+    dispatch(setCurrentMeetingID(undefined));
   } catch {}
 }

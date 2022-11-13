@@ -4,26 +4,21 @@ import type { RootState } from 'app/store';
 import type { DateTimeSet } from 'common/types';
 import { assert } from 'utils/misc.utils';
 import { useAppDispatch, useAppSelector } from 'app/hooks';
-import { selectCurrentMeetingID } from './currentMeeting';
 import { useCallback } from 'react';
-import { useGetMeetingQuery } from './enhancedApi';
 import { useGetCurrentMeetingWithSelector } from 'utils/meetings.hooks';
 
-// TODO: place these fields directly into AvailabilitiesSelectionState
-// and get rid of the type predicate functions
 type SelModeNone = { type: 'none' };
 type SelModeEditing = {
-  // TODO: distinguish between logged in vs non-logged in (i.e. guest)
-  type: 'editingSelf';
+  type: 'addingRespondent';
 } | {
-  type: 'editingOther';
-  otherUserID: number;  // respondentID
+  type: 'editingRespondent';
+  respondentID: number;
 } | {
   type: 'editingSchedule';
 };
 type SelModeSelectedUser = {
   type: 'selectedUser';
-  selectedUserID: number;  // respondentID
+  selectedRespondentID: number;
 };
 
 export type SelMode = SelModeNone | SelModeEditing | SelModeSelectedUser;
@@ -60,8 +55,8 @@ function stateIsEditing(state: AvailabilitiesSelectionState): state is {
   dateTimes: DateTimeSet,
   mouse: MouseState,
 } {
-  return state.selMode.type === 'editingSelf'
-      || state.selMode.type === 'editingOther'
+  return state.selMode.type === 'editingRespondent'
+      || state.selMode.type === 'addingRespondent'
       || state.selMode.type === 'editingSchedule';
 }
 
@@ -92,14 +87,23 @@ export const availabilitiesSelectionSlice = createSlice({
         mouse: initialMouseState,
       };
     },
-    editUserInternal: (state, {payload: {availabilities, isSelf}}: PayloadAction<{availabilities: DateTimeSet, isSelf: boolean}>) => {
-      let selMode: {type: 'editingSelf'} | {type: 'editingOther', otherUserID: number} | undefined;
-      if (isSelf) {
-        assert(state.selMode.type === 'none' || state.selMode.type === 'selectedUser');
-        selMode = {type: 'editingSelf'};
+    editUserInternal: (
+      state,
+      {payload: {availabilities, isAdding, selfRespondentID}}: PayloadAction<{
+        availabilities: DateTimeSet, isAdding: boolean, selfRespondentID?: number,
+      }>) => {
+      let selMode: {type: 'addingRespondent'} | {type: 'editingRespondent', respondentID: number} | undefined;
+      if (isAdding) {
+        assert(state.selMode.type === 'none');
+        selMode = {type: 'addingRespondent'};
       } else {
-        assert(state.selMode.type === 'selectedUser');
-        selMode = {type: 'editingOther', otherUserID: state.selMode.selectedUserID};
+        if (state.selMode.type === 'none') {
+          assert(selfRespondentID !== undefined);
+          selMode = {type: 'editingRespondent', respondentID: selfRespondentID};
+        } else {
+          assert(state.selMode.type === 'selectedUser');
+          selMode = {type: 'editingRespondent', respondentID: state.selMode.selectedRespondentID};
+        }
       }
       return {
         selMode,
@@ -107,16 +111,16 @@ export const availabilitiesSelectionSlice = createSlice({
         mouse: initialMouseState,
       };
     },
-    selectUser: (state, action: PayloadAction<{userID: number}>) => {
+    selectUser: (state, {payload}: PayloadAction<{respondentID: number}>) => {
       assert(state.selMode.type === 'none' || state.selMode.type === 'selectedUser');
       return {
-        selMode: {type: 'selectedUser', selectedUserID: action.payload.userID}
+        selMode: {type: 'selectedUser', selectedRespondentID: payload.respondentID}
       };
     },
     cancelEditingOther: (state) => {
-      assert(state.selMode.type === 'editingOther');
+      assert(state.selMode.type === 'editingRespondent');
       return {
-        selMode: {type: 'selectedUser', selectedUserID: state.selMode.otherUserID}
+        selMode: {type: 'selectedUser', selectedRespondentID: state.selMode.respondentID}
       };
     },
     reset: (state) => {
@@ -198,60 +202,59 @@ const {
   editUserInternal,
 } = availabilitiesSelectionSlice.actions;
 
-function selectSelectedUserID(rootState: RootState): number | undefined {
+function selectSelectedRespondentID(rootState: RootState): number | undefined {
   const state = selectSelModeAndDateTimes(rootState);
   if (state.selMode.type === 'selectedUser') {
-    return state.selMode.selectedUserID;
+    return state.selMode.selectedRespondentID;
   }
   return undefined;
 }
 
 export function useEditSelectedUser() {
   const dispatch = useAppDispatch();
-  const selectedRespondentID = useAppSelector(selectSelectedUserID);
-  const {availabilities, selfRespondentID} = useGetCurrentMeetingWithSelector(
+  const selectedRespondentID = useAppSelector(selectSelectedRespondentID);
+  const {availabilities} = useGetCurrentMeetingWithSelector(
     ({data: meeting}) => ({
       availabilities: selectedRespondentID !== undefined
         ? meeting?.respondents[selectedRespondentID]?.availabilities
         : undefined,
-      selfRespondentID: meeting?.selfRespondentID,
     })
   );
   const editSelectedUser = useCallback(() => {
-    if (availabilities !== undefined && selectedRespondentID !== undefined) {
+    if (availabilities !== undefined) {
       dispatch(editUserInternal({
         availabilities,
-        isSelf: selectedRespondentID === selfRespondentID,
+        isAdding: false,
       }));
     }
-  }, [dispatch, availabilities, selectedRespondentID, selfRespondentID]);
+  }, [dispatch, availabilities]);
   return editSelectedUser;
 }
 
 export function useEditSelfWhenLoggedIn() {
   const dispatch = useAppDispatch();
-  const meetingID = useAppSelector(selectCurrentMeetingID);
-  const {availabilities} = useGetMeetingQuery(meetingID || 0, {
-    skip: meetingID !== undefined,
-    selectFromResult: ({data: meeting}) => ({
+  const {availabilities, selfRespondentID} = useGetCurrentMeetingWithSelector(
+    ({data: meeting}) => ({
       availabilities: meeting?.selfRespondentID !== undefined
         ? meeting.respondents[meeting.selfRespondentID]!.availabilities
         : undefined,
+      selfRespondentID: meeting?.selfRespondentID,
     })
-  });
+  );
   const editSelf = useCallback(() => {
     dispatch(editUserInternal({
       availabilities: availabilities || {},
-      isSelf: true,
+      isAdding: selfRespondentID === undefined,
+      selfRespondentID,
     }));
-  }, [dispatch, availabilities]);
+  }, [dispatch, availabilities, selfRespondentID]);
   return editSelf;
 }
 
 export function useEditSelfAsGuest() {
   const dispatch = useAppDispatch();
   const editSelfAsGuest = useCallback(() => {
-    dispatch(editUserInternal({availabilities: {}, isSelf: true}));
+    dispatch(editUserInternal({availabilities: {}, isAdding: true}));
   }, [dispatch]);
   return editSelfAsGuest;
 }

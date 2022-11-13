@@ -1,14 +1,6 @@
-import { ApiProperty } from '@nestjs/swagger';
-import { IsString } from 'class-validator';
+import { OmitType } from '@nestjs/swagger';
+import OAuth2ConsentPostRedirectDto from '../oauth2/oauth2-consent-post-redirect.dto';
 
-export default class LinkExternalCalendarDto {
-  @ApiProperty({
-    description: (
-      'The URL to which the client should be redirected after the OAuth2'
-      + ' consent has been granted'
-    ),
-    example: 'http://localhost:3001/me/settings'
-  })
-  @IsString()
-  post_redirect: string;
-}
+export default class LinkExternalCalendarDto extends OmitType(
+  OAuth2ConsentPostRedirectDto, ['nonce']
+) {}

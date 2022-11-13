@@ -16,7 +16,7 @@ import { addMinutesToDateTimeString, daysOfWeek, months, to12HourClock } from 'u
 import ButtonWithSpinner from 'components/ButtonWithSpinner';
 import { useGetCurrentMeetingWithSelector } from 'utils/meetings.hooks';
 import { selectTokenIsPresent } from 'slices/authentication';
-import { useAddGuestRespondentMutation, useAddSelfRespondentMutation, useScheduleMeetingMutation, useUnscheduleMeetingMutation, useUpdateAvailabilitiesMutation } from 'slices/api';
+import { useAddGuestRespondentMutation, usePutSelfRespondentMutation, useDeleteRespondentMutation, useScheduleMeetingMutation, useUnscheduleMeetingMutation, useUpdateAvailabilitiesMutation } from 'slices/api';
 import { getReqErrorMessage } from 'utils/requests.utils';
 import { selectCurrentMeetingID } from 'slices/currentMeeting';
 
@@ -60,7 +60,7 @@ function AvailabilitiesRow({
   const [
     submitSelf,
     {isSuccess: submitSelf_isSuccess, isLoading: submitSelf_isLoading, isError: submitSelf_isError, error: submitSelf_error}
-  ] = useAddSelfRespondentMutation();
+  ] = usePutSelfRespondentMutation();
   // updateRespondent is used for updating some existing respondent, who may be the current
   // user who is logged in
   const [
@@ -71,6 +71,10 @@ function AvailabilitiesRow({
     addGuest,
     {isSuccess: addGuest_isSuccess, isLoading: addGuest_isLoading, isError: addGuest_isError, error: addGuest_error}
   ] = useAddGuestRespondentMutation();
+  const [
+    deleteRespondent,
+    {isSuccess: deleteRespondent_isSuccess, isLoading: deleteRespondent_isLoading, isError: deleteRespondent_isError, error: deleteRespondent_error}
+  ] = useDeleteRespondentMutation();
   const [
     schedule,
     {isSuccess: schedule_isSuccess, isLoading: schedule_isLoading, isError: schedule_isError, error: schedule_error}
@@ -93,20 +97,12 @@ function AvailabilitiesRow({
   const { showToast } = useToast();
   const [shouldShowModal, setShouldShowModal] = useState(false);
   const closeModal = useCallback(() => setShouldShowModal(false), []);
-  let rightBtnText: string | undefined;
-  let onRightBtnClick: React.MouseEventHandler<HTMLButtonElement> | undefined;
-  let rightBtnDisabled = false;
-  let leftBtnText: string | undefined;
-  let onLeftBtnClick: React.MouseEventHandler<HTMLButtonElement> | undefined;
-  let leftBtnDisabled = false;
   let title = 'Availabilities';
-  let selectedUserName: string | undefined;
+  const [selectedUserName, setSelectedUserName] = useState<string | null>(null);
+  // A ref is necessary to avoid running the useEffect hooks (which show the
+  // toast messages) twice
+  const selectedUserNameRef = useRef<string | null>(null);
 
-  if (selMode.type === 'selectedUser') {
-    selectedUserName = respondents[selMode.selectedUserID].name;
-  } else if (selMode.type === 'editingOther') {
-    selectedUserName = respondents[selMode.otherUserID].name;
-  }
   if (scheduledDateTimeTitle !== null) {
     title = scheduledDateTimeTitle;
   }
@@ -121,8 +117,9 @@ function AvailabilitiesRow({
       });
       dispatch(resetSelection());
     } else if (submitSelf_isError) {
+      const verb = selfRespondentIDRef.current === undefined ? 'add' : 'update';
       showToast({
-        msg: `Failed to update availabilities: ${getReqErrorMessage(submitSelf_error!)}`,
+        msg: `Failed to ${verb} availabilities: ${getReqErrorMessage(submitSelf_error!)}`,
         msgType: 'failure',
       });
     }
@@ -136,18 +133,50 @@ function AvailabilitiesRow({
   useEffect(() => {
     if (updateRespondent_isSuccess) {
       showToast({
-        msg: `${selectedUserName}'s availabilities successfully updated`,
+        msg: `${selectedUserNameRef.current}'s availabilities successfully updated`,
         msgType: 'success',
         autoClose: true,
       });
       dispatch(resetSelection());
     } else if (updateRespondent_isError) {
       showToast({
-        msg: `Error updating ${selectedUserName}'s availabilities: ${getReqErrorMessage(updateRespondent_error!)}`,
+        msg: `Error updating ${selectedUserNameRef.current}'s availabilities: ${getReqErrorMessage(updateRespondent_error!)}`,
         msgType: 'failure',
       });
     }
-  }, [updateRespondent_isSuccess, updateRespondent_isError, updateRespondent_error, showToast, selectedUserName, dispatch])
+  }, [updateRespondent_isSuccess, updateRespondent_isError, updateRespondent_error, showToast, dispatch])
+
+  useEffect(() => {
+    if (addGuest_isSuccess) {
+      showToast({
+        msg: 'Successfully added availabilities',
+        msgType: 'success',
+        autoClose: true,
+      });
+      dispatch(resetSelection());
+    } else if (addGuest_isError) {
+      showToast({
+        msg: `Failed to add availabilities: ${getReqErrorMessage(addGuest_error!)}`,
+        msgType: 'failure',
+      });
+    }
+  }, [addGuest_isSuccess, addGuest_isError, addGuest_error, showToast, dispatch]);
+
+  useEffect(() => {
+    if (deleteRespondent_isSuccess) {
+      showToast({
+        msg: `Successfully deleted respondent`,
+        msgType: 'success',
+        autoClose: true,
+      });
+      dispatch(resetSelection());
+    } else if (deleteRespondent_isError) {
+      showToast({
+        msg: `Error deleting respondent: ${getReqErrorMessage(deleteRespondent_error!)}`,
+        msgType: 'failure',
+      });
+    }
+  }, [deleteRespondent_isSuccess, deleteRespondent_isError, deleteRespondent_error, showToast, dispatch]);
 
   useEffect(() => {
     if (schedule_isSuccess) {
@@ -181,10 +210,23 @@ function AvailabilitiesRow({
     }
   }, [unschedule_isSuccess, unschedule_isError, unschedule_error, showToast, dispatch]);
 
-  if (submitSelf_isLoading || updateRespondent_isLoading || schedule_isLoading || unschedule_isLoading) {
-    leftBtnDisabled = rightBtnDisabled = true;
-  }
+  useEffect(() => {
+    if (selMode.type === 'selectedUser') {
+      selectedUserNameRef.current = respondents[selMode.selectedRespondentID].name;
+    } else if (selMode.type === 'editingRespondent') {
+      selectedUserNameRef.current = respondents[selMode.respondentID].name;
+    } else {
+      selectedUserNameRef.current = null;
+    }
+    // FIXME: this feels wrong
+    setSelectedUserName(selectedUserNameRef.current);
+  }, [selMode, respondents]);
 
+  const btnDisabled = submitSelf_isLoading || updateRespondent_isLoading || deleteRespondent_isLoading || schedule_isLoading || unschedule_isLoading;
+
+  let rightBtnText: string | undefined;
+  let onRightBtnClick: React.MouseEventHandler<HTMLButtonElement> | undefined;
+  let rightBtn_isLoading = false;
   if (selMode.type === 'none') {
     if (selfRespondentID !== undefined) {
       rightBtnText = 'Edit availability';
@@ -192,12 +234,8 @@ function AvailabilitiesRow({
       rightBtnText = 'Add availability';
     }
     onRightBtnClick = () => editSelf();
-  } else if (selMode.type === 'editingSelf') {
-    if (selfRespondentID !== undefined) {
-      title = 'Edit your availability';
-    } else {
-      title = 'Add your availability';
-    }
+  } else if (selMode.type === 'addingRespondent') {
+    title = 'Add your availability';
     rightBtnText = 'Continue';
     if (moreDaysToRight) {
       onRightBtnClick = () => pageDispatch('inc');
@@ -209,23 +247,29 @@ function AvailabilitiesRow({
             availabilities: Object.keys(selectedTimes),
           },
         });
+        rightBtn_isLoading = submitSelf_isLoading;
       } else {
         onRightBtnClick = () => setShouldShowModal(true);
       }
     }
-  } else if (selMode.type === 'editingOther') {
-    title = `Edit ${selMode.otherUserID}'s availability`;
+  } else if (selMode.type === 'editingRespondent') {
+    if (selfRespondentID === selMode.respondentID) {
+      title = 'Edit your availability';
+    } else {
+      title = `Edit ${selectedUserName}'s availability`;
+    }
     rightBtnText = 'Next';
     if (moreDaysToRight) {
       onRightBtnClick = () => pageDispatch('inc');
     } else {
       onRightBtnClick = () => updateRespondent({
         id: meetingID,
-        respondentId: selMode.otherUserID,
+        respondentId: selMode.respondentID,
         putRespondentDto: {
           availabilities: Object.keys(selectedTimes),
         },
       });
+      rightBtn_isLoading = updateRespondent_isLoading;
     }
   } else if (selMode.type === 'editingSchedule') {
     title = 'Schedule your meeting';
@@ -244,12 +288,13 @@ function AvailabilitiesRow({
         id: meetingID,
         scheduleMeetingDto: {
           startDateTime: selectedTimesFlat[0],
-          endDateTime: selectedTimesFlat[selectedTimesFlat.length - 1],
+          endDateTime: addMinutesToDateTimeString(selectedTimesFlat[selectedTimesFlat.length - 1], 30),
         }
       });
     };
+    rightBtn_isLoading = schedule_isLoading;
   } else if (selMode.type === 'selectedUser') {
-    if (selfRespondentID === selMode.selectedUserID) {
+    if (selfRespondentID === selMode.selectedRespondentID) {
       title = 'Your availability';
       rightBtnText = 'Edit availability';
     } else {
@@ -262,10 +307,14 @@ function AvailabilitiesRow({
     assertIsNever(selMode);
   }
 
+  let leftBtnText: string | undefined;
+  let onLeftBtnClick: React.MouseEventHandler<HTMLButtonElement> | undefined;
+  let leftBtn_isLoading = false;
   if (selMode.type === 'none') {
     if (isScheduled) {
       leftBtnText = 'Unschedule';
       onLeftBtnClick = () => unschedule(meetingID);
+      leftBtn_isLoading = unschedule_isLoading;
     } else {
       leftBtnText = 'Schedule';
       onLeftBtnClick = () => dispatch(createSchedule());
@@ -275,32 +324,38 @@ function AvailabilitiesRow({
     onLeftBtnClick = () => dispatch(resetSelection());
   }
 
+  let onDeleteBtnClick: React.MouseEventHandler<HTMLButtonElement> | undefined;
+  // TODO: show confirmation modal
+  if (selMode.type === 'editingRespondent') {
+    onDeleteBtnClick = () => deleteRespondent({
+      id: meetingID,
+      respondentId: selMode.respondentID,
+    });
+  }
+
   return (
     <>
-      <div style={{
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        marginTop: '4em',
-        marginBottom: '2em',
-      }}>
+      <div className="d-flex align-items-center justify-content-between mb-5">
         <div style={{fontSize: '1.3em'}}>{title}</div>
         <div className="d-none d-md-flex">
-          {leftBtnText && leftBtnText === 'Cancel' ? (
-            <button
-              type="button"
-              className="btn btn-outline-primary meeting-avl-button"
-              onClick={onLeftBtnClick}
-              disabled={leftBtnDisabled}
+          {onDeleteBtnClick && (
+            <ButtonWithSpinner
+              as="NonFocusButton"
+              className="btn btn-outline-danger me-4 meeting-avl-button"
+              onClick={onDeleteBtnClick}
+              disabled={btnDisabled}
+              isLoading={deleteRespondent_isLoading}
             >
-              {leftBtnText}
-            </button>
-          ) : (
+              Delete
+            </ButtonWithSpinner>
+          )}
+          {onLeftBtnClick && (
             <ButtonWithSpinner
               as="NonFocusButton"
               className="btn btn-outline-primary meeting-avl-button"
               onClick={onLeftBtnClick}
-              isLoading={leftBtnDisabled}
+              disabled={btnDisabled}
+              isLoading={leftBtn_isLoading}
             >
               {leftBtnText}
             </ButtonWithSpinner>
@@ -308,20 +363,33 @@ function AvailabilitiesRow({
           <ButtonWithSpinner
             as="NonFocusButton"
             className="btn btn-primary ms-4 meeting-avl-button"
-            isLoading={rightBtnDisabled}
             onClick={onRightBtnClick}
+            disabled={btnDisabled}
+            isLoading={rightBtn_isLoading}
           >
             {rightBtnText}
           </ButtonWithSpinner>
         </div>
       </div>
       <BottomOverlay>
+        {onDeleteBtnClick && (
+          <ButtonWithSpinner
+            as="NonFocusButton"
+            className="btn btn-outline-light me-2 meeting-avl-button"
+            onClick={onDeleteBtnClick}
+            disabled={btnDisabled}
+            isLoading={deleteRespondent_isLoading}
+          >
+            Delete
+          </ButtonWithSpinner>
+        )}
         {leftBtnText && (
           <ButtonWithSpinner
             as="NonFocusButton"
             className="btn btn-outline-light meeting-avl-button"
             onClick={onLeftBtnClick}
-            isLoading={leftBtnDisabled}
+            disabled={btnDisabled}
+            isLoading={leftBtn_isLoading}
           >
             {leftBtnText}
           </ButtonWithSpinner>
@@ -329,8 +397,9 @@ function AvailabilitiesRow({
         <ButtonWithSpinner
           as="NonFocusButton"
           className="btn btn-light ms-auto meeting-avl-button"
-          isLoading={rightBtnDisabled}
           onClick={onRightBtnClick}
+          disabled={btnDisabled}
+          isLoading={rightBtn_isLoading}
         >
           {rightBtnText}
         </ButtonWithSpinner>

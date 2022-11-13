@@ -4,7 +4,8 @@ import { Link, useNavigate } from 'react-router-dom';
 import BottomOverlay from 'components/BottomOverlay';
 import ContinueWithGoogleButton from 'components/ContinueWithGoogleButton';
 import { useToast } from 'components/Toast';
- import styles from './Login.module.css';
+import styles from './Login.module.css';
+import historyHelper from 'utils/historyHelper';
 import { getReqErrorMessage } from "utils/requests.utils";
 import ButtonWithSpinner from './ButtonWithSpinner';
 import { useLoginMutation } from 'slices/api';
@@ -50,7 +51,7 @@ function LoginForm() {
         msgType: 'failure',
       });
     } else if (isSuccess) {
-      navigate('/');
+      navigate(historyHelper.getLastNonAuthPath());
     }
   }, [isError, error, isSuccess, navigate, showToast]);
 

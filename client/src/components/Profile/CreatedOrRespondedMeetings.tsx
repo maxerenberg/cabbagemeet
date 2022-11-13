@@ -1,6 +1,6 @@
 import { Link } from "react-router-dom";
 import GenericSpinner from 'components/GenericSpinner';
-import { addDaysToDateString, getLocalYearMonthDayFromDate, getMonthAbbr, getYearMonthDayFromDateString, tzAbbr } from "utils/dates.utils";
+import { addDaysToDateString, convertDateTimeStringToHourDecimal, getLocalYearMonthDayFromDate, getMonthAbbr, getYearMonthDayFromDateString, tzAbbr } from "utils/dates.utils";
 import styles from './Profile.module.css';
 import { getReqErrorMessage } from "utils/requests.utils";
 import { useGetCreatedMeetingsQuery, useGetRespondedMeetingsQuery } from 'slices/enhancedApi';
@@ -59,7 +59,7 @@ export default function CreatedMeetings({showCreatedMeetings}: {showCreatedMeeti
           <div className={`ps-4 ${styles.meetingCardRight}`}>
             <h5>{meeting.name}</h5>
             {
-              meeting.scheduledStartDateTime || (
+              (meeting.scheduledStartDateTime === undefined) && (
                 <div>
                   <CalendarIcon />
                   <span className="ms-2">
@@ -133,7 +133,16 @@ function shortTimeString(hour: number): string {
 }
 
 function meetingTimesRangeString(meeting: TransformedMeetingShortResponse): string {
-  return `${shortTimeString(meeting.minStartHour)} - ${shortTimeString(meeting.maxEndHour)}`;
+  let startHour: number | undefined;
+  let endHour: number | undefined;
+  if (meeting.scheduledStartDateTime !== undefined && meeting.scheduledEndDateTime !== undefined) {
+    startHour = convertDateTimeStringToHourDecimal(meeting.scheduledStartDateTime);
+    endHour = convertDateTimeStringToHourDecimal(meeting.scheduledEndDateTime);
+  } else {
+    startHour = meeting.minStartHour;
+    endHour = meeting.maxEndHour;
+  }
+  return `${shortTimeString(startHour)} - ${shortTimeString(endHour)}`;
 }
 
 function CalendarIcon() {

@@ -133,6 +133,11 @@ export function addMinutesToDateTimeString(dateTime: string, numMinutes: number)
   return customToISOString(date);
 }
 
+export function convertDateTimeStringToHourDecimal(dateTime: string): number {
+  const date = new Date(dateTime);
+  return date.getHours() + date.getMinutes() / 60;
+}
+
 export function convertOtherTzToLocal(
   {
     startHour,

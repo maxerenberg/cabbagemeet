@@ -8,7 +8,7 @@ import CreateMeetingDto from './create-meeting.dto';
 import MeetingResponse from './meeting-response';
 import Meeting from './meeting.entity';
 import MeetingsService from './meetings.service';
-import { ApiBadRequestResponse, ApiCookieAuth, ApiNotFoundResponse, ApiOperation, ApiTags, ApiForbiddenResponse } from '@nestjs/swagger';
+import { ApiBadRequestResponse, ApiBearerAuth, ApiNotFoundResponse, ApiOperation, ApiTags, ApiForbiddenResponse } from '@nestjs/swagger';
 import { BadRequestResponse, NotFoundResponse, ForbiddenResponse } from '../common-responses';
 import OAuth2Service from '../oauth2/oauth2.service';
 import PutRespondentDto from './put-respondent.dto';
@@ -40,9 +40,9 @@ export function meetingToMeetingShortResponse(meeting: Meeting): MeetingShortRes
   return response;
 }
 
-export function meetingToMeetingResponse(
+function meetingToMeetingResponse(
   meeting: Meeting,
-  callingUser?: User | null,
+  callingUser: User | null,
 ): MeetingResponse {
   const response: MeetingResponse = {
     ...meetingToMeetingShortResponse(meeting),
@@ -140,7 +140,7 @@ export class MeetingsController {
     // Normally we would do a left join to get the respondents
     // Since we just created the meeting, this field will be undefined
     meeting.Respondents = [];
-    return meetingToMeetingResponse(meeting);
+    return meetingToMeetingResponse(meeting, maybeUser);
   }
 
   @ApiOperation({
@@ -280,16 +280,16 @@ export class MeetingsController {
   ): Promise<MeetingResponse> {
     await this.meetingsService.addRespondent(meetingID, body.availabilities, body.name, body.email);
     const updatedMeeting = await this.meetingsService.getMeetingWithRespondents(meetingID);
-    return meetingToMeetingResponse(updatedMeeting!);
+    return meetingToMeetingResponse(updatedMeeting!, null);
   }
 
   @ApiOperation({
-    summary: 'Add own availabilities',
+    summary: 'Add or update own availabilities',
     description: 'Add or update the meeting availabilities of the user who is currently logged in.',
-    operationId: 'addSelfRespondent',
+    operationId: 'putSelfRespondent',
   })
   @ApiForbiddenResponse({type: ForbiddenResponse})
-  @ApiCookieAuth()
+  @ApiBearerAuth()
   @Put(':id/respondents/me')
   @UseGuards(JwtAuthGuard)
   async putSelfRespondent(
@@ -304,7 +304,7 @@ export class MeetingsController {
       await this.meetingsService.addRespondent(meetingID, body.availabilities, user.ID);
     }
     const updatedMeeting = await this.meetingsService.getMeetingWithRespondents(meetingID);
-    return meetingToMeetingResponse(updatedMeeting!);
+    return meetingToMeetingResponse(updatedMeeting!, user);
   }
 
   @ApiOperation({
@@ -327,7 +327,7 @@ export class MeetingsController {
     await this.checkIfRespondentExistsAndClientIsAllowedToModifyThem(respondentID, maybeUser);
     await this.meetingsService.updateRespondent(respondentID, body.availabilities);
     const updatedMeeting = await this.meetingsService.getMeetingWithRespondents(meetingID);
-    return meetingToMeetingResponse(updatedMeeting!);
+    return meetingToMeetingResponse(updatedMeeting!, maybeUser);
   }
 
   @ApiOperation({
@@ -348,6 +348,6 @@ export class MeetingsController {
     await this.checkIfRespondentExistsAndClientIsAllowedToModifyThem(respondentID, maybeUser);
     await this.meetingsService.deleteRespondent(respondentID);
     const updatedMeeting = await this.meetingsService.getMeetingWithRespondents(meetingID);
-    return meetingToMeetingResponse(updatedMeeting!);
+    return meetingToMeetingResponse(updatedMeeting!, maybeUser);
   }
 }

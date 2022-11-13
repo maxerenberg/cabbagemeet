@@ -1,6 +1,6 @@
 import { BadRequestException, Body, Controller, Delete, Get, HttpCode, HttpStatus, NotFoundException, ParseIntPipe, Patch, Post, Query, Redirect, UseGuards } from '@nestjs/common';
 import { ModuleRef } from '@nestjs/core';
-import { ApiCookieAuth, ApiOperation, ApiResponse, ApiTags, ApiUnauthorizedResponse } from '@nestjs/swagger';
+import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags, ApiUnauthorizedResponse } from '@nestjs/swagger';
 import type { DeepPartial } from 'typeorm';
 import { GoogleCalendarEvent } from '../oauth2/google-calendar-events.entity';
 import { AuthUser } from '../auth/auth-user.decorator';
@@ -32,7 +32,7 @@ export function UserToUserResponse(user: User): UserResponse {
 }
 
 @ApiTags('me')
-@ApiCookieAuth()
+@ApiBearerAuth()
 @ApiUnauthorizedResponse({type: UnauthorizedResponse})
 @Controller('me')
 @UseGuards(JwtAuthGuard)

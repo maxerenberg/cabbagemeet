@@ -95,7 +95,6 @@ export default function WeeklyViewTimePicker() {
   );
   // If the meeting data hasn't been loaded yet, then this component
   // shouldn't even be loaded
-  console.log(startTime, endTime, dates);
   assert(startTime !== undefined && endTime !== undefined && dates !== undefined);
   // startTime/endTime can be fractional (e.g. 9.5) if someone's timezone offset (in hours)
   // is not an integer, e.g. St. John's

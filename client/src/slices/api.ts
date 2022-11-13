@@ -22,13 +22,21 @@ const injectedRtkApi = api.injectEndpoints({
       LoginWithGoogleApiResponse,
       LoginWithGoogleApiArg
     >({
-      query: () => ({ url: `/api/login-with-google`, method: "POST" }),
+      query: (queryArg) => ({
+        url: `/api/login-with-google`,
+        method: "POST",
+        body: queryArg,
+      }),
     }),
     signupWithGoogle: build.mutation<
       SignupWithGoogleApiResponse,
       SignupWithGoogleApiArg
     >({
-      query: () => ({ url: `/api/signup-with-google`, method: "POST" }),
+      query: (queryArg) => ({
+        url: `/api/signup-with-google`,
+        method: "POST",
+        body: queryArg,
+      }),
     }),
     confirmLinkGoogleAccount: build.mutation<
       ConfirmLinkGoogleAccountApiResponse,
@@ -148,9 +156,9 @@ const injectedRtkApi = api.injectEndpoints({
         body: queryArg.addGuestRespondentDto,
       }),
     }),
-    addSelfRespondent: build.mutation<
-      AddSelfRespondentApiResponse,
-      AddSelfRespondentApiArg
+    putSelfRespondent: build.mutation<
+      PutSelfRespondentApiResponse,
+      PutSelfRespondentApiArg
     >({
       query: (queryArg) => ({
         url: `/api/meetings/${queryArg.id}/respondents/me`,
@@ -189,10 +197,10 @@ export type LogoutApiResponse = unknown;
 export type LogoutApiArg = void;
 export type LoginWithGoogleApiResponse =
   /** status 200  */ CustomRedirectResponse;
-export type LoginWithGoogleApiArg = void;
+export type LoginWithGoogleApiArg = OAuth2ConsentPostRedirectDto;
 export type SignupWithGoogleApiResponse =
   /** status 200  */ CustomRedirectResponse;
-export type SignupWithGoogleApiArg = void;
+export type SignupWithGoogleApiArg = OAuth2ConsentPostRedirectDto;
 export type ConfirmLinkGoogleAccountApiResponse = unknown;
 export type ConfirmLinkGoogleAccountApiArg = ConfirmLinkAccountDto;
 export type GetSelfInfoApiResponse = /** status 200  */ UserResponse;
@@ -238,8 +246,8 @@ export type AddGuestRespondentApiArg = {
   id: number;
   addGuestRespondentDto: AddGuestRespondentDto;
 };
-export type AddSelfRespondentApiResponse = /** status 200  */ MeetingResponse;
-export type AddSelfRespondentApiArg = {
+export type PutSelfRespondentApiResponse = /** status 200  */ MeetingResponse;
+export type PutSelfRespondentApiArg = {
   id: number;
   putRespondentDto: PutRespondentDto;
 };
@@ -288,6 +296,10 @@ export type CustomRedirectResponse = {
 export type NotFoundResponse = {
   statusCode: number;
   message: string;
+};
+export type OAuth2ConsentPostRedirectDto = {
+  post_redirect: string;
+  nonce?: string;
 };
 export type ConfirmLinkAccountDto = {
   encrypted_entity: string;
@@ -403,7 +415,7 @@ export const {
   useScheduleMeetingMutation,
   useUnscheduleMeetingMutation,
   useAddGuestRespondentMutation,
-  useAddSelfRespondentMutation,
+  usePutSelfRespondentMutation,
   useUpdateAvailabilitiesMutation,
   useDeleteRespondentMutation,
 } = injectedRtkApi;

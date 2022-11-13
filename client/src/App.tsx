@@ -68,7 +68,13 @@ function AppRoot() {
       });
     }
   }, [isError, error, showToast]);
-  useExtractTokenFromQueryParams();
+  const tokenIsInURL = useExtractTokenFromQueryParams();
+  if (tokenIsInURL) {
+    // Don't make any requests yet until the token has been saved into
+    // LocalStorage and stored in the Redux slice.
+    // Otherwise the requests will be prematurely unauthenticated.
+    return null;
+  }
   return (
     <div className="App light-theme d-flex flex-column">
       <Navbar expand="md" className="mt-3 mb-5">

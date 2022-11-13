@@ -48,6 +48,7 @@ export default function Meeting() {
   return (
     <div className="meeting-container">
       <MeetingTitleRow setIsEditingMeeting={setIsEditingMeeting} />
+      <hr className="my-4 my-md-5" />
       <MeetingAboutRow />
       <WeeklyViewTimePicker />
     </div>

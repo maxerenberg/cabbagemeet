@@ -18,7 +18,6 @@ export default function DeleteMeetingModal({
   const [deleteMeeting, {isLoading, isSuccess, isError, error}] = useDeleteMeetingMutation();
   const navigate = useNavigate();
   const {showToast} = useToast();
-  // TODO: don't store meeting ID as string
   const onDeleteClick = () => deleteMeeting(meetingID);
 
   useEffect(() => {
@@ -28,7 +27,7 @@ export default function DeleteMeetingModal({
         msgType: 'success',
         autoClose: true,
       });
-      navigate('/me');
+      navigate('/');
     } else if (isError) {
       showToast({
         msg: `Failed to delete meeting: ${getReqErrorMessage(error!)}`,

@@ -1,7 +1,10 @@
-import React, { ReactElement, useMemo } from 'react';
+import React, { ReactElement, useEffect, useMemo } from 'react';
 import { useAppSelector, useAppDispatch } from 'app/hooks';
 import type { PeopleDateTimes, Style } from 'common/types';
-import { useGetCurrentMeetingWithSelector } from 'utils/meetings.hooks';
+import {
+  useGetCurrentMeetingWithSelector,
+  useGetGoogleCalendarEventsIfTokenIsPresent,
+} from 'utils/meetings.hooks';
 import {
   selectSelMode,
   selectSelectedTimes,
@@ -19,8 +22,6 @@ import { useToast } from 'components/Toast';
 import { flatGridCoords } from 'utils/arrays.utils';
 import { addDaysToDateString, customToISOString, startAndEndDateTimeToDateTimesFlat } from 'utils/dates.utils';
 import { assert, assertIsNever } from 'utils/misc.utils';
-import { useEffect } from 'react';
-import { useGetGoogleCalendarEventsQuery } from 'slices/api';
 import { selectCurrentMeetingID } from 'slices/currentMeeting';
 
 // TODO: deal with decimal start/end times
@@ -104,7 +105,7 @@ function MouseupProvider({
     }
     let colStart = mouseState.downCell.colIdx;
     let colEnd = mouseState.curCell.colIdx;
-    if (selMode.type === 'editingSelf' || selMode.type === 'editingOther') {
+    if (selMode.type === 'addingRespondent' || selMode.type === 'editingRespondent') {
       if (colStart > colEnd) {
         [colStart, colEnd] = [colEnd, colStart];
       }
@@ -118,7 +119,7 @@ function MouseupProvider({
         dateTimesInSelectionArea.push(dateTimes[rowIdx][colIdx]);
       }
     }
-    if (selMode.type === 'editingSelf' || selMode.type === 'editingOther') {
+    if (selMode.type === 'addingRespondent' || selMode.type === 'editingRespondent') {
       if (mouseState.downCellWasOriginallySelected) {
         dispatch(removeDateTimesAndResetMouse(dateTimesInSelectionArea));
       } else {
@@ -181,7 +182,7 @@ function MeetingGridBodyCells({
   const scheduleSet = useMemo(() => scheduledDateTimes || {}, [scheduledDateTimes]);
   const meetingID = useAppSelector(selectCurrentMeetingID);
   assert(meetingID !== undefined);
-  const {data: externalEvents} = useGetGoogleCalendarEventsQuery(meetingID);
+  const {data: externalEvents} = useGetGoogleCalendarEventsIfTokenIsPresent(meetingID);
   // Take the first event of each dateTime, and take the first dateTime of each event
   const dateTimesToExternalEventInfo = useMemo(() => {
     const result: {
@@ -224,7 +225,7 @@ function MeetingGridBodyCells({
           const hoverUserIsAvailableAtThisTime = somebodyIsHovered && respondents[hoverUser].availabilities[dateTime];
           const selectedUserIsAvailableAtThisTime =
             selMode.type === 'selectedUser'
-            && respondents[selMode.selectedUserID].availabilities[dateTime];
+            && respondents[selMode.selectedRespondentID].availabilities[dateTime];
           const numPeopleAvailableAtThisTime = dateTimePeople[dateTime]?.length ?? 0;
           return (
             <Cell key={i} {...{
@@ -313,7 +314,7 @@ const Cell = React.memo(function Cell({
   const style: Style = {gridArea: `c${cellIdx}`};
   let rgb: string | undefined;
   let alpha = '100%';
-  if (selMode.type === 'editingSelf') {
+  if (selMode.type === 'addingRespondent' || selMode.type === 'editingRespondent') {
     if (
       (isInMouseSelectionArea && mouseSelectionAreaIsAddingDateTimes)
       || (!isInMouseSelectionArea && isSelected)
@@ -329,13 +330,6 @@ const Cell = React.memo(function Cell({
     }
   } else if (selMode.type === 'selectedUser') {
     if (selectedUserIsAvailableAtThisTime) {
-      rgb = 'var(--custom-primary-rgb)';
-    }
-  } else if (selMode.type === 'editingOther') {
-    if (
-      (isInMouseSelectionArea && mouseSelectionAreaIsAddingDateTimes)
-      || (!isInMouseSelectionArea && isSelected)
-    ) {
       rgb = 'var(--custom-primary-rgb)';
     }
   } else if (selMode.type === 'none') {
@@ -355,8 +349,8 @@ const Cell = React.memo(function Cell({
   // FIXME: this is getting too complicated
   if (
     (
-      selMode.type === 'editingSelf'
-      || selMode.type === 'editingOther'
+      selMode.type === 'addingRespondent'
+      || selMode.type === 'editingRespondent'
     )
     && externalEventName !== undefined
     && !meetingIsScheduled
@@ -387,8 +381,8 @@ const Cell = React.memo(function Cell({
   let onMouseLeave: React.MouseEventHandler | undefined;
   let onMouseDown: React.MouseEventHandler | undefined;
   if (
-    selMode.type === 'editingSelf'
-    || selMode.type === 'editingOther'
+    selMode.type === 'addingRespondent'
+    || selMode.type === 'editingRespondent'
     || selMode.type === 'editingSchedule'
   ) {
     if (mouseStateType === 'upNoCellsSelected') {

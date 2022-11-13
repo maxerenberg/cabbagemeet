@@ -8,7 +8,7 @@ import GoogleOAuth2 from './google-oauth2.entity';
 import { DataSource, DeepPartial, Repository } from 'typeorm';
 import { normalizeDBError, UniqueConstraintFailed } from 'src/database.utils';
 import User from 'src/users/user.entity';
-import { assert } from 'src/misc.utils';
+import { assert, encodeQueryParams } from 'src/misc.utils';
 import { columnsForGetUser } from 'src/users/users.service';
 import type { GoogleOIDCResponse, GoogleDecodedOIDCIDToken, GoogleRefreshTokenResponse, GoogleListEventsResponse, GoogleListEventsResponseItem, GoogleInsertEventResponse } from './oauth2-response-types';
 import { toISOStringUTC, getSecondsSinceUnixEpoch } from 'src/dates.utils';
@@ -26,6 +26,7 @@ export type OAuth2State = {
   reason: OAuth2Reason;
   postRedirect: string;
   userID?: number;
+  nonce?: string;
 };
 export class OAuth2NotConfiguredError extends Error {}
 export class OAuth2ErrorResponseError extends Error {
@@ -112,12 +113,6 @@ export default class OAuth2Service {
     }
   }
 
-  private encodeQueryParams(params: Record<string, string>): string {
-    return Object.entries(params)
-      .map(([key, value]) => key + '=' + encodeURIComponent(value))
-      .join('&');
-  }
-
   // When submitting content of type application/x-www-form-urlencoded,
   // ' ' needs to be converted into '+' instead of '%20'.
   // See https://developer.mozilla.org/en-US/docs/Glossary/percent-encoding.
@@ -173,7 +168,7 @@ export default class OAuth2Service {
     if (state.reason === 'link' || state.reason === 'signup') {
       params.prompt = 'consent';
     }
-    return authzEndpoint + '?' + this.encodeQueryParams(params);
+    return authzEndpoint + '?' + encodeQueryParams(params);
   }
 
   private async google_getTokenFromCode(code: string, state: OAuth2State): Promise<{
@@ -522,7 +517,7 @@ export default class OAuth2Service {
       return null;
     }
     const params = {syncToken: existingEventsData.SyncToken};
-    const url = GOOGLE_API_CALENDAR_EVENTS_BASE_URL + '?' + this.encodeQueryParams(params);
+    const url = GOOGLE_API_CALENDAR_EVENTS_BASE_URL + '?' + encodeQueryParams(params);
     let response: GoogleListEventsResponse | undefined;
     try {
       response = await this.google_apiRequest<GoogleListEventsResponse>(creds, url);
@@ -569,7 +564,7 @@ export default class OAuth2Service {
       timeMin: `${minDate}T00:00:00Z`,
       timeMax: `${maxDate}T00:00:00Z`,
     };
-    const url = GOOGLE_API_CALENDAR_EVENTS_BASE_URL + '?' + this.encodeQueryParams(params);
+    const url = GOOGLE_API_CALENDAR_EVENTS_BASE_URL + '?' + encodeQueryParams(params);
     const response = await this.google_apiRequest<GoogleListEventsResponse>(creds, url);
     this.logger.debug(response);
     const events = response.items.map(

@@ -5,14 +5,14 @@
 /* media-breakpoint-up(md) */
 @media (min-width: 768px) {
   .meeting-avl-button {
-    min-width: 10em;
+    min-width: 8em;
   }
 }
 
 /* media-breakpoint-up(lg) */
 @media (min-width: 992px) {
   .meeting-avl-button {
-    min-width: 12em;
+    min-width: 10em;
   }
 }
 
@@ -88,7 +88,7 @@
 .weeklyview-grid__monthtext {
   grid-area: m;
   text-align: left;
-  font-size: 1.4em;
+  font-size: 1.2em;
   height: 2em;
   margin-bottom: 1em;
   display: flex;

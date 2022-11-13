@@ -26,6 +26,7 @@ import AuthService from './auth.service';
 import LocalLoginDto from './local-login.dto';
 import LocalSignupDto from './local-signup.dto';
 import OAuth2Service, {OAuth2Provider, OAuth2Reason, OAuth2NotConfiguredError} from 'src/oauth2/oauth2.service';
+import OAuth2ConsentPostRedirectDto from 'src/oauth2/oauth2-consent-post-redirect.dto';
 
 const setTokenDescription = (
   "A token will be set in the response body which must be included in the Authorization"
@@ -93,13 +94,13 @@ export class AuthController {
   })
   @Post('logout')
   @HttpCode(HttpStatus.NO_CONTENT)
-  async signout(@Req() req: Request): Promise<void> {
+  async signout(): Promise<void> {
     // TODO: add option to signout of all sessions everywhere (use iat claim in JWT)
   }
 
-  private redirectToGoogle(reason: OAuth2Reason): string {
+  private redirectToGoogle(reason: OAuth2Reason, postRedirect: string, nonce?: string): string {
     try {
-      return this.oauth2Service.getRequestURL(OAuth2Provider.GOOGLE, {reason, postRedirect: '/'});
+      return this.oauth2Service.getRequestURL(OAuth2Provider.GOOGLE, {reason, postRedirect, nonce});
     } catch (err: any) {
       if (err instanceof OAuth2NotConfiguredError) {
         throw new NotFoundException();
@@ -116,9 +117,9 @@ export class AuthController {
   @ApiResponse({type: NotFoundResponse})
   @Post('login-with-google')
   @HttpCode(HttpStatus.OK)
-  loginWithGoogle(): CustomRedirectResponse {
+  loginWithGoogle(@Body() body: OAuth2ConsentPostRedirectDto): CustomRedirectResponse {
     return {
-      redirect: this.redirectToGoogle('login')
+      redirect: this.redirectToGoogle('login', body.post_redirect, body.nonce)
     };
   }
 
@@ -129,9 +130,9 @@ export class AuthController {
   })
   @Post('signup-with-google')
   @HttpCode(HttpStatus.OK)
-  signupWithGoogle(): CustomRedirectResponse {
+  signupWithGoogle(@Body() body: OAuth2ConsentPostRedirectDto): CustomRedirectResponse {
     return {
-      redirect: this.redirectToGoogle('signup')
+      redirect: this.redirectToGoogle('signup', body.post_redirect, body.nonce)
     };
   }
 }

@@ -12,7 +12,7 @@ export const currentMeetingSlice = createSlice({
   name: 'currentMeeting',
   initialState,
   reducers: {
-    setMeetingID(state, {payload: meetingID}: PayloadAction<number>) {
+    setMeetingID(state, {payload: meetingID}: PayloadAction<number | undefined>) {
       state.meetingID = meetingID;
     },
   },

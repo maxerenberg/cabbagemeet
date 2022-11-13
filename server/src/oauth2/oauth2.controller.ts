@@ -17,7 +17,7 @@ import { Response } from 'express';
 import { AuthUser } from 'src/auth/auth-user.decorator';
 import JwtAuthGuard from 'src/auth/jwt-auth.guard';
 import CustomJwtService from 'src/custom-jwt/custom-jwt.service';
-import { assertIsNever } from 'src/misc.utils';
+import { assertIsNever, encodeQueryParams } from 'src/misc.utils';
 import User from 'src/users/user.entity';
 import { DeepPartial } from 'typeorm';
 import ConfirmLinkAccountDto from './confirm-link-account.dto';
@@ -49,14 +49,18 @@ export class Oauth2Controller {
         && typeof state.postRedirect === 'string';
   }
 
-  private redirectWithToken(res: Response, redirectURL: string, user: User) {
+  private redirectWithToken(res: Response, redirectURL: string, nonce: string | undefined, user: User) {
     // We need to "push" the response to the client
     const serializedUserJwt = this.jwtService.serializeUserToJwt(user);
-    // Ugggghhhhhhh...
+    const urlParams: Record<string, string> =  {token: serializedUserJwt};
+    if (nonce) {
+      urlParams.nonce = nonce;
+    }
+    const encodedURLParams = encodeQueryParams(urlParams);
     if (redirectURL.includes('?')) {
-      res.redirect(redirectURL + `&token=${serializedUserJwt}`);
+      res.redirect(redirectURL + '&' + encodedURLParams);
     } else {
-      res.redirect(redirectURL + `?token=${serializedUserJwt}`);
+      res.redirect(redirectURL + '?' + encodedURLParams);
     }
   }
 
@@ -69,10 +73,7 @@ export class Oauth2Controller {
     @Query('error') error?: string,
   ) {
     if (error) {
-      this.logger.error(error);
-      // TODO: redirect to a nice-looking error page
-      res.status(500).contentType('text/plain').send('Internal server error');
-      return;
+      throw new Error(error);
     }
     const state = JSON.parse(stateStr!) as OAuth2State;
     if (!this.stateIsValid(state)) {
@@ -85,7 +86,7 @@ export class Oauth2Controller {
         res.redirect(state.postRedirect);
       } else if (state.reason === 'signup') {
         const user = await this.oauth2Service.google_fetchAndStoreUserInfoForSignup(code, state);
-        this.redirectWithToken(res, state.postRedirect, user);
+        this.redirectWithToken(res, state.postRedirect, state.nonce, user);
       } else if (state.reason === 'login') {
         const {
           user,
@@ -96,7 +97,7 @@ export class Oauth2Controller {
           // The user explicitly linked their account with Google (either by signing
           // up with Google initially, or by clicking 'Link account' from the settings
           // page). We should successfully log them in.
-          this.redirectWithToken(res, state.postRedirect, user);
+          this.redirectWithToken(res, state.postRedirect, state.nonce, user);
         } else if (user) {
           // The user signed up with this Gmail account, but never linked the account
           // via the settings page. We need them to confirm whether they want
@@ -109,20 +110,23 @@ export class Oauth2Controller {
             iv,
             salt,
           } = await this.jwtService.encryptText(JSON.stringify(pendingOAuth2Entity!));
-          res.redirect(
-            '/confirm-link-google-account?'
-            + `postRedirect=${encodeURIComponent(state.postRedirect)}`
-            + `&token=${serializedUserJwt}`
-            + `&encryptedEntity=${encryptedEntity.toString('base64url')}`
-            + `&iv=${iv.toString('base64url')}`
-            + `&salt=${salt.toString('base64url')}`
-          );
+          const urlParams: Record<string, string> = {
+            postRedirect: state.postRedirect,
+            token: serializedUserJwt,
+            encryptedEntity: encryptedEntity.toString('base64url'),
+            iv: iv.toString('base64url'),
+            salt: salt.toString('base64url'),
+          };
+          if (state.nonce) {
+            urlParams.nonce = state.nonce;
+          }
+          res.redirect('/confirm-link-google-account?' + encodeQueryParams(urlParams));
         } else {
           // The local account associated with this Google account no longer exists.
           // We need to force the user to go through the consent screen again
           // so that we can get a new refresh token.
           res.redirect(this.oauth2Service.getRequestURL(OAuth2Provider.GOOGLE, {
-            postRedirect: '/',
+            ...state,
             reason: 'signup',
           }));
         }
@@ -130,7 +134,6 @@ export class Oauth2Controller {
         assertIsNever(state.reason);
       }
     } catch (err: any) {
-      // TODO: show a nice error message page
       if (err instanceof OAuth2NotConfiguredError) {
         res.redirect('/error?e=E_GOOGLE_OAUTH2_NOT_AVAILABLE');
       } else if (err instanceof OAuth2AccountAlreadyLinkedError) {

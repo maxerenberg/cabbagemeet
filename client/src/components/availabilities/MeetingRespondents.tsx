@@ -41,11 +41,11 @@ function MeetingRespondents() {
   const dispatch = useAppDispatch();
 
   if (respondentIDs.length === 0) return null;
-  let selectedUserID: number | undefined;
+  let selectedRespondentID: number | undefined;
   if (selMode.type === 'selectedUser') {
-    selectedUserID = selMode.selectedUserID;
-  } else if (selMode.type === 'editingOther') {
-    selectedUserID = selMode.otherUserID;
+    selectedRespondentID = selMode.selectedRespondentID;
+  } else if (selMode.type === 'editingRespondent') {
+    selectedRespondentID = selMode.respondentID;
   }
   const numPeopleForHover =
     hoverDateTime !== null && dateTimePeople.hasOwnProperty(hoverDateTime)
@@ -60,7 +60,7 @@ function MeetingRespondents() {
         width: '9em',
       }}>
         Respondents (
-          {(!selectedUserID && hoverDateTime) ? numPeopleForHover + '/' : ''}
+          {(!selectedRespondentID && hoverDateTime) ? numPeopleForHover + '/' : ''}
           {respondentIDs.length}
         )
       </div>
@@ -68,12 +68,12 @@ function MeetingRespondents() {
         {
           respondentIDs.map(respondentID => {
             const style: Style = {};
-            if (respondentID === selectedUserID) {
+            if (respondentID === selectedRespondentID) {
               style.color = 'var(--custom-primary)';
             }
             let className = '';
             if (
-              selectedUserID === undefined
+              selectedRespondentID === undefined
               && hoverDateTime !== null
               && !(
                 dateTimePeople.hasOwnProperty(hoverDateTime)
@@ -83,10 +83,10 @@ function MeetingRespondents() {
               className = 'unavailable';
             }
             let onClick: React.MouseEventHandler | undefined;
-            if (respondentID === selectedUserID) {
+            if (respondentID === selectedRespondentID) {
               onClick = () => dispatch(resetSelection());
             } else {
-              onClick = () => dispatch(selectUser({userID: respondentID}));
+              onClick = () => dispatch(selectUser({respondentID}));
             }
             let onMouseEnter: React.MouseEventHandler | undefined;
             let onMouseLeave: React.MouseEventHandler | undefined;

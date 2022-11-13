@@ -6,6 +6,7 @@ import {
 } from "slices/authentication";
 import { useAppDispatch, useAppSelector } from "app/hooks";
 import { useSearchParams } from "react-router-dom";
+import { getSessionNonce, removeSessionNonce } from "./auth.utils";
 
 export function useGetSelfInfoIfTokenIsPresent() {
   const tokenIsPresent = useAppSelector(selectTokenIsPresent);
@@ -26,19 +27,29 @@ export function useSelfInfoIsPresent(): boolean {
 
 // The server will inject a token into the URL when logging in with an OAuth2 provider.
 // We need to extract it and store it.
-export function useExtractTokenFromQueryParams() {
+// This function returns true iff a token query parameter is present in the current URL.
+export function useExtractTokenFromQueryParams(): boolean {
   const dispatch = useAppDispatch();
   const [searchParams, setSearchParams] = useSearchParams();
   // We use a ref to avoid running the useEffect hook twice when we replace the URL
   const searchParamsRef = useRef(searchParams);
-  const token = searchParams.get('token');
   useEffect(() => {
-    if (token) {
-      dispatch(setToken(token));
-      const newParams = new URLSearchParams(searchParamsRef.current);
-      newParams.delete('token');
-      setSearchParams(newParams, {replace: true});
-      searchParamsRef.current = newParams;
+    const token = searchParamsRef.current.get('token');
+    const nonce = searchParamsRef.current.get('nonce');
+    if (token === null || nonce === null) {
+      return;
     }
-  }, [token, dispatch, setSearchParams]);
+    if (nonce === getSessionNonce()) {
+      dispatch(setToken(token));
+    } else {
+      console.error(`nonce '${nonce}' from server did not match '${getSessionNonce()}'`);
+    }
+    removeSessionNonce();
+    const newParams = new URLSearchParams(searchParamsRef.current);
+    newParams.delete('token');
+    newParams.delete('nonce');
+    setSearchParams(newParams, {replace: true});
+    searchParamsRef.current = newParams;
+  }, [dispatch, setSearchParams]);
+  return searchParams.has('token');
 }
