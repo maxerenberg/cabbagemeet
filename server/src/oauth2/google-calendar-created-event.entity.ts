@@ -4,6 +4,7 @@ import GoogleOAuth2 from './google-oauth2.entity';
 
 @Entity('GoogleCalendarCreatedEvent')
 export default class GoogleCalendarCreatedEvent {
+  // Composite primary key (order matters - MeetingID must be first)
   @PrimaryColumn()
   MeetingID: number;
 

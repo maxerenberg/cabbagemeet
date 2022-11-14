@@ -42,78 +42,65 @@ export const {
 } = replacedApi;
 
 export const enhancedApi = replacedApi.enhanceEndpoints({
-  addTagTypes: ['me', 'createdMeetings', 'respondedMeetings', 'currentMeeting'],
+  addTagTypes: ['createdMeetings', 'respondedMeetings'],
   endpoints: {
     login: {
-      invalidatesTags: ['me'],
       onQueryStarted: loginOrSignup_onQueryStarted,
     },
     signup: {
-      invalidatesTags: ['me'],
       onQueryStarted: loginOrSignup_onQueryStarted,
     },
     logout: {
-      invalidatesTags: ['me'],
       onQueryStarted: logoutOrDeleteAccount_onQueryStarted,
     },
     deleteUser: {
-      invalidatesTags: ['me'],
       onQueryStarted: logoutOrDeleteAccount_onQueryStarted,
     },
     getSelfInfo: {
-      providesTags: ['me'],
       onQueryStarted: getSelfInfo_onQueryStarted,
     },
     editUser: {
-      invalidatesTags: ['me'],
       onQueryStarted: editUser_onQueryStarted,
     },
     confirmLinkGoogleAccount: {
-      invalidatesTags: ['me'],
       onQueryStarted: editUser_onQueryStarted,
     },
     unlinkGoogleCalendar: {
-      invalidatesTags: ['me'],
       onQueryStarted: editUser_onQueryStarted,
     },
     getMeeting: {
-      providesTags: ['currentMeeting'],
       onQueryStarted: getMeeting_onQueryStarted,
     },
     addGuestRespondent: {
-      //invalidatesTags: ['currentMeeting'],
       onQueryStarted: upsertMeeting_onQueryStarted,
     },
     putSelfRespondent: {
-      //invalidatesTags: ['currentMeeting'],
       onQueryStarted: upsertMeeting_onQueryStarted,
     },
     updateAvailabilities: {
-      //invalidatesTags: ['currentMeeting'],
       onQueryStarted: upsertMeeting_onQueryStarted,
     },
     deleteRespondent: {
-      //invalidatesTags: ['currentMeeting'],
       onQueryStarted: upsertMeeting_onQueryStarted,
     },
     createMeeting: {
-      invalidatesTags: ['createdMeetings', 'respondedMeetings', /* 'currentMeeting' */],
+      invalidatesTags: ['createdMeetings', 'respondedMeetings'],
       onQueryStarted: upsertMeeting_onQueryStarted,
     },
     editMeeting: {
-      invalidatesTags: ['createdMeetings', 'respondedMeetings', /* 'currentMeeting' */],
+      invalidatesTags: ['createdMeetings', 'respondedMeetings'],
       onQueryStarted: upsertMeeting_onQueryStarted,
     },
     deleteMeeting: {
-      invalidatesTags: ['createdMeetings', 'respondedMeetings', /* 'currentMeeting' */],
+      invalidatesTags: ['createdMeetings', 'respondedMeetings'],
       onQueryStarted: deleteMeeting_onQueryStarted,
     },
     scheduleMeeting: {
-      invalidatesTags: ['createdMeetings', 'respondedMeetings', /* 'currentMeeting' */],
+      invalidatesTags: ['createdMeetings', 'respondedMeetings'],
       onQueryStarted: upsertMeeting_onQueryStarted,
     },
     unscheduleMeeting: {
-      invalidatesTags: ['createdMeetings', 'respondedMeetings', /* 'currentMeeting' */],
+      invalidatesTags: ['createdMeetings', 'respondedMeetings'],
       onQueryStarted: upsertMeeting_onQueryStarted,
     },
     getCreatedMeetings: {

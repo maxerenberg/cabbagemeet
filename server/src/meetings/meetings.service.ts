@@ -25,26 +25,14 @@ export default class MeetingsService {
     return meeting;
   }
 
-  async getMeetingWithRespondents(meetingID: number): Promise<Meeting | null> {
-    return await this.meetingsRepository
+  getMeetingWithRespondents(meetingID: number): Promise<Meeting | null> {
+    return this.meetingsRepository
       .createQueryBuilder()
       .leftJoin('Meeting.Respondents', 'MeetingRespondent')
       .leftJoin('MeetingRespondent.User', 'User')
       .select(['Meeting', 'MeetingRespondent', 'User.ID', 'User.Name'])
       .where('Meeting.ID = :meetingID', {meetingID})
       .getOne();
-  }
-
-  async getMeetingTentativeDates(meetingID: number): Promise<string[]> {
-    const meeting = await this.meetingsRepository
-      .createQueryBuilder()
-      .select(['Meeting.TentativeDates'])
-      .where('Meeting.ID = :meetingID', {meetingID})
-      .getOne();
-    if (!meeting) {
-      throw new NoSuchMeetingError();
-    }
-    return JSON.parse(meeting.TentativeDates);
   }
 
   async updateMeeting(meetingID: number, meetingInfo: DeepPartial<Meeting>): Promise<Meeting> {

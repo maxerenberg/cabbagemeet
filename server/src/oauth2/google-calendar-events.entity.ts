@@ -21,15 +21,15 @@ export default class GoogleCalendarEvents {
   @Column()
   Events: string;
 
-  // The date used in the timeMin parameter of the previous API request
+  // The timeMin parameter used in the previous API request
   // See https://developers.google.com/calendar/api/v3/reference/events/list#parameters
   @Column()
-  MeetingMinDate: string;
+  PrevTimeMin: string;
 
-  // The date used in the timeMax parameter of the previous API request
+  // The timeMax parameter used in the previous API request
   // See https://developers.google.com/calendar/api/v3/reference/events/list#parameters
   @Column()
-  MeetingMaxDate: string;
+  PrevTimeMax: string;
 
   // See https://developers.google.com/calendar/api/guides/sync
   @Column({nullable: true})

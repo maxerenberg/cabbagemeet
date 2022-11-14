@@ -1,14 +1,14 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useContext, useEffect, useRef, useState } from 'react';
 import Form from 'react-bootstrap/Form';
 import { Link, useNavigate } from 'react-router-dom';
 import BottomOverlay from 'components/BottomOverlay';
 import ContinueWithGoogleButton from 'components/ContinueWithGoogleButton';
 import { useToast } from 'components/Toast';
 import styles from './Signup.module.css';
-import historyHelper from 'utils/historyHelper';
 import { getReqErrorMessage } from 'utils/requests.utils';
 import ButtonWithSpinner from './ButtonWithSpinner';
 import { useSignupMutation } from 'slices/api';
+import { HistoryContext } from './HistoryProvider';
 
 export default function Signup() {
   return (
@@ -27,6 +27,9 @@ function SignupForm() {
   const nameRef = useRef<HTMLInputElement>(null);
   const emailRef = useRef<HTMLInputElement>(null);
   const passwordRef = useRef<HTMLInputElement>(null);
+  const {lastNonAuthPath} = useContext(HistoryContext);
+  // Ref is used to avoid triggering a useEffect hook twice
+  const lastNonAuthPathRef = useRef('/');
   let onSubmit: React.FormEventHandler<HTMLFormElement> | undefined;
   const submitBtnDisabled = isLoading;
   if (!submitBtnDisabled) {
@@ -45,6 +48,8 @@ function SignupForm() {
     };
   }
 
+  useEffect(() => { lastNonAuthPathRef.current = lastNonAuthPath; }, [lastNonAuthPath]);
+
   useEffect(() => {
     if (isError) {
       showToast({
@@ -52,7 +57,7 @@ function SignupForm() {
         msgType: 'failure',
       });
     } else if (isSuccess) {
-      navigate(historyHelper.getLastNonAuthPath());
+      navigate(lastNonAuthPathRef.current);
     }
   }, [isError, error, isSuccess, navigate, showToast]);
 

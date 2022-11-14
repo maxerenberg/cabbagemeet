@@ -114,6 +114,7 @@ export class MeetingsController {
     if (meeting.CreatorID && (!maybeUser || maybeUser.ID !== meeting.CreatorID)) {
       throw new ForbiddenException('You must be logged in as the creator of this meeting.');
     }
+    return meeting;
   }
 
   @ApiOperation({
@@ -178,12 +179,27 @@ export class MeetingsController {
     @Body() body: EditMeetingDto,
     @MaybeAuthUser() maybeUser: User | null,
   ): Promise<MeetingResponse> {
-    await this.checkIfMeetingExistsAndClientIsAllowedToModifyIt(meetingID, maybeUser);
-    const updatedInfo = meetingDtoToMeetingEntity(body);
-    if (Object.keys(updatedInfo).length === 0) {
+    const meeting = await this.checkIfMeetingExistsAndClientIsAllowedToModifyIt(meetingID, maybeUser);
+    const partialUpdate = meetingDtoToMeetingEntity(body);
+    if (Object.keys(partialUpdate).length === 0) {
       throw new BadRequestException('At least one property must be specified');
     }
-    const meeting = await this.meetingsService.updateMeeting(meetingID, updatedInfo);
+    const updatedMeeting = await this.meetingsService.updateMeeting(meetingID, partialUpdate);
+    if (
+      updatedMeeting.ScheduledStartDateTime !== null
+      && updatedMeeting.ScheduledEndDateTime !== null
+      && (
+        meeting.Name !== updatedMeeting.Name
+        || meeting.About !== updatedMeeting.About
+      )
+    ) {
+      // All of the respondents' Google calendars need to be updated.
+      // Since this could take a long time, and we do not want to block the
+      // client for too long, we do not 'await' the promise below.
+      this.oauth2Service.google_tryCreateOrUpdateEventsForMeeting(
+        meeting, meeting.ScheduledStartDateTime, meeting.ScheduledEndDateTime
+      );
+    }
     return meetingToMeetingResponse(meeting, maybeUser);
   }
 
@@ -211,12 +227,12 @@ export class MeetingsController {
       ScheduledEndDateTime: body.endDateTime,
     };
     const meeting = await this.meetingsService.updateMeeting(meetingID, updatedInfo);
-    if (maybeUser) {
-      // Update the user's external calendars, if necessary
-      await this.oauth2Service.google_createEventForMeeting(
-        maybeUser.ID, meetingID, body.startDateTime, body.endDateTime
-      );
-    }
+    // We need to add the meeting to all of the respondents' Google calendars.
+    // Since this could take a long time, and we do not want to block the
+    // client for too long, we do not 'await' the promise below.
+    this.oauth2Service.google_tryCreateOrUpdateEventsForMeeting(
+      meeting, body.startDateTime, body.endDateTime
+    );
     return meetingToMeetingResponse(meeting, maybeUser);
   }
 
@@ -239,10 +255,10 @@ export class MeetingsController {
       ScheduledEndDateTime: null,
     };
     const meeting = await this.meetingsService.updateMeeting(meetingID, updatedInfo);
-    if (maybeUser) {
-      // Update the user's external calendars, if necessary
-      await this.oauth2Service.google_deleteEventForMeeting(maybeUser.ID, meetingID);
-    }
+    // We need to delete the meeting from all of the respondents' Google calendars.
+    // Since this could take a long time, and we do not want to block the
+    // client for too long, we do not 'await' the promise below.
+    this.oauth2Service.google_tryDeleteEventsForMeeting(meetingID);
     return meetingToMeetingResponse(meeting, maybeUser);
   }
 
@@ -261,6 +277,14 @@ export class MeetingsController {
     @MaybeAuthUser() maybeUser: User | null,
   ): Promise<void> {
     await this.checkIfMeetingExistsAndClientIsAllowedToModifyIt(meetingID, maybeUser);
+    // This meeting needs to be deleted from all of the respondents' Google calendars.
+    // We need to wait until this runs to completion or else the row in
+    // the GoogleCalendarCreatedEvents table might be deleted prematurely
+    // (due to cascading deletions).
+    // Unfortunately this might take a long time, but since deleting a meeting is a
+    // relatively infrequent operation, it should be acceptable. The use of
+    // Promise.allSettled() in the OAuth2Service should hopefully speed things up.
+    await this.oauth2Service.google_tryDeleteEventsForMeeting(meetingID);
     await this.meetingsService.deleteMeeting(meetingID);
   }
 
@@ -304,6 +328,9 @@ export class MeetingsController {
       await this.meetingsService.addRespondent(meetingID, body.availabilities, user.ID);
     }
     const updatedMeeting = await this.meetingsService.getMeetingWithRespondents(meetingID);
+    // Add the meeting to the user's Google calendar, if applicable.
+    // The promise below is not awaited to speed up the response.
+    this.oauth2Service.google_tryCreateEventForMeeting(user.ID, updatedMeeting);
     return meetingToMeetingResponse(updatedMeeting!, user);
   }
 
@@ -346,6 +373,12 @@ export class MeetingsController {
     @MaybeAuthUser() maybeUser: User | null,
   ): Promise<MeetingResponse> {
     await this.checkIfRespondentExistsAndClientIsAllowedToModifyThem(respondentID, maybeUser);
+    if (maybeUser) {
+      // We need to wait until this runs to completion or else the row in
+      // the GoogleCalendarCreatedEvents table might be deleted prematurely
+      // (due to cascading deletions).
+      await this.oauth2Service.google_tryDeleteEventForMeeting(maybeUser.ID, meetingID);
+    }
     await this.meetingsService.deleteRespondent(respondentID);
     const updatedMeeting = await this.meetingsService.getMeetingWithRespondents(meetingID);
     return meetingToMeetingResponse(updatedMeeting!, maybeUser);

@@ -16,6 +16,7 @@ import 'common/common.css';
 import { useAppSelector } from 'app/hooks';
 import DayPicker from 'components/DayPicker/DayPicker';
 import ForgotPassword from 'components/ForgotPassword';
+import HistoryProvider from 'components/HistoryProvider';
 import HowItWorksPage from 'components/HowItWorksPage';
 import Login from 'components/Login';
 import MeetingForm from 'components/MeetingForm';
@@ -34,24 +35,26 @@ import ConfirmLinkExternalCalendar from 'components/ConfirmLinkExternalCalendar'
 export default function App() {
   return (
     <BrowserRouter>
-      <Routes>
-        <Route path="/" element={<AppRoot />}>
-          <Route index element={<DayPicker />} />
-          <Route path="how-it-works" element={<HowItWorksPage />} />
-          <Route path="create" element={<MeetingForm />} />
-          <Route path="m/:id" element={<Meeting />} />
-          <Route path="signup" element={<Signup />} />
-          <Route path="login" element={<Login />} />
-          <Route path="confirm-link-google-account" element={<ConfirmLinkExternalCalendar provider="google" />} />
-          <Route path="forgot-password" element={<ForgotPassword />} />
-          <Route path="error" element={<ErrorPage />} />
-          <Route path="me">
-            <Route index element={<Profile />} />
-            <Route path="settings" element={<Settings />} />
+      <HistoryProvider>
+        <Routes>
+          <Route path="/" element={<AppRoot />}>
+            <Route index element={<DayPicker />} />
+            <Route path="how-it-works" element={<HowItWorksPage />} />
+            <Route path="create" element={<MeetingForm />} />
+            <Route path="m/:id" element={<Meeting />} />
+            <Route path="signup" element={<Signup />} />
+            <Route path="login" element={<Login />} />
+            <Route path="confirm-link-google-account" element={<ConfirmLinkExternalCalendar provider="google" />} />
+            <Route path="forgot-password" element={<ForgotPassword />} />
+            <Route path="error" element={<ErrorPage />} />
+            <Route path="me">
+              <Route index element={<Profile />} />
+              <Route path="settings" element={<Settings />} />
+            </Route>
           </Route>
-        </Route>
-        {/* TODO: use custom 404 page */}
-      </Routes>
+          {/* TODO: use custom 404 page */}
+        </Routes>
+      </HistoryProvider>
     </BrowserRouter>
   );
 }
@@ -62,7 +65,6 @@ function AppRoot() {
   useEffect(() => {
     if (isError) {
       showToast({
-        // TODO: create helper function to serialize error message
         msg: `Failed to get user info: ${getReqErrorMessage(error!)}`,
         msgType: 'failure',
       });

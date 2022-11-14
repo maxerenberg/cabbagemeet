@@ -19,6 +19,7 @@
 .weeklyview__bodycell {
   user-select: none;
   border-right: 1px solid lightgray;
+  text-align: left;
 }
 
 .weeklyview__bodycell_firstrow {

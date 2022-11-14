@@ -282,9 +282,9 @@ const Cell = React.memo(function Cell({
 }) {
   const selMode = useAppSelector(selectSelMode);
   const isSelected = useAppSelector(state => !!selectSelectedTimes(state)[dateTime]);
-  const {meetingIsScheduled} = useGetCurrentMeetingWithSelector(
-    ({data: meeting}) => ({meetingIsScheduled: meeting?.scheduledDateTimes !== undefined})
-  )
+  // const {meetingIsScheduled} = useGetCurrentMeetingWithSelector(
+  //   ({data: meeting}) => ({meetingIsScheduled: meeting?.scheduledDateTimes !== undefined})
+  // );
   const mouseStateType = useAppSelector((state) => selectMouseState(state)?.type);
   const isInMouseSelectionArea = useAppSelector((state) => {
     const mouseState = selectMouseState(state);
@@ -346,14 +346,13 @@ const Cell = React.memo(function Cell({
   }
 
   let externalEventBox: ReactElement<HTMLDivElement> | undefined;
-  // FIXME: this is getting too complicated
   if (
     (
       selMode.type === 'addingRespondent'
       || selMode.type === 'editingRespondent'
     )
     && externalEventName !== undefined
-    && !meetingIsScheduled
+    //&& !meetingIsScheduled
   ) {
     externalEventBox = (
       <div className="weeklyview__bodycell_external_event">

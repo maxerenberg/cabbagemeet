@@ -1,11 +1,11 @@
-import { useEffect } from 'react';
+import { useContext, useEffect } from 'react';
 import GoogleLogo from 'assets/google-g-logo.svg';
 import { useLoginWithGoogleMutation, useSignupWithGoogleMutation } from 'slices/api';
 import { useToast } from 'components/Toast';
-import historyHelper from 'utils/historyHelper';
 import { getReqErrorMessage } from 'utils/requests.utils';
 import ButtonWithSpinner from './ButtonWithSpinner';
 import { createAndStoreSessionNonce } from 'utils/auth.utils';
+import { HistoryContext } from './HistoryProvider';
 
 // TODO: get feature flags from server so that we don't display this button
 // if Google OAuth2 isn't enabled
@@ -32,18 +32,19 @@ export default function ContinueWithGoogleButton({reason}: {reason: 'signup' | '
     }
   ] = useSignupWithGoogleMutation();
   const {showToast} = useToast();
+  const {lastNonAuthPath} = useContext(HistoryContext);
   let onClick: React.MouseEventHandler<HTMLButtonElement> | undefined;
   if (reason === 'login') {
     onClick = async () => {
       login({
-        post_redirect: historyHelper.getLastNonAuthPath(),
+        post_redirect: lastNonAuthPath,
         nonce: await createAndStoreSessionNonce(),
       });
     };
   } else if (reason === 'signup') {
     onClick = async () => {
       signup({
-        post_redirect: historyHelper.getLastNonAuthPath(),
+        post_redirect: lastNonAuthPath,
         nonce: await createAndStoreSessionNonce(),
       });
     };
