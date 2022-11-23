@@ -11,14 +11,20 @@ export default class User {
   @Column({nullable: true})
   PasswordHash?: string;
 
+  // Seconds since Unix epoch
+  // If a token's 'iat' value is less than this number, then the token
+  // is invalid
+  @Column({nullable: true})
+  TimestampOfEarliestValidToken: number;
+
   @Column()
   Name: string;
 
-  @Index({ unique: true })
+  @Index({unique: true})
   @Column()
   Email: string;
 
-  @Column({ default: true })
+  @Column({default: true})
   IsSubscribedToNotifications: boolean;
 
   @OneToMany(() => MeetingRespondent, respondent => respondent.User)

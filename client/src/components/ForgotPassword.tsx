@@ -1,26 +1,15 @@
 import React, { useEffect, useState } from 'react';
 import Form from 'react-bootstrap/Form';
-import { useAppDispatch, useAppSelector } from 'app/hooks';
 import BottomOverlay from 'components/BottomOverlay';
 import { useToast } from 'components/Toast';
-import {
-  resetPassword,
-  selectResetPasswordError,
-  selectResetPasswordState,
-  setResetPasswordStateToIdle,
- } from 'slices/resetPassword';
- import styles from './ForgotPassword.module.css';
+import styles from './ForgotPassword.module.css';
 import ButtonWithSpinner from './ButtonWithSpinner';
+import { useResetPasswordMutation } from 'slices/api';
+import { getReqErrorMessage } from 'utils/requests.utils';
 
  export default function ForgotPassword() {
   const [email, setEmail] = useState('');
   const [resetPasswordAtLeastOnce, setResetPasswordAtLeastOnce] = useState(false);
-  const dispatch = useAppDispatch();
-
-  // FIXME: this is ugly, figure out where/when to reset all of the Redux state
-  useEffect(() => {
-    dispatch(setResetPasswordStateToIdle());
-  }, [dispatch]);
 
   return (
     <div className="d-flex justify-content-center">
@@ -43,19 +32,18 @@ function ForgotPasswordForm({
   setResetPasswordAtLeastOnce: (val: boolean) => void,
 }) {
   const [validated, setValidated] = useState(false);
-  const dispatch = useAppDispatch();
-  const resetPasswordState = useAppSelector(selectResetPasswordState);
-  const resetPasswordError = useAppSelector(selectResetPasswordError);
+
   const { showToast } = useToast();
-  let onSubmit: React.FormEventHandler<HTMLFormElement> | undefined;
-  const canSendRequest = resetPasswordState === 'idle';
+  const [resetPassword, {isUninitialized, isSuccess, isError, error}] = useResetPasswordMutation();
+  const canSendRequest = isUninitialized;
   const submitBtnDisabled = !canSendRequest;
+  let onSubmit: React.FormEventHandler<HTMLFormElement> | undefined;
   if (canSendRequest) {
     onSubmit = (ev) => {
       ev.preventDefault();
       const form = ev.currentTarget;
       if (form.checkValidity()) {
-        dispatch(resetPassword({email}));
+        resetPassword({email});
       } else {
         setValidated(true);
       }
@@ -63,16 +51,15 @@ function ForgotPasswordForm({
   }
 
   useEffect(() => {
-    if (resetPasswordState === 'fulfilled') {
+    if (isSuccess) {
       setResetPasswordAtLeastOnce(true);
-    } else if (resetPasswordState === 'rejected') {
+    } else if (isError) {
       showToast({
-        msg: `An error occurred: ${resetPasswordError!.message || 'unknown'}`,
+        msg: `An error occurred: ${getReqErrorMessage(error!)}`,
         msgType: 'failure',
       });
-      dispatch(setResetPasswordStateToIdle());
     }
-  }, [resetPasswordState, setResetPasswordAtLeastOnce, resetPasswordError, dispatch, showToast]);
+  }, [isSuccess, isError, error, setResetPasswordAtLeastOnce, showToast]);
 
   return (
     <Form noValidate className={styles.forgotPasswordForm} {...{validated, onSubmit}}>
@@ -125,18 +112,20 @@ function ResetButtons({ disabled } : { disabled: boolean }) {
   )
 }
 
-function PasswordResetConfirmation({ email }: { email: string }) {
-  const dispatch = useAppDispatch();
-  const resetPasswordState = useAppSelector(selectResetPasswordState);
-  const resetPasswordError = useAppSelector(selectResetPasswordError);
+function PasswordResetConfirmation({
+  email,
+}: {
+  email: string,
+}) {
   const { showToast } = useToast();
-  const canSendRequest = resetPasswordState === 'idle' || resetPasswordState === 'fulfilled';
+  const [resetPassword, {isUninitialized, isSuccess, isError, error}] = useResetPasswordMutation();
+  const canSendRequest = isUninitialized || isSuccess;
   const submitBtnDisabled = !canSendRequest;
   const [clickedResendAtLeastOnce, setClickedResendAtLeastOnce] = useState(false);
   let onClick: React.MouseEventHandler | undefined;
   if (canSendRequest) {
     onClick = () => {
-      dispatch(resetPassword({email}));
+      resetPassword({email});
       setClickedResendAtLeastOnce(true);
     };
   }
@@ -145,27 +134,26 @@ function PasswordResetConfirmation({ email }: { email: string }) {
     if (!clickedResendAtLeastOnce) {
       return;
     }
-    if (resetPasswordState === 'rejected') {
+    if (isError) {
       showToast({
-        msg: `An error occurred: ${resetPasswordError!.message || 'unknown'}`,
+        msg: `An error occurred: ${getReqErrorMessage(error!)}`,
         msgType: 'failure',
       });
-      dispatch(setResetPasswordStateToIdle());
-    } else if (resetPasswordState === 'fulfilled') {
+    } else if (isSuccess) {
       showToast({
         msg: 'Request successfully submitted',
         msgType: 'success',
         autoClose: true,
       });
     }
-  }, [clickedResendAtLeastOnce, resetPasswordState, resetPasswordError, dispatch, showToast]);
+  }, [clickedResendAtLeastOnce, isSuccess, isError, error, showToast]);
 
   return (
     <div className={styles.passwordResetConfirmation}>
       <h4 className="mb-5">Email sent!</h4>
       <p>
         If the account exists, you'll receive an email with a link to
-        reset your password. If more than 5 minutes have passed and you
+        reset your password. If more than 10 minutes have passed and you
         still haven't received it, press the Resend button below to receive
         a new email.
       </p>

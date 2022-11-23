@@ -49,11 +49,13 @@ export default function Profile() {
   );
 };
 
+// TODO: add button to sign out everywhere
+
 function Heading() {
   const [logout, {isLoading, isError, error}] = useLogoutMutation();
   const {data: userInfo} = useGetSelfInfoIfTokenIsPresent();
   const dispatch = useAppDispatch();
-  const onSignoutClick = () => logout();
+  const onSignoutClick = () => logout(false);
   const { showToast } = useToast();
 
   useEffect(() => {

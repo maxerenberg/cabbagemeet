@@ -15,6 +15,8 @@ import type {
   UserResponseWithToken,
   DeleteMeetingApiResponse,
   GetSelfInfoApiResponse,
+  ConfirmPasswordResetApiResponse,
+  ConfirmPasswordResetApiArg,
 } from './api';
 import { setCurrentMeetingID } from './currentMeeting';
 
@@ -32,6 +34,17 @@ const replacedApi = api.injectEndpoints({
       query: () => ({ url: `/api/me/responded-meetings` }),
       transformResponse: transformMeetingsShortResponse,
     }),
+    confirmPasswordReset: build.mutation<
+      ConfirmPasswordResetApiResponse,
+      ConfirmPasswordResetApiArg & {token: string}
+    >({
+      query: (queryArg) => ({
+        url: `/api/confirm-password-reset`,
+        method: "POST",
+        body: {password: queryArg.password},
+        headers: {authorization: `Bearer ${queryArg.token}`},
+      }),
+    }),
   }),
   overrideExisting: true,
 });
@@ -39,6 +52,7 @@ export const {
   useGetMeetingQuery,
   useGetCreatedMeetingsQuery,
   useGetRespondedMeetingsQuery,
+  useConfirmPasswordResetMutation,
 } = replacedApi;
 
 export const enhancedApi = replacedApi.enhanceEndpoints({
@@ -145,7 +159,7 @@ async function getSelfInfo_onQueryStarted(
   try {
     await queryFulfilled;
   } catch (err: any) {
-    console.error(err);
+    console.warn(err);
     dispatch(removeToken());
   }
 }

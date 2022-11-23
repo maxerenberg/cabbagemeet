@@ -31,6 +31,7 @@ import { useExtractTokenFromQueryParams, useGetSelfInfoIfTokenIsPresent } from '
 import { getReqErrorMessage } from 'utils/requests.utils';
 import ErrorPage from 'components/ErrorPage';
 import ConfirmLinkExternalCalendar from 'components/ConfirmLinkExternalCalendar';
+import ConfirmPasswordReset from 'components/ConfirmPasswordReset';
 
 export default function App() {
   return (
@@ -46,6 +47,7 @@ export default function App() {
             <Route path="login" element={<Login />} />
             <Route path="confirm-link-google-account" element={<ConfirmLinkExternalCalendar provider="google" />} />
             <Route path="forgot-password" element={<ForgotPassword />} />
+            <Route path="confirm-password-reset" element={<ConfirmPasswordReset />} />
             <Route path="error" element={<ErrorPage />} />
             <Route path="me">
               <Route index element={<Profile />} />

@@ -13,3 +13,10 @@ export function encodeQueryParams(params: Record<string, string>): string {
     .map(([key, value]) => key + '=' + encodeURIComponent(value))
     .join('&');
 }
+
+export function stripTrailingSlash(s: string): string {
+  if (s.endsWith('/')) {
+    return s.substring(0, s.length - 1);
+  }
+  return s;
+}

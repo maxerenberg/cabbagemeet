@@ -1,16 +1,25 @@
 import {
   Controller,
   Post,
-  Req,
   Body,
   BadRequestException,
   UnauthorizedException,
   NotFoundException,
   HttpCode,
   HttpStatus,
+  Query,
+  ParseBoolPipe,
+  UseGuards,
 } from '@nestjs/common';
-import { ApiResponse, ApiBadRequestResponse, ApiOperation, ApiTags, ApiUnauthorizedResponse } from '@nestjs/swagger';
-import { Request } from 'express';
+import {
+  ApiResponse,
+  ApiBadRequestResponse,
+  ApiOperation,
+  ApiTags,
+  ApiUnauthorizedResponse,
+  ApiQuery,
+  ApiBearerAuth,
+} from '@nestjs/swagger';
 import {
   BadRequestResponse,
   UnauthorizedResponse,
@@ -21,24 +30,25 @@ import CustomJwtService from '../custom-jwt/custom-jwt.service';
 import { UserResponseWithToken } from '../users/user-response';
 import User from '../users/user.entity';
 import { UserToUserResponse } from '../users/users.controller';
-import { UserAlreadyExistsError } from '../users/users.service';
+import UsersService, { UserAlreadyExistsError } from '../users/users.service';
 import AuthService from './auth.service';
 import LocalLoginDto from './local-login.dto';
 import LocalSignupDto from './local-signup.dto';
-import OAuth2Service, {OAuth2Provider, OAuth2Reason, OAuth2NotConfiguredError} from 'src/oauth2/oauth2.service';
-import OAuth2ConsentPostRedirectDto from 'src/oauth2/oauth2-consent-post-redirect.dto';
+import OAuth2Service, {
+  OAuth2Provider,
+  OAuth2Reason,
+  OAuth2NotConfiguredError,
+} from '../oauth2/oauth2.service';
+import OAuth2ConsentPostRedirectDto from '../oauth2/oauth2-consent-post-redirect.dto';
+import ResetPasswordDto from './reset-password.dto';
+import JwtAuthGuard from './jwt-auth.guard';
+import { AuthUser } from './auth-user.decorator';
+import ConfirmResetPasswordDto from './ConfirmResetPassword.dto';
 
 const setTokenDescription = (
   "A token will be set in the response body which must be included in the Authorization"
   + " header in future requests, like so: `Authorization: Bearer eyJhbGciOiJIUzI1NiI...`"
 );
-
-export function UserToUserResponseWithToken(user: User, jwtService: CustomJwtService): UserResponseWithToken {
-  return {
-    ...UserToUserResponse(user),
-    token: jwtService.serializeUserToJwt(user),
-  };
-}
 
 @ApiTags('auth')
 @Controller()
@@ -47,7 +57,17 @@ export class AuthController {
     private authService: AuthService,
     private jwtService: CustomJwtService,
     private oauth2Service: OAuth2Service,
+    private usersService: UsersService,
   ) {}
+
+  private async createTokenAndUpdateSavedTimestamp(user: User) {
+    const {payload, token} = this.jwtService.serializeUserToJwt(user);
+    await this.usersService.updateTimestamp(user, payload.iat);
+    return {
+      ...UserToUserResponse(user),
+      token,
+    };
+  }
 
   // TODO: email verification
   @ApiOperation({
@@ -67,7 +87,7 @@ export class AuthController {
       }
       throw err;
     }
-    return UserToUserResponseWithToken(user, this.jwtService);
+    return this.createTokenAndUpdateSavedTimestamp(user);
   }
 
   @ApiOperation({
@@ -84,7 +104,7 @@ export class AuthController {
     if (user === null) {
       throw new UnauthorizedException();
     }
-    return UserToUserResponseWithToken(user, this.jwtService);
+    return this.createTokenAndUpdateSavedTimestamp(user);
   }
 
   @ApiOperation({
@@ -92,10 +112,56 @@ export class AuthController {
     description: 'Destroy the session of the user who is currently logged in.',
     operationId: 'logout',
   })
+  @ApiQuery({
+    name: 'everywhere',
+    description: 'If true, the user will be logged out everywhere',
+    required: false,
+    type: Boolean,
+  })
+  @ApiBearerAuth()
   @Post('logout')
   @HttpCode(HttpStatus.NO_CONTENT)
-  async signout(): Promise<void> {
-    // TODO: add option to signout of all sessions everywhere (use iat claim in JWT)
+  @UseGuards(JwtAuthGuard)
+  async signout(
+    @Query('everywhere', ParseBoolPipe) logoutEverywhere: boolean,
+    @AuthUser() user: User,
+  ): Promise<void> {
+    if (logoutEverywhere) {
+      await this.usersService.invalidateTimestamp(user.ID);
+    }
+  }
+
+  @ApiOperation({
+    summary: 'Reset password',
+    description: (
+      'Reset the password of the user with the given email. A confirmation link ' +
+      'will be sent to the given address.'
+    ),
+    operationId: 'resetPassword',
+  })
+  @Post('reset-password')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  async resetPassword(@Body() body: ResetPasswordDto): Promise<void> {
+    await this.authService.resetPassword(body.email);
+  }
+
+  @ApiOperation({
+    summary: 'Confirm password reset',
+    description: (
+      'Confirm a new password for the given user. The token in the Authorization ' +
+      'header is expected to be the same as that sent in the confirmation email.'
+    ),
+    operationId: 'confirmPasswordReset',
+  })
+  @ApiBearerAuth()
+  @Post('confirm-password-reset')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @UseGuards(JwtAuthGuard)
+  async confirmResetPassword(
+    @AuthUser() user: User,
+    @Body() body: ConfirmResetPasswordDto,
+  ) {
+    await this.authService.confirmResetPassword(user, body.password);
   }
 
   private redirectToGoogle(reason: OAuth2Reason, postRedirect: string, nonce?: string): string {

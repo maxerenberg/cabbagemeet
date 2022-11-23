@@ -51,8 +51,8 @@ export class Oauth2Controller {
 
   private redirectWithToken(res: Response, redirectURL: string, nonce: string | undefined, user: User) {
     // We need to "push" the response to the client
-    const serializedUserJwt = this.jwtService.serializeUserToJwt(user);
-    const urlParams: Record<string, string> =  {token: serializedUserJwt};
+    const {token} = this.jwtService.serializeUserToJwt(user);
+    const urlParams: Record<string, string> = {token};
     if (nonce) {
       urlParams.nonce = nonce;
     }
@@ -102,7 +102,7 @@ export class Oauth2Controller {
           // The user signed up with this Gmail account, but never linked the account
           // via the settings page. We need them to confirm whether they want
           // to link the accounts together.
-          const serializedUserJwt = this.jwtService.serializeUserToJwt(user);
+          const {token} = this.jwtService.serializeUserToJwt(user);
           // To avoid showing OAuth2 tokens in the browser URL bar, we encrypt the
           // entity first
           const {
@@ -112,7 +112,7 @@ export class Oauth2Controller {
           } = await this.jwtService.encryptText(JSON.stringify(pendingOAuth2Entity!));
           const urlParams: Record<string, string> = {
             postRedirect: state.postRedirect,
-            token: serializedUserJwt,
+            token,
             encryptedEntity: encryptedEntity.toString('base64url'),
             iv: iv.toString('base64url'),
             salt: salt.toString('base64url'),

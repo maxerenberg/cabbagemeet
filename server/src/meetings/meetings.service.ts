@@ -6,6 +6,8 @@ import Meeting from './meeting.entity';
 
 export class NoSuchMeetingError extends Error {}
 
+// TODO: delete meetings after their max. tentative date or scheduled date (cron job)
+
 @Injectable()
 export default class MeetingsService {
   constructor(

@@ -1,6 +1,7 @@
 import { BadRequestException, INestApplication, ValidationPipe } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { NestFactory } from '@nestjs/core';
+import { NestExpressApplication } from '@nestjs/platform-express';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { AppModule } from './app.module';
 import { EnvironmentVariables } from './env.validation';
@@ -18,7 +19,7 @@ function setupSwagger(app: INestApplication) {
 // TODO: use helmet in prod
 
 async function bootstrap() {
-  const app = await NestFactory.create(AppModule);
+  const app = await NestFactory.create<NestExpressApplication>(AppModule);
   app.setGlobalPrefix('api', {
     exclude: ['redirect/google']
   });
@@ -36,6 +37,10 @@ async function bootstrap() {
   );
   setupSwagger(app);
   const configService = app.get(ConfigService<EnvironmentVariables, true>);
+  const trustProxy = configService.get('TRUST_PROXY', {infer: true});
+  if (trustProxy) {
+    app.set('trust proxy', true);
+  }
   const port = configService.get('PORT', {infer: true});
   const host = configService.get('HOST', {infer: true});
   await app.listen(port, host);

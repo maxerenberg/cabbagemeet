@@ -60,6 +60,9 @@ export class UsersController {
     return UserToUserResponse(user);
   }
 
+  // TODO: create separate endpoint for user to edit their email address
+  // (requires email address validation + rate limiting)
+
   @ApiOperation({
     summary: 'Edit user information',
     description: 'Edit information for the user who is currently logged in',

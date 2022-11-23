@@ -2,12 +2,16 @@
 
 import { plainToInstance } from 'class-transformer';
 import {
+  IsBoolean,
+  IsEmail,
   IsIn,
   IsInt,
+  IsNumber,
   IsOptional,
   IsPort,
   IsPositive,
   IsString,
+  IsUrl,
   validateSync,
 } from 'class-validator';
 
@@ -31,12 +35,13 @@ export class EnvironmentVariables {
   // The IP address or hostname to which the listening socket should be bound
   @IsOptional()
   @IsString()
-  HOST?: string = '127.0.0.1';
+  HOST?: string = 'localhost';
 
-  // The public-facing URL of this server. Will be used when creating Google calendar events.
-  @IsOptional()
-  @IsString()
-  PUBLIC_URL?: string = '';
+  // The public-facing URL of this server.
+  // Will be used when creating Google calendar events and sending password
+  // reset emails.
+  @IsUrl({require_tld: false})
+  PUBLIC_URL: string;
 
   @IsOptional()
   @IsString()
@@ -65,6 +70,49 @@ export class EnvironmentVariables {
   @IsOptional()
   @IsString()
   OAUTH2_GOOGLE_REDIRECT_URI?: string;
+
+  // Should be set to true if this app is behind a reverse proxy AND the proxy
+  // has been configured to set the X-Forwarded-For header
+  @IsOptional()
+  @IsBoolean()
+  TRUST_PROXY?: boolean = false;
+
+  @IsOptional()
+  @IsBoolean()
+  VERIFY_SIGNUP_EMAIL_ADDRESS?: boolean = true;
+
+  // Make sure that this is an IP address if it is not resolvable via
+  // an external resolver (e.g. something in /etc/hosts).
+  // See https://nodemailer.com/smtp/ for an explanation.
+  @IsOptional()
+  @IsString()
+  SMTP_HOST?: string;
+
+  @IsOptional()
+  @IsPort()
+  SMTP_PORT?: string;
+
+  @IsOptional()
+  @IsEmail({allow_display_name: false, require_tld: false})
+  SMTP_FROM?: string;
+
+  @IsOptional()
+  @IsString()
+  SMTP_USER?: string;
+
+  @IsOptional()
+  @IsString()
+  SMTP_PASSWORD?: string;
+
+  @IsOptional()
+  @IsNumber()
+  @IsPositive()
+  EMAIL_HOURLY_LIMIT?: number = 20;
+
+  @IsOptional()
+  @IsNumber()
+  @IsPositive()
+  EMAIL_DAILY_LIMIT?: number = 100;
 }
 
 export function validate(

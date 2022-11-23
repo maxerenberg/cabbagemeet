@@ -64,10 +64,7 @@ export default function ConfirmLinkExternalCalendar({provider}: {provider: OAuth
   });
   const btnDisabled = isLoading;
   return (
-    <div style={{
-      width: 'min(100%, 600px)',
-      alignSelf: 'center'
-    }}>
+    <div className="align-self-center" style={{width: 'min(100%, 600px)'}}>
       <div className="d-flex align-items-center justify-content-between">
         <h3 className="mb-0">
           Link your {capitalizedProvider} account

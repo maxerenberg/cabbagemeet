@@ -8,4 +8,4 @@ import Dbconfig from './dbconfig.entity';
   providers: [DbconfigService],
   exports: [DbconfigService],
 })
-export class DbconfigModule {}
+export default class DbconfigModule {}

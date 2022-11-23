@@ -1,7 +1,8 @@
 import { Inject, Injectable } from '@nestjs/common';
 import User from '../users/user.entity';
 import { decryptText, encryptText } from './encryption';
-import JwtStrategy from './jwt.strategy';
+import JwtStrategy, { TokenPurpose } from './jwt.strategy';
+import type { SerializedUserJwt } from './jwt.strategy';
 
 @Injectable()
 export default class CustomJwtService {
@@ -10,8 +11,11 @@ export default class CustomJwtService {
     private jwtStrategy: JwtStrategy,
   ) {}
 
-  serializeUserToJwt(user: User): string {
-    return this.jwtStrategy.serializeUserToJwt(user);
+  serializeUserToJwt(user: User, purpose?: TokenPurpose): {
+    payload: SerializedUserJwt,
+    token: string,
+  } {
+    return this.jwtStrategy.serializeUserToJwt(user, purpose);
   }
 
   // For convenience's sake, we will re-use the JWT secret for encryption.

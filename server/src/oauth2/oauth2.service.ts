@@ -2,17 +2,17 @@ import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import * as jwt from 'jsonwebtoken';
 import { Dispatcher, request } from 'undici';
-import { EnvironmentVariables } from 'src/env.validation';
+import { EnvironmentVariables } from '../env.validation';
 import { InjectRepository } from '@nestjs/typeorm';
 import GoogleOAuth2 from './google-oauth2.entity';
 import { DataSource, DeepPartial, Repository } from 'typeorm';
-import { normalizeDBError, UniqueConstraintFailed } from 'src/database.utils';
-import User from 'src/users/user.entity';
-import { assert, encodeQueryParams } from 'src/misc.utils';
+import { normalizeDBError, UniqueConstraintFailed } from '../database.utils';
+import User from '../users/user.entity';
+import { assert, encodeQueryParams, stripTrailingSlash } from '../misc.utils';
 import { columnsForGetUser } from 'src/users/users.service';
 import type { GoogleOIDCResponse, GoogleDecodedOIDCIDToken, GoogleRefreshTokenResponse, GoogleListEventsResponse, GoogleListEventsResponseItem, GoogleInsertEventResponse } from './oauth2-response-types';
-import { toISOStringUTC, getSecondsSinceUnixEpoch, toISOStringWithTz } from 'src/dates.utils';
-import MeetingsService from 'src/meetings/meetings.service';
+import { toISOStringUTC, getSecondsSinceUnixEpoch, toISOStringWithTz } from '../dates.utils';
+import MeetingsService from '../meetings/meetings.service';
 import GoogleCalendarEvents, { GoogleCalendarEvent } from './google-calendar-events.entity';
 import GoogleCalendarCreatedEvent from './google-calendar-created-event.entity';
 import Meeting from '../meetings/meeting.entity';
@@ -79,13 +79,6 @@ const GOOGLE_API_BASE_URL = 'https://www.googleapis.com';
 const GOOGLE_API_CALENDAR_EVENTS_BASE_URL = `${GOOGLE_API_BASE_URL}/calendar/v3/calendars/primary/events`;
 const MAX_EVENT_RESULTS = 100;
 
-function stripTrailingSlash(s: string): string {
-  if (s.endsWith('/')) {
-    return s.substring(0, s.length - 1);
-  }
-  return s;
-}
-
 function errorIsGoogleCalendarEventNoLongerExists(err: any): boolean {
   return err instanceof OAuth2ErrorResponseError
     && (
@@ -97,6 +90,7 @@ function errorIsGoogleCalendarEventNoLongerExists(err: any): boolean {
 @Injectable()
 export default class OAuth2Service {
   private readonly logger = new Logger(OAuth2Service.name);
+  private readonly publicURL: string;
 
   constructor(
     private configService: ConfigService<EnvironmentVariables, true>,
@@ -106,7 +100,9 @@ export default class OAuth2Service {
     @InjectRepository(GoogleCalendarEvents) private googleCalendarEventsRepository: Repository<GoogleCalendarEvents>,
     @InjectRepository(GoogleCalendarCreatedEvent) private googleCalendarCreatedEventsRepository: Repository<GoogleCalendarCreatedEvent>,
     @InjectRepository(User) private usersRepository: Repository<User>,
-  ) {}
+  ) {
+    this.publicURL = stripTrailingSlash(configService.get('PUBLIC_URL', {infer: true}));
+  }
 
   private getEnvKey<K extends keyof EnvironmentVariables>(key: K): EnvironmentVariables[K] {
     return this.configService.get(key, {infer: true});
@@ -730,13 +726,10 @@ export default class OAuth2Service {
       },
       description: meeting.About,
       summary: meeting.Name,
+      source: {
+        url: `${this.publicURL}/m/${meeting.ID}`,
+      },
     };
-    const publicURL = stripTrailingSlash(this.configService.get('PUBLIC_URL', {infer: true}));
-    if (publicURL) {
-      params.source = {
-        url: `${publicURL}/m/${meeting.ID}`,
-      };
-    }
     let response: GoogleInsertEventResponse | undefined;
     const body = JSON.stringify(params);
     const headers = {'content-type': 'application/json'};

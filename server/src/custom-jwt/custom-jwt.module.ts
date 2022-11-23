@@ -2,7 +2,7 @@ import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { JwtModule } from '@nestjs/jwt';
 import CustomJwtService from './custom-jwt.service';
-import { DbconfigModule } from 'src/dbconfig/dbconfig.module';
+import DbconfigModule from 'src/dbconfig/dbconfig.module';
 import { DbconfigService } from '../dbconfig/dbconfig.service';
 import { EnvironmentVariables } from '../env.validation';
 import JwtStrategy, { getJWTSigningKey } from './jwt.strategy';

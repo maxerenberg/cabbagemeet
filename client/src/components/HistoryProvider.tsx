@@ -3,7 +3,7 @@ import { useLocation } from "react-router-dom";
 
 // The idea is that after a user logs in or signs up, we want to redirect
 // them to the last page they visited *before* the login/signup page.
-const authPaths = ['/signup', '/login'];
+const authPaths = ['/signup', '/login', '/confirm-password-reset'];
 
 export type HistoryContextType = {
   lastNonAuthPath: string;

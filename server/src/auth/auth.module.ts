@@ -5,8 +5,9 @@ import AuthService from './auth.service';
 import UsersModule from '../users/users.module';
 import JwtAuthGuard from './jwt-auth.guard';
 import OptionalJwtAuthGuard from './optional-jwt-auth.guard';
-import CustomJwtModule from 'src/custom-jwt/custom-jwt.module';
-import OAuth2Module from 'src/oauth2/oauth2.module';
+import CustomJwtModule from '../custom-jwt/custom-jwt.module';
+import OAuth2Module from '../oauth2/oauth2.module';
+import MailModule from '../mail/mail.module';
 
 
 @Global()
@@ -16,6 +17,7 @@ import OAuth2Module from 'src/oauth2/oauth2.module';
     CustomJwtModule,
     UsersModule,
     PassportModule,
+    MailModule,
   ],
   providers: [
     AuthService,
@@ -25,4 +27,4 @@ import OAuth2Module from 'src/oauth2/oauth2.module';
   exports: [AuthService],
   controllers: [AuthController],
 })
-export class AuthModule {}
+export default class AuthModule {}

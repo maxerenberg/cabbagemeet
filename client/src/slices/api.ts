@@ -16,7 +16,31 @@ const injectedRtkApi = api.injectEndpoints({
       }),
     }),
     logout: build.mutation<LogoutApiResponse, LogoutApiArg>({
-      query: () => ({ url: `/api/logout`, method: "POST" }),
+      query: (queryArg) => ({
+        url: `/api/logout`,
+        method: "POST",
+        params: { everywhere: queryArg },
+      }),
+    }),
+    resetPassword: build.mutation<
+      ResetPasswordApiResponse,
+      ResetPasswordApiArg
+    >({
+      query: (queryArg) => ({
+        url: `/api/reset-password`,
+        method: "POST",
+        body: queryArg,
+      }),
+    }),
+    confirmPasswordReset: build.mutation<
+      ConfirmPasswordResetApiResponse,
+      ConfirmPasswordResetApiArg
+    >({
+      query: (queryArg) => ({
+        url: `/api/confirm-password-reset`,
+        method: "POST",
+        body: queryArg,
+      }),
     }),
     loginWithGoogle: build.mutation<
       LoginWithGoogleApiResponse,
@@ -194,7 +218,12 @@ export type SignupApiArg = LocalSignupDto;
 export type LoginApiResponse = /** status 200  */ UserResponseWithToken;
 export type LoginApiArg = LocalLoginDto;
 export type LogoutApiResponse = unknown;
-export type LogoutApiArg = void;
+export type LogoutApiArg =
+  /** If true, the user will be logged out everywhere */ boolean;
+export type ResetPasswordApiResponse = unknown;
+export type ResetPasswordApiArg = ResetPasswordDto;
+export type ConfirmPasswordResetApiResponse = unknown;
+export type ConfirmPasswordResetApiArg = ConfirmResetPasswordDto;
 export type LoginWithGoogleApiResponse =
   /** status 200  */ CustomRedirectResponse;
 export type LoginWithGoogleApiArg = OAuth2ConsentPostRedirectDto;
@@ -290,6 +319,12 @@ export type LocalLoginDto = {
   email: string;
   password: string;
 };
+export type ResetPasswordDto = {
+  email: string;
+};
+export type ConfirmResetPasswordDto = {
+  password: string;
+};
 export type CustomRedirectResponse = {
   redirect: string;
 };
@@ -315,7 +350,6 @@ export type UserResponse = {
 };
 export type EditUserDto = {
   name?: string;
-  email?: string;
   subscribe_to_notifications?: boolean;
 };
 export type MeetingShortResponse = {
@@ -397,6 +431,8 @@ export const {
   useSignupMutation,
   useLoginMutation,
   useLogoutMutation,
+  useResetPasswordMutation,
+  useConfirmPasswordResetMutation,
   useLoginWithGoogleMutation,
   useSignupWithGoogleMutation,
   useConfirmLinkGoogleAccountMutation,
