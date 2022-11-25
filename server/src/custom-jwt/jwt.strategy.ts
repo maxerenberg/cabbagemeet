@@ -1,7 +1,7 @@
 import * as crypto from 'crypto';
 import { ExtractJwt, Strategy } from 'passport-jwt';
 import { PassportStrategy } from '@nestjs/passport';
-import { Inject, Injectable } from '@nestjs/common';
+import { Inject, Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
 import { DbconfigService } from '../dbconfig/dbconfig.service';
@@ -46,6 +46,7 @@ const PWRESET_TOKEN_LIFETIME_SECONDS = 4 * 60 * 60;
 export default class JwtStrategy extends PassportStrategy(Strategy) {
   private jwtFromRequest = ExtractJwt.fromAuthHeaderAsBearerToken();
   private cacher = new Cacher();
+  private logger = new Logger(JwtStrategy.name);
 
   constructor(
     @Inject('JWT_SIGNING_KEY') secret: string,
@@ -71,7 +72,7 @@ export default class JwtStrategy extends PassportStrategy(Strategy) {
       }
       const token = this.jwtFromRequest(req);
       if (this.cacher.has(token)) {
-        // password reset tokens may not be re-used
+        this.logger.debug('Detected attempt to re-use password reset token');
         return null;
       }
       this.cacher.add(token, PWRESET_TOKEN_LIFETIME_SECONDS);

@@ -9,8 +9,8 @@ type ErrorCode =
 const ERROR_MESSAGES: Record<ErrorCode, string> = {
   // TODO: use hyperlink on "you must login" text
   E_GOOGLE_ACCOUNT_ALREADY_LINKED: (
-    'This Google account is already linked. You must login using this Google '
-    + 'account to unlink it.'
+    'This Google account is already linked to another local account. ' +
+    'You must login using this Google account to unlink it.'
   ),
   E_GOOGLE_OAUTH2_NOT_AVAILABLE: 'Google OAuth2 has not been configured on this server.',
   E_NOT_ALL_OAUTH2_SCOPES_GRANTED: 'Not all required OAuth2 scopes were granted.',

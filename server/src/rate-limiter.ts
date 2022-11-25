@@ -1,12 +1,13 @@
-const rateLimitTypes = ['hourly', 'daily', 'ten-minutely'] as const;
-type RateLimitType = typeof rateLimitTypes[number];
-export type TTLLimits = Partial<Record<RateLimitType, number>>;
-type RateLimitHistory = Partial<Record<RateLimitType, number[]>>;
-const TTLIntervalsInMilliseconds: Record<RateLimitType, number> = {
-  hourly: 1000 * 60 * 60,
-  daily: 1000 * 60 * 60 * 24,
-  'ten-minutely': 1000 * 60 * 10,
-};
+export const SECONDS_PER_MINUTE = 60;
+export const MINUTES_PER_HOUR = 60;
+export const SECONDS_PER_HOUR = SECONDS_PER_MINUTE * MINUTES_PER_HOUR;
+export const HOURS_PER_DAY = 24;
+export const SECONDS_PER_DAY = SECONDS_PER_HOUR * HOURS_PER_DAY;
+// map of interval length (seconds) to limit (number of allowed requests)
+export type TTLLimits = Record<number, number>;
+// Map of interval length (seconds) to request history (timestamps)
+// The keys should be exactly the same as TTLLimits
+type RateLimitHistory = Record<number, number[]>;
 
 /**
  * Returns the index of the first element of `orderedHistory` which is at most
@@ -41,20 +42,24 @@ export default class RateLimiter {
     this.callbacks[key].push(cb);
   }
 
+  private getAllIntervalSeconds(): number[] {
+    return Object.keys(this.limits).map(s => +s);
+  }
+
   private willExceedRateLimit(
     now: number,
-    limitType: RateLimitType,
+    intervalSeconds: number,
     histories: RateLimitHistory,
   ): boolean {
-    const history = histories[limitType];
+    const history = histories[intervalSeconds];
     if (history === undefined || history.length === 0) {
       return false;
     }
-    const limit = this.limits[limitType];
+    const limit = this.limits[intervalSeconds];
     if (limit === undefined) {
       return false;
     }
-    const interval = TTLIntervalsInMilliseconds[limitType];
+    const interval = intervalSeconds * 1000;  // milliseconds
     const firstSampleIdxWithinSameInterval = getFirstSampleIdxWithinSameInterval(now, history, interval);
     const numSamplesInInterval = history.length - firstSampleIdxWithinSameInterval;
     // Add 1 because we are about to add a new sample
@@ -68,7 +73,9 @@ export default class RateLimiter {
     if (histories === undefined) {
       return false;
     }
-    return rateLimitTypes.some(limitType => this.willExceedRateLimit(now, limitType, histories));
+    return this.getAllIntervalSeconds().some(
+      intervalSeconds => this.willExceedRateLimit(now, intervalSeconds, histories)
+    );
   }
 
   tryAddRequestIfWithinLimits(key: string): boolean {
@@ -80,20 +87,17 @@ export default class RateLimiter {
     if (!this.histories[key]) {
       this.histories[key] = {};
     }
-    for (const limitType of rateLimitTypes) {
-      if (!this.limits.hasOwnProperty(limitType)) {
-        continue;
+    for (const intervalSeconds of this.getAllIntervalSeconds()) {
+      if (!this.histories[key][intervalSeconds]) {
+        this.histories[key][intervalSeconds] = [];
       }
-      if (!this.histories[key][limitType]) {
-        this.histories[key][limitType] = [];
-      }
-      if (this.histories[key][limitType].push(now) === 1) {
+      if (this.histories[key][intervalSeconds].push(now) === 1) {
         // set timeouts to clear the histories so we don't leak memory
         setTimeout(
-          () => this.removeStaleEntriesFromHistory(key, limitType),
+          () => this.removeStaleEntriesFromHistory(key, intervalSeconds),
           // The +1 is to make sure that the first entry can be safely removed
           // by the time the timer expires
-          TTLIntervalsInMilliseconds[limitType] + 1
+          intervalSeconds * 1000 + 1
         );
       }
     }
@@ -110,21 +114,21 @@ export default class RateLimiter {
     })
   }
 
-  private removeStaleEntriesFromHistory(key: string, limitType: RateLimitType) {
-    const interval = TTLIntervalsInMilliseconds[limitType];
+  private removeStaleEntriesFromHistory(key: string, intervalSeconds: number) {
+    const interval = intervalSeconds * 1000;  // milliseconds
     const now = Date.now();
-    const history = this.histories[key][limitType];
+    const history = this.histories[key][intervalSeconds];
     const numSamplesToRemove = getFirstSampleIdxWithinSameInterval(now, history, interval);
     history.splice(0, numSamplesToRemove);
     if (history.length === 0) {
-      delete this.histories[key][limitType];
+      delete this.histories[key][intervalSeconds];
       if (Object.keys(this.histories[key]).length == 0) {
         delete this.histories[key];
       }
     } else {
       const timeWhenOldestSampleWillExpire = history[0] + interval + 1;
       setTimeout(
-        () => this.removeStaleEntriesFromHistory(key, limitType),
+        () => this.removeStaleEntriesFromHistory(key, intervalSeconds),
         timeWhenOldestSampleWillExpire - now
       );
     }

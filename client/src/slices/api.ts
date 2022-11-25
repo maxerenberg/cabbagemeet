@@ -8,6 +8,13 @@ const injectedRtkApi = api.injectEndpoints({
         body: queryArg,
       }),
     }),
+    verifyEmail: build.mutation<VerifyEmailApiResponse, VerifyEmailApiArg>({
+      query: (queryArg) => ({
+        url: `/api/verify-email`,
+        method: "POST",
+        body: queryArg,
+      }),
+    }),
     login: build.mutation<LoginApiResponse, LoginApiArg>({
       query: (queryArg) => ({
         url: `/api/login`,
@@ -213,8 +220,12 @@ const injectedRtkApi = api.injectEndpoints({
   overrideExisting: false,
 });
 export { injectedRtkApi as api };
-export type SignupApiResponse = /** status 201  */ UserResponseWithToken;
+export type SignupApiResponse = /** status 200  */
+  | VerifyEmailAddressResponse
+  | /** status 201  */ UserResponseWithToken;
 export type SignupApiArg = LocalSignupDto;
+export type VerifyEmailApiResponse = /** status 201  */ UserResponseWithToken;
+export type VerifyEmailApiArg = VerifyEmailAddressDto;
 export type LoginApiResponse = /** status 200  */ UserResponseWithToken;
 export type LoginApiArg = LocalLoginDto;
 export type LogoutApiResponse = unknown;
@@ -292,6 +303,9 @@ export type DeleteRespondentApiArg = {
   id: number;
   respondentId: number;
 };
+export type VerifyEmailAddressResponse = {
+  mustVerifyEmailAddress: boolean;
+};
 export type UserResponseWithToken = {
   userID: number;
   name: string;
@@ -310,6 +324,13 @@ export type LocalSignupDto = {
   email: string;
   password: string;
   subscribe_to_notifications?: boolean;
+};
+export type VerifyEmailAddressDto = {
+  name: string;
+  email: string;
+  password: string;
+  subscribe_to_notifications?: boolean;
+  code: string;
 };
 export type UnauthorizedResponse = {
   statusCode: number;
@@ -429,6 +450,7 @@ export type PutRespondentDto = {
 };
 export const {
   useSignupMutation,
+  useVerifyEmailMutation,
   useLoginMutation,
   useLogoutMutation,
   useResetPasswordMutation,

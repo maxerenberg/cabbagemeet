@@ -3,7 +3,7 @@ import { ConfigService } from '@nestjs/config';
 import * as nodemailer from 'nodemailer';
 import SMTPTransport from 'nodemailer/lib/smtp-transport';
 import { EnvironmentVariables } from '../env.validation';
-import RateLimiter from '../rate-limiter';
+import RateLimiter, { SECONDS_PER_DAY, SECONDS_PER_HOUR } from '../rate-limiter';
 
 const KEY = 'mail';
 
@@ -21,8 +21,8 @@ export default class MailService {
 
   constructor(configService: ConfigService<EnvironmentVariables, true>) {
     this.rateLimiter.setLimits({
-      hourly: configService.get('EMAIL_HOURLY_LIMIT', {infer: true}),
-      daily: configService.get('EMAIL_DAILY_LIMIT', {infer: true}),
+      [SECONDS_PER_HOUR]: configService.get('EMAIL_HOURLY_LIMIT', {infer: true}),
+      [SECONDS_PER_DAY]: configService.get('EMAIL_DAILY_LIMIT', {infer: true}),
     });
     const smtpHost = configService.get('SMTP_HOST', {infer: true});
     const smtpPort = +configService.get('SMTP_PORT', {infer: true});

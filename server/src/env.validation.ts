@@ -113,6 +113,10 @@ export class EnvironmentVariables {
   @IsNumber()
   @IsPositive()
   EMAIL_DAILY_LIMIT?: number = 100;
+
+  @IsOptional()
+  @IsBoolean()
+  SIGNUP_REQUIRES_EMAIL_VALIDATION?: boolean = true;
 }
 
 export function validate(

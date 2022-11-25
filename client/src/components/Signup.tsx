@@ -1,4 +1,4 @@
-import React, { useContext, useEffect, useRef, useState } from 'react';
+import React, { useCallback, useContext, useEffect, useRef, useState } from 'react';
 import Form from 'react-bootstrap/Form';
 import { Link, useNavigate } from 'react-router-dom';
 import BottomOverlay from 'components/BottomOverlay';
@@ -9,27 +9,55 @@ import { getReqErrorMessage } from 'utils/requests.utils';
 import ButtonWithSpinner from './ButtonWithSpinner';
 import { useSignupMutation } from 'slices/api';
 import { HistoryContext } from './HistoryProvider';
+import { isVerifyEmailAddressResponse } from 'slices/enhancedApi';
+import VerifyEmailAddress from './VerifyEmailAddress';
 
 export default function Signup() {
+  const [name, setName] = useState('');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [shouldShowVerificationPage, setShouldShowVerificationPage] = useState(false);
+  const navigate = useNavigate();
+  const {lastNonAuthPath} = useContext(HistoryContext);
+  // Ref is used to avoid creating a new callback after the redirect, which would
+  // force the child components to re-render
+  // TODO: encapsulate this in a separate hook
+  const lastNonAuthPathRef = useRef('/');
+  useEffect(() => { lastNonAuthPathRef.current = lastNonAuthPath; }, [lastNonAuthPath]);
+  const redirectAfterSuccessfulSignup = useCallback(() => {
+    navigate(lastNonAuthPathRef.current);
+  }, [navigate]);
+
+  if (shouldShowVerificationPage) {
+    return <VerifyEmailAddress {...{name, email, password, redirectAfterSuccessfulSignup}} />;
+  }
   return (
     <div className={styles.signupContainer}>
-      <SignupForm />
+      <SignupForm {...{
+        name, setName, email, setEmail, password, setPassword,
+        setShouldShowVerificationPage, redirectAfterSuccessfulSignup,
+      }} />
       <WhyShouldISignUp />
     </div>
   );
 };
 
-function SignupForm() {
+function SignupForm({
+  name, setName,
+  email, setEmail,
+  password, setPassword,
+  setShouldShowVerificationPage,
+  redirectAfterSuccessfulSignup,
+}: {
+  name: string, setName: (s: string) => void,
+  email: string, setEmail: (s: string) => void,
+  password: string, setPassword: (s: string) => void,
+  setShouldShowVerificationPage: (b: boolean) => void,
+  redirectAfterSuccessfulSignup: () => void,
+}) {
   const [validated, setValidated] = useState(false);
-  const navigate = useNavigate();
-  const [signup, {isLoading, isSuccess, isError, error}] = useSignupMutation();
+  const [signup, {data, isLoading, isSuccess, isError, error}] = useSignupMutation();
   const { showToast } = useToast();
-  const nameRef = useRef<HTMLInputElement>(null);
-  const emailRef = useRef<HTMLInputElement>(null);
-  const passwordRef = useRef<HTMLInputElement>(null);
-  const {lastNonAuthPath} = useContext(HistoryContext);
-  // Ref is used to avoid triggering a useEffect hook twice
-  const lastNonAuthPathRef = useRef('/');
   let onSubmit: React.FormEventHandler<HTMLFormElement> | undefined;
   const submitBtnDisabled = isLoading;
   if (!submitBtnDisabled) {
@@ -38,17 +66,15 @@ function SignupForm() {
       const form = ev.currentTarget;
       if (form.checkValidity()) {
         signup({
-          name: nameRef.current!.value,
-          email: emailRef.current!.value,
-          password: passwordRef.current!.value,
+          name,
+          email,
+          password,
         });
       } else {
         setValidated(true);
       }
     };
   }
-
-  useEffect(() => { lastNonAuthPathRef.current = lastNonAuthPath; }, [lastNonAuthPath]);
 
   useEffect(() => {
     if (isError) {
@@ -57,9 +83,17 @@ function SignupForm() {
         msgType: 'failure',
       });
     } else if (isSuccess) {
-      navigate(lastNonAuthPathRef.current);
+      if (isVerifyEmailAddressResponse(data!)) {
+        setShouldShowVerificationPage(true);
+      } else {
+        redirectAfterSuccessfulSignup();
+      }
     }
-  }, [isError, error, isSuccess, navigate, showToast]);
+  }, [
+    data, isError, error, isSuccess,
+    setShouldShowVerificationPage, redirectAfterSuccessfulSignup,
+    showToast,
+  ]);
 
   return (
     <Form noValidate className={styles.signupForm} {...{validated, onSubmit}}>
@@ -75,8 +109,10 @@ function SignupForm() {
         <Form.Control
           required
           placeholder="What's your name?"
+          minLength={1}
           className="form-text-input"
-          ref={nameRef}
+          value={name}
+          onChange={(ev) => setName(ev.target.value)}
         />
         <Form.Control.Feedback type="invalid">Please enter a name.</Form.Control.Feedback>
       </Form.Group>
@@ -87,7 +123,8 @@ function SignupForm() {
           placeholder="What's your email address?"
           type="email"
           className="form-text-input"
-          ref={emailRef}
+          value={email}
+          onChange={(ev) => setEmail(ev.target.value)}
         />
         <Form.Control.Feedback type="invalid">
           Please enter a valid email address.
@@ -102,7 +139,8 @@ function SignupForm() {
           placeholder="What would you like your password to be?"
           type="password"
           className="form-text-input"
-          ref={passwordRef}
+          value={password}
+          onChange={(ev) => setPassword(ev.target.value)}
         />
         <Form.Control.Feedback type="invalid">
           Password must be between 6-30 characters.

@@ -1,5 +1,5 @@
 import { jest } from '@jest/globals';
-import RateLimiter from './rate-limiter';
+import RateLimiter, { SECONDS_PER_HOUR } from './rate-limiter';
 import { setJestTimeout } from './testing-helpers';
 
 describe('RateLimitsService', () => {
@@ -28,7 +28,7 @@ describe('RateLimitsService', () => {
 
   it('should allow requests under the rate limit', () => {
     const limit = 6;
-    rateLimiter.setLimits({hourly: limit});
+    rateLimiter.setLimits({[SECONDS_PER_HOUR]: limit});
     const firstMockDateNowValue = mockDateNowValue;
     for (let i = 0; i < limit; i++) {
       expect(rateLimiter.tryAddRequestIfWithinLimits('key')).toBe(true);
@@ -75,7 +75,7 @@ describe('RateLimitsService', () => {
 
   it('should not allow requests over the rate limit', () => {
     const limit = 6;
-    rateLimiter.setLimits({hourly: limit});
+    rateLimiter.setLimits({[SECONDS_PER_HOUR]: limit});
     const firstMockDateNowValue = mockDateNowValue;
     for (let i = 0; i < limit; i++) {
       expect(rateLimiter.tryAddRequestIfWithinLimits('key')).toBe(true);

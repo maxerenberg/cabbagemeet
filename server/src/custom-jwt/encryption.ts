@@ -1,6 +1,8 @@
 import {createCipheriv, createDecipheriv, randomBytes, scrypt as scryptCb} from 'crypto';
 import {promisify} from 'util';
 
+// TODO: use GCM mode instead (provides message authentication)
+// will need to pass the message authentication code to the client as well
 const CIPHER_ALGORITHM = 'aes-128-ctr';
 const KEY_LENGTH = 16;
 const scrypt = promisify(scryptCb);

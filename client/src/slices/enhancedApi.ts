@@ -5,7 +5,7 @@ import type {
   TransformedMeetingResponse,
   TransformedMeetingsShortResponse,
 } from 'utils/response-transforms';
-import { api } from './api';
+import { api, SignupApiResponse, VerifyEmailAddressResponse } from './api';
 import type {
   MeetingResponse,
   GetMeetingApiArg,
@@ -19,6 +19,7 @@ import type {
   ConfirmPasswordResetApiArg,
 } from './api';
 import { setCurrentMeetingID } from './currentMeeting';
+import { AnyAction, ThunkDispatch } from '@reduxjs/toolkit';
 
 const replacedApi = api.injectEndpoints({
   endpoints: (build) => ({
@@ -59,10 +60,13 @@ export const enhancedApi = replacedApi.enhanceEndpoints({
   addTagTypes: ['createdMeetings', 'respondedMeetings'],
   endpoints: {
     login: {
-      onQueryStarted: loginOrSignup_onQueryStarted,
+      onQueryStarted: loginOrVerifyEmail_onQueryStarted,
     },
     signup: {
-      onQueryStarted: loginOrSignup_onQueryStarted,
+      onQueryStarted: signup_onQueryStarted,
+    },
+    verifyEmail: {
+      onQueryStarted: loginOrVerifyEmail_onQueryStarted,
     },
     logout: {
       onQueryStarted: logoutOrDeleteAccount_onQueryStarted,
@@ -126,20 +130,44 @@ export const enhancedApi = replacedApi.enhanceEndpoints({
   },
 });
 
-async function loginOrSignup_onQueryStarted(
+export function isVerifyEmailAddressResponse(resp: object): resp is VerifyEmailAddressResponse {
+  return resp.hasOwnProperty('mustVerifyEmailAddress');
+}
+
+function updateStoreForUserResponseWithToken(
+  dispatch: ThunkDispatch<any, any, AnyAction>,
+  selfInfoWithToken: UserResponseWithToken,
+) {
+  const {token, ...selfInfo} = selfInfoWithToken;
+  dispatch(replacedApi.util.upsertQueryData(
+    'getSelfInfo', undefined, selfInfo
+  ));
+  dispatch(setToken(token));
+}
+
+async function loginOrVerifyEmail_onQueryStarted(
   arg: unknown,
   {dispatch, queryFulfilled}: MutationLifecycleApi<any, any, UserResponseWithToken, 'api'>,
 ) {
   // pessimistic update
   // https://redux-toolkit.js.org/rtk-query/usage/manual-cache-updates#pessimistic-updates
   try {
-    const {data: selfInfoWithToken} = await queryFulfilled;
-    const {token, ...selfInfo} = selfInfoWithToken;
-    dispatch(replacedApi.util.upsertQueryData(
-      'getSelfInfo', undefined, selfInfo
-    ));
-    dispatch(setToken(token));
-  } catch {}
+    const {data} = await queryFulfilled;
+    updateStoreForUserResponseWithToken(dispatch, data);
+  } catch (err) {}
+}
+
+async function signup_onQueryStarted(
+  arg: unknown,
+  {dispatch, queryFulfilled}: MutationLifecycleApi<any, any, SignupApiResponse, 'api'>,
+) {
+  try {
+    const {data} = await queryFulfilled;
+    if (isVerifyEmailAddressResponse(data)) {
+      return;
+    }
+    updateStoreForUserResponseWithToken(dispatch, data);
+  } catch (err) {}
 }
 
 async function logoutOrDeleteAccount_onQueryStarted(
