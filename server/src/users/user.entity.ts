@@ -24,7 +24,7 @@ export default class User {
   @Column()
   Email: string;
 
-  @Column({default: true})
+  @Column({default: false})
   IsSubscribedToNotifications: boolean;
 
   @OneToMany(() => MeetingRespondent, respondent => respondent.User)

@@ -685,13 +685,16 @@ export default class OAuth2Service {
       .getMany();
   }
 
-  async google_tryCreateOrUpdateEventsForMeeting(meeting: Meeting, startDateTime: string, endDateTime: string) {
+  async google_tryCreateOrUpdateEventsForMeeting(meeting: Meeting) {
+    if (meeting.ScheduledStartDateTime === null || meeting.ScheduledEndDateTime === null) {
+      return;
+    }
     const linkedRespondents = await this.getRespondentsLinkedWithGoogle(meeting.ID);
     const results = await Promise.allSettled(linkedRespondents.map(
       linkedRespondent => this.google_createOrUpdateEventForMeeting(
         linkedRespondent,
         linkedRespondent.CreatedEvents.length > 0 ? linkedRespondent.CreatedEvents[0] : null,
-        meeting, startDateTime, endDateTime
+        meeting,
       )
     ));
     for (const result of results) {
@@ -705,9 +708,10 @@ export default class OAuth2Service {
     creds: GoogleOAuth2,
     existingEvent: GoogleCalendarCreatedEvent | null,
     meeting: Meeting,
-    startDateTime: string,
-    endDateTime: string
   ): Promise<void> {
+    if (meeting.ScheduledStartDateTime === null || meeting.ScheduledEndDateTime === null) {
+      return;
+    }
     creds = await this.google_refreshCredsIfNecessary(creds);
     const userID = creds.UserID;
     let apiURL = GOOGLE_API_CALENDAR_EVENTS_BASE_URL;
@@ -719,10 +723,10 @@ export default class OAuth2Service {
     }
     const params: Record<string, any> = {
       start: {
-        dateTime: startDateTime,
+        dateTime: meeting.ScheduledStartDateTime,
       },
       end: {
-        dateTime: endDateTime,
+        dateTime: meeting.ScheduledEndDateTime,
       },
       description: meeting.About,
       summary: meeting.Name,
@@ -755,7 +759,7 @@ export default class OAuth2Service {
     });
   }
 
-  async google_tryCreateEventForMeeting(userID: number, meeting: Meeting) {
+  async google_tryCreateOrUpdateEventForMeeting(userID: number, meeting: Meeting) {
     if (meeting.ScheduledStartDateTime === null || meeting.ScheduledEndDateTime === null) {
       return;
     }
@@ -770,12 +774,14 @@ export default class OAuth2Service {
       .where('GoogleOAuth2.LinkedCalendar = true')
       .select(['GoogleOAuth2', 'GoogleCalendarCreatedEvent'])
       .getOne();
+    if (!creds) {
+      return;
+    }
     try {
       await this.google_createOrUpdateEventForMeeting(
         creds,
         creds.CreatedEvents.length > 0 ? creds.CreatedEvents[0] : null,
         meeting,
-        meeting.ScheduledStartDateTime, meeting.ScheduledEndDateTime
       );
     } catch (err: any) {
       this.logger.error(err);

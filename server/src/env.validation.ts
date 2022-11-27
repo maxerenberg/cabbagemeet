@@ -107,11 +107,6 @@ export class EnvironmentVariables {
   @IsOptional()
   @IsNumber()
   @IsPositive()
-  EMAIL_HOURLY_LIMIT?: number = 20;
-
-  @IsOptional()
-  @IsNumber()
-  @IsPositive()
   EMAIL_DAILY_LIMIT?: number = 100;
 
   @IsOptional()

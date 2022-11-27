@@ -68,8 +68,8 @@ const RATE_LIMIT_ERROR_MESSAGE = 'Rate limit reached. Please try again later';
 @Controller()
 export class AuthController {
   private readonly logger = new Logger(AuthController.name);
-  private readonly pwresetRateLimiter = new RateLimiter();
-  private readonly signupRateLimiter = new RateLimiter();
+  private readonly pwresetRateLimiter: RateLimiter;
+  private readonly signupRateLimiter: RateLimiter;
   private readonly verifySignupEmailAddress: boolean;
 
   constructor(
@@ -80,9 +80,9 @@ export class AuthController {
     configService: ConfigService<EnvironmentVariables, true>,
   ) {
     // A user can reset their password at most once every 10 minutes
-    this.pwresetRateLimiter.setLimits({[SECONDS_PER_MINUTE * 10]: 1});
+    this.pwresetRateLimiter = new RateLimiter(SECONDS_PER_MINUTE * 10, 1);
     // A user can try to sign up at most once every 10 minutes
-    this.signupRateLimiter.setLimits({[SECONDS_PER_MINUTE * 10]: 1});
+    this.signupRateLimiter = new RateLimiter(SECONDS_PER_MINUTE * 10, 1);
     this.verifySignupEmailAddress = configService.get('VERIFY_SIGNUP_EMAIL_ADDRESS', {infer: true});
   }
 

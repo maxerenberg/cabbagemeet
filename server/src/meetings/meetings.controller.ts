@@ -6,16 +6,15 @@ import OptionalJwtAuthGuard from 'src/auth/optional-jwt-auth.guard';
 import User from 'src/users/user.entity';
 import CreateMeetingDto from './create-meeting.dto';
 import MeetingResponse from './meeting-response';
+import MeetingRespondent from './meeting-respondent.entity';
 import Meeting from './meeting.entity';
 import MeetingsService from './meetings.service';
 import { ApiBadRequestResponse, ApiBearerAuth, ApiNotFoundResponse, ApiOperation, ApiTags, ApiForbiddenResponse } from '@nestjs/swagger';
 import { BadRequestResponse, NotFoundResponse, ForbiddenResponse } from '../common-responses';
-import OAuth2Service from '../oauth2/oauth2.service';
 import PutRespondentDto from './put-respondent.dto';
 import AddGuestRespondentDto from './add-guest-respondent.dto';
 import EditMeetingDto from './edit-meeting.dto';
 import ScheduleMeetingDto from './schedule-meeting.dto';
-import { ModuleRef } from '@nestjs/core';
 import type MeetingShortResponse from './meeting-short-response';
 
 const modifyMeetingAuthzDoc = (
@@ -78,22 +77,15 @@ function meetingDtoToMeetingEntity(body: Partial<CreateMeetingDto>): DeepPartial
 @ApiTags('meetings')
 @Controller('meetings')
 export class MeetingsController {
-  private oauth2Service: OAuth2Service;
 
   constructor(
     private meetingsService: MeetingsService,
-    private moduleRef: ModuleRef,
   ) {}
-
-  onModuleInit() {
-    // circular dependency
-    this.oauth2Service = this.moduleRef.get(OAuth2Service, {strict: false});
-  }
 
   private async checkIfRespondentExistsAndClientIsAllowedToModifyThem(
     respondentID: number,
     maybeUser: User | null
-  ) {
+  ): Promise<MeetingRespondent> {
     const existingRespondent = await this.meetingsService.getRespondent(respondentID);
     if (!existingRespondent) {
       throw new NotFoundException();
@@ -101,6 +93,7 @@ export class MeetingsController {
     if (existingRespondent.UserID && (!maybeUser || maybeUser.ID !== existingRespondent.UserID)) {
       throw new ForbiddenException('You must be logged in as this user to modify their availabilities');
     }
+    return existingRespondent;
   }
 
   private async checkIfMeetingExistsAndClientIsAllowedToModifyIt(
@@ -184,23 +177,8 @@ export class MeetingsController {
     if (Object.keys(partialUpdate).length === 0) {
       throw new BadRequestException('At least one property must be specified');
     }
-    const updatedMeeting = await this.meetingsService.updateMeeting(meetingID, partialUpdate);
-    if (
-      updatedMeeting.ScheduledStartDateTime !== null
-      && updatedMeeting.ScheduledEndDateTime !== null
-      && (
-        meeting.Name !== updatedMeeting.Name
-        || meeting.About !== updatedMeeting.About
-      )
-    ) {
-      // All of the respondents' Google calendars need to be updated.
-      // Since this could take a long time, and we do not want to block the
-      // client for too long, we do not 'await' the promise below.
-      this.oauth2Service.google_tryCreateOrUpdateEventsForMeeting(
-        meeting, meeting.ScheduledStartDateTime, meeting.ScheduledEndDateTime
-      );
-    }
-    return meetingToMeetingResponse(meeting, maybeUser);
+    const updatedMeeting = await this.meetingsService.editMeeting(meeting, partialUpdate);
+    return meetingToMeetingResponse(updatedMeeting, maybeUser);
   }
 
   @ApiOperation({
@@ -221,19 +199,9 @@ export class MeetingsController {
     if (body.endDateTime <= body.startDateTime) {
       throw new BadRequestException('end time must be greater than start time');
     }
-    await this.checkIfMeetingExistsAndClientIsAllowedToModifyIt(meetingID, maybeUser);
-    const updatedInfo: DeepPartial<Meeting> = {
-      ScheduledStartDateTime: body.startDateTime,
-      ScheduledEndDateTime: body.endDateTime,
-    };
-    const meeting = await this.meetingsService.updateMeeting(meetingID, updatedInfo);
-    // We need to add the meeting to all of the respondents' Google calendars.
-    // Since this could take a long time, and we do not want to block the
-    // client for too long, we do not 'await' the promise below.
-    this.oauth2Service.google_tryCreateOrUpdateEventsForMeeting(
-      meeting, body.startDateTime, body.endDateTime
-    );
-    return meetingToMeetingResponse(meeting, maybeUser);
+    const oldMeeting = await this.checkIfMeetingExistsAndClientIsAllowedToModifyIt(meetingID, maybeUser);
+    const newMeeting = await this.meetingsService.scheduleMeeting(oldMeeting, body.startDateTime, body.endDateTime);
+    return meetingToMeetingResponse(newMeeting, maybeUser);
   }
 
   @ApiOperation({
@@ -250,15 +218,7 @@ export class MeetingsController {
     @MaybeAuthUser() maybeUser: User | null,
   ): Promise<MeetingResponse> {
     await this.checkIfMeetingExistsAndClientIsAllowedToModifyIt(meetingID, maybeUser);
-    const updatedInfo: DeepPartial<Meeting> = {
-      ScheduledStartDateTime: null,
-      ScheduledEndDateTime: null,
-    };
-    const meeting = await this.meetingsService.updateMeeting(meetingID, updatedInfo);
-    // We need to delete the meeting from all of the respondents' Google calendars.
-    // Since this could take a long time, and we do not want to block the
-    // client for too long, we do not 'await' the promise below.
-    this.oauth2Service.google_tryDeleteEventsForMeeting(meetingID);
+    const meeting = await this.meetingsService.unscheduleMeeting(meetingID);
     return meetingToMeetingResponse(meeting, maybeUser);
   }
 
@@ -277,19 +237,8 @@ export class MeetingsController {
     @MaybeAuthUser() maybeUser: User | null,
   ): Promise<void> {
     await this.checkIfMeetingExistsAndClientIsAllowedToModifyIt(meetingID, maybeUser);
-    // This meeting needs to be deleted from all of the respondents' Google calendars.
-    // We need to wait until this runs to completion or else the row in
-    // the GoogleCalendarCreatedEvents table might be deleted prematurely
-    // (due to cascading deletions).
-    // Unfortunately this might take a long time, but since deleting a meeting is a
-    // relatively infrequent operation, it should be acceptable. The use of
-    // Promise.allSettled() in the OAuth2Service should hopefully speed things up.
-    await this.oauth2Service.google_tryDeleteEventsForMeeting(meetingID);
     await this.meetingsService.deleteMeeting(meetingID);
   }
-
-  // TODO: email notifications for when people add availabilities or meeting
-  // is scheduled
 
   @ApiOperation({
     summary: 'Add guest availabilities',
@@ -321,17 +270,8 @@ export class MeetingsController {
     @AuthUser() user: User,
     @Body() body: PutRespondentDto,
   ): Promise<MeetingResponse> {
-    const existingRespondent = await this.meetingsService.getRespondent(meetingID, user.ID);
-    if (existingRespondent) {
-      await this.meetingsService.updateRespondent(existingRespondent.RespondentID, body.availabilities);
-    } else {
-      await this.meetingsService.addRespondent(meetingID, body.availabilities, user.ID);
-    }
-    const updatedMeeting = await this.meetingsService.getMeetingWithRespondents(meetingID);
-    // Add the meeting to the user's Google calendar, if applicable.
-    // The promise below is not awaited to speed up the response.
-    this.oauth2Service.google_tryCreateEventForMeeting(user.ID, updatedMeeting);
-    return meetingToMeetingResponse(updatedMeeting!, user);
+    const meeting = await this.meetingsService.addOrUpdateRespondent(meetingID, user.ID, body.availabilities);
+    return meetingToMeetingResponse(meeting, user);
   }
 
   @ApiOperation({
@@ -372,15 +312,8 @@ export class MeetingsController {
     @Param('respondentID', ParseIntPipe) respondentID: number,
     @MaybeAuthUser() maybeUser: User | null,
   ): Promise<MeetingResponse> {
-    await this.checkIfRespondentExistsAndClientIsAllowedToModifyThem(respondentID, maybeUser);
-    if (maybeUser) {
-      // We need to wait until this runs to completion or else the row in
-      // the GoogleCalendarCreatedEvents table might be deleted prematurely
-      // (due to cascading deletions).
-      await this.oauth2Service.google_tryDeleteEventForMeeting(maybeUser.ID, meetingID);
-    }
-    await this.meetingsService.deleteRespondent(respondentID);
-    const updatedMeeting = await this.meetingsService.getMeetingWithRespondents(meetingID);
-    return meetingToMeetingResponse(updatedMeeting!, maybeUser);
+    const respondent = await this.checkIfRespondentExistsAndClientIsAllowedToModifyThem(respondentID, maybeUser);
+    const updatedMeeting = await this.meetingsService.deleteRespondent(respondent);
+    return meetingToMeetingResponse(updatedMeeting, maybeUser);
   }
 }

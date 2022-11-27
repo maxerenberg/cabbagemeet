@@ -3,7 +3,7 @@ import { ConfigService } from '@nestjs/config';
 import * as nodemailer from 'nodemailer';
 import SMTPTransport from 'nodemailer/lib/smtp-transport';
 import { EnvironmentVariables } from '../env.validation';
-import RateLimiter, { SECONDS_PER_DAY, SECONDS_PER_HOUR } from '../rate-limiter';
+import RateLimiter, { SECONDS_PER_DAY, SECONDS_PER_MINUTE } from '../rate-limiter';
 
 const KEY = 'mail';
 
@@ -13,17 +13,23 @@ export interface SendParams {
   body: string;
 }
 
+function sleep(millis: number): Promise<void> {
+  return new Promise(resolve => {
+    setTimeout(() => {
+      resolve();
+    }, millis);
+  });
+}
+
 @Injectable()
 export default class MailService {
   private transport: nodemailer.Transporter = undefined;
   private readonly logger = new Logger(MailService.name);
-  private readonly rateLimiter = new RateLimiter();
+  private readonly rateLimiter: RateLimiter;
 
   constructor(configService: ConfigService<EnvironmentVariables, true>) {
-    this.rateLimiter.setLimits({
-      [SECONDS_PER_HOUR]: configService.get('EMAIL_HOURLY_LIMIT', {infer: true}),
-      [SECONDS_PER_DAY]: configService.get('EMAIL_DAILY_LIMIT', {infer: true}),
-    });
+    const dailyLimit = configService.get('EMAIL_DAILY_LIMIT', {infer: true});
+    this.rateLimiter = new RateLimiter(SECONDS_PER_DAY, dailyLimit);
     const smtpHost = configService.get('SMTP_HOST', {infer: true});
     const smtpPort = +configService.get('SMTP_PORT', {infer: true});
     const smtpFrom = configService.get('SMTP_FROM', {infer: true});
@@ -76,8 +82,22 @@ export default class MailService {
     }
   }
 
-  sendNowOrLater(args: SendParams) {
-    this.rateLimiter.addOrDeferRequest(KEY, () => this.trySendNow(args));
+  async sendNowOrLater(args: SendParams) {
+    const MAX_TRIES = 3;
+    for (let i = 0; i < MAX_TRIES; i++) {
+      if (this.rateLimiter.tryAddRequestIfWithinLimits(KEY)) {
+        if (await this.trySendNow(args)) {
+          return;
+        }
+      }
+      if (i == MAX_TRIES - 1) {
+        this.logger.warn(`Gave up trying to send email to ${args.recipient}`);
+        return;
+      }
+      const jitter = Math.floor(Math.random() * 30);
+      const seconds = (i + 1) * SECONDS_PER_MINUTE + jitter;
+      await sleep(seconds * 1000);
+    }
   }
 
   async sendNowIfAllowed(args: SendParams): Promise<boolean> {
