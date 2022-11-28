@@ -8,7 +8,7 @@ import GoogleOAuth2 from './google-oauth2.entity';
 import { DataSource, DeepPartial, Repository } from 'typeorm';
 import { normalizeDBError, UniqueConstraintFailed } from '../database.utils';
 import User from '../users/user.entity';
-import { assert, encodeQueryParams, stripTrailingSlash } from '../misc.utils';
+import { assert, encodeQueryParams } from '../misc.utils';
 import { columnsForGetUser } from 'src/users/users.service';
 import type { GoogleOIDCResponse, GoogleDecodedOIDCIDToken, GoogleRefreshTokenResponse, GoogleListEventsResponse, GoogleListEventsResponseItem, GoogleInsertEventResponse } from './oauth2-response-types';
 import { toISOStringUTC, getSecondsSinceUnixEpoch, toISOStringWithTz } from '../dates.utils';
@@ -101,7 +101,7 @@ export default class OAuth2Service {
     @InjectRepository(GoogleCalendarCreatedEvent) private googleCalendarCreatedEventsRepository: Repository<GoogleCalendarCreatedEvent>,
     @InjectRepository(User) private usersRepository: Repository<User>,
   ) {
-    this.publicURL = stripTrailingSlash(configService.get('PUBLIC_URL', {infer: true}));
+    this.publicURL = configService.get('PUBLIC_URL', {infer: true});
   }
 
   private getEnvKey<K extends keyof EnvironmentVariables>(key: K): EnvironmentVariables[K] {

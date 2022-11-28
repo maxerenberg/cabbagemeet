@@ -11,11 +11,8 @@ export default function BottomOverlay(props: React.PropsWithChildren<{}>) {
   );
 };
 
-export function BottomOverlayProvider(props: React.PropsWithChildren<{}>) {
+export function BottomOverlayFiller() {
   return (
-    <>
-      {props.children}
-      <div className={`d-block d-md-none ${styles.overlayTopFiller}`}></div>
-    </>
+    <div className={`d-block d-md-none ${styles.overlayTopFiller}`}></div>
   );
 }

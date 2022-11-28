@@ -2,6 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import * as nodemailer from 'nodemailer';
 import SMTPTransport from 'nodemailer/lib/smtp-transport';
+import { sleep } from '../misc.utils';
 import { EnvironmentVariables } from '../env.validation';
 import RateLimiter, { SECONDS_PER_DAY, SECONDS_PER_MINUTE } from '../rate-limiter';
 
@@ -11,14 +12,6 @@ export interface SendParams {
   recipient: string;
   subject: string;
   body: string;
-}
-
-function sleep(millis: number): Promise<void> {
-  return new Promise(resolve => {
-    setTimeout(() => {
-      resolve();
-    }, millis);
-  });
 }
 
 @Injectable()

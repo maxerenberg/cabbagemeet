@@ -4,7 +4,6 @@ import { ConfigService } from '@nestjs/config';
 import { InjectRepository } from '@nestjs/typeorm';
 import { DateTime } from 'luxon';
 import { EnvironmentVariables } from '../env.validation';
-import { stripTrailingSlash } from '../misc.utils';
 import MailService from '../mail/mail.service';
 import OAuth2Service from '../oauth2/oauth2.service';
 import { DeepPartial, Repository } from 'typeorm';
@@ -37,7 +36,7 @@ export default class MeetingsService {
     private moduleRef: ModuleRef,
     configService: ConfigService<EnvironmentVariables, true>,
   ) {
-    this.publicURL = stripTrailingSlash(configService.get('PUBLIC_URL', {infer: true}));
+    this.publicURL = configService.get('PUBLIC_URL', {infer: true});
   }
 
   onModuleInit() {

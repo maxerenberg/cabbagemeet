@@ -4,7 +4,6 @@ import './index.css';
 import App from './App';
 import { store } from 'app/store';
 import { Provider } from 'react-redux';
-import { BottomOverlayProvider } from 'components/BottomOverlay';
 import { ToastProvider } from 'components/Toast';
 import * as serviceWorker from './serviceWorker';
 
@@ -14,9 +13,7 @@ root.render(
   <React.StrictMode>
     <Provider store={store}>
       <ToastProvider>
-        <BottomOverlayProvider>
-          <App />
-        </BottomOverlayProvider>
+        <App />
       </ToastProvider>
     </Provider>
   </React.StrictMode>

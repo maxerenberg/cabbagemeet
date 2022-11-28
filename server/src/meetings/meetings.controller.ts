@@ -1,4 +1,4 @@
-import { BadRequestException, Body, Controller, Delete, ForbiddenException, Get, HttpCode, HttpStatus, NotFoundException, Param, ParseIntPipe, Patch, Post, Put, UseGuards } from '@nestjs/common';
+import { BadRequestException, Body, Controller, Delete, ForbiddenException, Get, HttpCode, HttpException, HttpStatus, Ip, NotFoundException, Param, ParseIntPipe, Patch, Post, Put, UseGuards } from '@nestjs/common';
 import { DeepPartial } from 'typeorm';
 import { AuthUser, MaybeAuthUser } from 'src/auth/auth-user.decorator';
 import JwtAuthGuard from 'src/auth/jwt-auth.guard';
@@ -16,6 +16,10 @@ import AddGuestRespondentDto from './add-guest-respondent.dto';
 import EditMeetingDto from './edit-meeting.dto';
 import ScheduleMeetingDto from './schedule-meeting.dto';
 import type MeetingShortResponse from './meeting-short-response';
+import RateLimiter, { SECONDS_PER_HOUR } from 'src/rate-limiter';
+import { ConfigService } from '@nestjs/config';
+import { EnvironmentVariables } from 'src/env.validation';
+import { oneYearAgoDateString, oneYearFromNowDateString } from 'src/dates.utils';
 
 const modifyMeetingAuthzDoc = (
   'If the meeting was created by a registed user, then '
@@ -65,22 +69,49 @@ function meetingToMeetingResponse(
 
 function meetingDtoToMeetingEntity(body: Partial<CreateMeetingDto>): DeepPartial<Meeting> {
   const meeting: DeepPartial<Meeting> = {};
-    if (body.hasOwnProperty('name')) meeting.Name = body.name;
-    if (body.hasOwnProperty('about')) meeting.About = body.about;
-    if (body.hasOwnProperty('timezone')) meeting.Timezone = body.timezone;
-    if (body.hasOwnProperty('minStartHour')) meeting.MinStartHour = body.minStartHour;
-    if (body.hasOwnProperty('maxEndHour')) meeting.MaxEndHour = body.maxEndHour;
-    if (body.hasOwnProperty('tentativeDates')) meeting.TentativeDates = JSON.stringify(body.tentativeDates.sort());
+    if (body.hasOwnProperty('name')) {
+      meeting.Name = body.name;
+    }
+    if (body.hasOwnProperty('about')) {
+      meeting.About = body.about;
+    }
+    if (body.hasOwnProperty('timezone')) {
+      meeting.Timezone = body.timezone;
+    }
+    if (body.hasOwnProperty('minStartHour')) {
+      meeting.MinStartHour = body.minStartHour;
+    }
+    if (body.hasOwnProperty('maxEndHour')) {
+      meeting.MaxEndHour = body.maxEndHour;
+    }
+    if (body.hasOwnProperty('tentativeDates')) {
+      meeting.TentativeDates = JSON.stringify(body.tentativeDates.sort());
+    }
     return meeting;
+}
+
+function tentativeDatesAreOutOfRange(tentativeDates: string[]): boolean {
+  const minDate = tentativeDates.reduce((a, b) => a < b ? a : b);
+  const maxDate = tentativeDates.reduce((a, b) => a > b ? a : b);
+  const oneYearAgo = oneYearAgoDateString();
+  const oneYearFromNow = oneYearFromNowDateString();
+  return minDate < oneYearAgoDateString() || maxDate > oneYearFromNow;
 }
 
 @ApiTags('meetings')
 @Controller('meetings')
 export class MeetingsController {
+  private meetingCreationRateLimiter: RateLimiter = undefined;
 
   constructor(
     private meetingsService: MeetingsService,
-  ) {}
+    configService: ConfigService<EnvironmentVariables, true>,
+  ) {
+    const meetingCreationLimit = configService.get('HOURLY_MEETING_CREATION_LIMIT_PER_IP', {infer: true});
+    if (meetingCreationLimit !== 0) {
+      this.meetingCreationRateLimiter = new RateLimiter(SECONDS_PER_HOUR, meetingCreationLimit);
+    }
+  }
 
   private async checkIfRespondentExistsAndClientIsAllowedToModifyThem(
     respondentID: number,
@@ -123,10 +154,17 @@ export class MeetingsController {
   @Post()
   @UseGuards(OptionalJwtAuthGuard)
   async createMeeting(
+    @Ip() ip: string,
     @Body() body: CreateMeetingDto,
     @MaybeAuthUser() maybeUser: User | null,
   ): Promise<MeetingResponse> {
-    const partialMeeting= meetingDtoToMeetingEntity(body);
+    if (this.meetingCreationRateLimiter && !this.meetingCreationRateLimiter.tryAddRequestIfWithinLimits(ip)) {
+      throw new HttpException('Too many requests', HttpStatus.TOO_MANY_REQUESTS);
+    }
+    if (tentativeDatesAreOutOfRange(body.tentativeDates)) {
+      throw new BadRequestException('Dates are out of the acceptable range');
+    }
+    const partialMeeting = meetingDtoToMeetingEntity(body);
     if (maybeUser) {
       partialMeeting.CreatorID = maybeUser.ID;
     }

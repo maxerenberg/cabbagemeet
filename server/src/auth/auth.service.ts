@@ -9,7 +9,6 @@ import UsersService from '../users/users.service';
 import LocalSignupDto from './local-signup.dto';
 import MailService from '../mail/mail.service';
 import CustomJwtService from '../custom-jwt/custom-jwt.service';
-import { stripTrailingSlash } from '../misc.utils';
 import Cacher from '../cacher';
 import { SECONDS_PER_MINUTE } from '../rate-limiter';
 
@@ -41,7 +40,7 @@ export default class AuthService {
     private jwtService: CustomJwtService,
     configService: ConfigService<EnvironmentVariables, true>,
   ) {
-    this.publicURL = stripTrailingSlash(configService.get('PUBLIC_URL', {infer: true}));
+    this.publicURL = configService.get('PUBLIC_URL', {infer: true});
   }
 
   async validateUser(email: string, password: string): Promise<User | null> {

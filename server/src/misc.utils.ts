@@ -20,3 +20,11 @@ export function stripTrailingSlash(s: string): string {
   }
   return s;
 }
+
+export function sleep(millis: number): Promise<void> {
+  return new Promise(resolve => {
+    setTimeout(() => {
+      resolve();
+    }, millis);
+  });
+}

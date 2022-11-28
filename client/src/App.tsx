@@ -13,6 +13,9 @@ import {
 import './App.scss';
 import './custom.css';
 import 'common/common.css';
+// Make sure to use JSX camelCase style in the SVG file
+// See https://stackoverflow.com/a/61167146
+import Logo from 'assets/cabbage';
 import { useAppSelector } from 'app/hooks';
 import DayPicker from 'components/DayPicker/DayPicker';
 import ForgotPassword from 'components/ForgotPassword';
@@ -32,6 +35,7 @@ import { getReqErrorMessage } from 'utils/requests.utils';
 import ErrorPage from 'components/ErrorPage';
 import ConfirmLinkExternalCalendar from 'components/ConfirmLinkExternalCalendar';
 import ConfirmPasswordReset from 'components/ConfirmPasswordReset';
+import { BottomOverlayFiller } from 'components/BottomOverlay';
 
 export default function App() {
   return (
@@ -61,6 +65,25 @@ export default function App() {
   );
 }
 
+function BrandWithLogo() {
+  return (
+    <LinkContainer to="/">
+      <Navbar.Brand>
+        <div className="d-inline-block me-1" style={{
+          height: '1.5em',
+          width: '1.5em',
+          // There's a bit of empty space at the top of the image
+          position: 'relative',
+          top: '-0.1em',
+        }}>
+          <Logo />
+        </div>
+        CabbageMeet
+      </Navbar.Brand>
+    </LinkContainer>
+  );
+}
+
 function AppRoot() {
   const {showToast} = useToast();
   const {isError, error} = useGetSelfInfoIfTokenIsPresent();
@@ -83,9 +106,7 @@ function AppRoot() {
     <div className="App light-theme d-flex flex-column">
       <Navbar expand="md" className="mt-3 mb-5">
         <Container className="app-main-container custom-navbar-container">
-          <LinkContainer to="/">
-            <Navbar.Brand href="/">Logo</Navbar.Brand>
-          </LinkContainer>
+          <BrandWithLogo />
           <Navbar.Toggle aria-controls="app-navbar-nav" className="custom-navbar-toggle" />
           {/* TODO: hide offcanvas when link is clicked */}
           <Navbar.Offcanvas
@@ -93,15 +114,16 @@ function AppRoot() {
             aria-labelledby="app-navbar-offcanvas-label"
             placement="start"
           >
-            <Offcanvas.Header closeButton>
-              <Offcanvas.Title id="app-navbar-offcanvas-label">
-                <Link to="/">LOGO</Link>
+            <Offcanvas.Header closeButton className="mt-3">
+              <Offcanvas.Title id="app-navbar-offcanvas-label" className="fs-4">
+                <BrandWithLogo />
               </Offcanvas.Title>
             </Offcanvas.Header>
             <Offcanvas.Body>
-            <Nav className="ms-auto">
-              <HeaderLinks />
-            </Nav>
+              <div className="px-3"><hr className="mt-0 mb-4" /></div>
+              <Nav className="ms-auto">
+                <HeaderLinks />
+              </Nav>
             </Offcanvas.Body>
           </Navbar.Offcanvas>
         </Container>
@@ -110,6 +132,7 @@ function AppRoot() {
         <Outlet />
       </main>
       <Footer />
+      <BottomOverlayFiller />
     </div>
   );
 }

@@ -14,13 +14,14 @@ import {
   IsUrl,
   validateSync,
 } from 'class-validator';
+import { stripTrailingSlash } from './misc.utils';
 
 // Adapted from https://stackoverflow.com/a/68800520
 const environments = ['development', 'production', 'test'] as const;
 type Environment = typeof environments[number];
 
 const databaseTypes = ['sqlite', 'mysql', 'postgres'] as const;
-type DatabaseType = typeof databaseTypes[number];
+export type DatabaseType = typeof databaseTypes[number];
 
 export class EnvironmentVariables {
   @IsIn(environments)
@@ -38,8 +39,7 @@ export class EnvironmentVariables {
   HOST?: string = 'localhost';
 
   // The public-facing URL of this server.
-  // Will be used when creating Google calendar events and sending password
-  // reset emails.
+  // Will be used when creating Google calendar events and sending emails.
   @IsUrl({require_tld: false})
   PUBLIC_URL: string;
 
@@ -50,7 +50,12 @@ export class EnvironmentVariables {
   @IsOptional()
   @IsInt()
   @IsPositive()
-  MAX_MEETINGS_PER_USER?: number = 100;
+  HOURLY_MEETING_CREATION_LIMIT_PER_IP?: number = 100;
+
+  @IsOptional()
+  @IsInt()
+  @IsPositive()
+  DELETE_MEETINGS_OLDER_THAN_NUM_DAYS?: number = 60;
 
   @IsIn(databaseTypes)
   DATABASE_TYPE: DatabaseType;
@@ -124,13 +129,16 @@ export function validate(
   if (errors.length > 0) {
     throw new Error(errors.toString());
   }
-  if (
-    validatedConfig.DATABASE_TYPE === 'sqlite' &&
-    !validatedConfig.SQLITE_PATH
-  ) {
-    throw new Error(
-      'SQLITE_PATH must be specified for sqlite database type',
-    );
+  if (validatedConfig.DATABASE_TYPE === 'sqlite') {
+    if (!validatedConfig.SQLITE_PATH) {
+      throw new Error(
+        'SQLITE_PATH must be specified for sqlite database type',
+      );
+    }
+  } else {
+    // TODO: add more databases
+    throw new Error('Unsupported database ' + validatedConfig.DATABASE_TYPE);
   }
+  validatedConfig.PUBLIC_URL = stripTrailingSlash(validatedConfig.PUBLIC_URL);
   return validatedConfig;
 }

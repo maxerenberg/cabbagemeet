@@ -4,6 +4,29 @@ export function getSecondsSinceUnixEpoch(): number {
   return Math.floor(Date.now() / 1000);
 }
 
+export function getUTCDateString(date: Date): string {
+  const year = date.getUTCFullYear();
+  const month = date.getUTCMonth() + 1;
+  const day = date.getUTCDate();
+
+  const YYYY = String(year);
+  const MM = String(month).padStart(2, '0');
+  const DD = String(day).padStart(2, '0');
+  return `${YYYY}-${MM}-${DD}`;
+}
+
+export function oneYearAgoDateString(): string {
+  const date = new Date();
+  date.setUTCFullYear(date.getUTCFullYear() - 1);
+  return getUTCDateString(date);
+}
+
+export function oneYearFromNowDateString(): string {
+  const date = new Date();
+  date.setUTCFullYear(date.getUTCFullYear() + 1);
+  return getUTCDateString(date);
+}
+
 export function toISOStringUTC(date: Date): string {
   const year = date.getUTCFullYear();
   const month = date.getUTCMonth() + 1;
