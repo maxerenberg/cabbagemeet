@@ -2,6 +2,7 @@ import { ConfigService } from '@nestjs/config';
 import { TypeOrmModuleOptions } from '@nestjs/typeorm';
 import type { Database } from 'better-sqlite3';
 import type { BetterSqlite3ConnectionOptions } from 'typeorm/driver/better-sqlite3/BetterSqlite3ConnectionOptions';
+import { MysqlConnectionOptions } from 'typeorm/driver/mysql/MysqlConnectionOptions';
 import { EnvironmentVariables } from './env.validation';
 
 type Writable<T> = {
@@ -31,6 +32,9 @@ export default (
     //entities: ['dist/**/*.entity.js'],
   };
   if (databaseType === 'better-sqlite3') {
+    if (configService.get('SQLITE_PATH', {infer: true}) === undefined) {
+      throw new Error('Must specify SQLITE_PATH for database of type sqlite');
+    }
     options.database = configService.get('SQLITE_PATH', {infer: true});
     (options as Writable<BetterSqlite3ConnectionOptions>).prepareDatabase = (db: Database) => {
       if (nodeEnv === 'test') {
@@ -41,6 +45,18 @@ export default (
         db.pragma('synchronous = NORMAL');
       }
     };
+  } else if (databaseType === 'mysql') {
+    for (const option of ['MYSQL_HOST', 'MYSQL_PORT', 'MYSQL_DATABASE', 'MYSQL_USER', 'MYSQL_PASSWORD'] as const) {
+      if (configService.get(option, {infer: true}) === undefined) {
+        throw new Error(`Must specify ${option} for database of type mysql`);
+      }
+    }
+    (options as Writable<MysqlConnectionOptions>).host = configService.get('MYSQL_HOST', {infer: true});
+    (options as Writable<MysqlConnectionOptions>).port = +configService.get('MYSQL_PORT', {infer: true});
+    (options as Writable<MysqlConnectionOptions>).username = configService.get('MYSQL_USER', {infer: true});
+    (options as Writable<MysqlConnectionOptions>).password = configService.get('MYSQL_PASSWORD', {infer: true});
+    (options as Writable<MysqlConnectionOptions>).database = configService.get('MYSQL_DATABASE', {infer: true});
+    (options as Writable<MysqlConnectionOptions>).charset = 'utf8mb4';
   } else {
     throw new Error(`Database type ${envDatabaseType} is not supported yet`);
   }

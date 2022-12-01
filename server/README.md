@@ -1,39 +1,55 @@
-<p align="center">
-  <a href="http://nestjs.com/" target="blank"><img src="https://nestjs.com/img/logo-small.svg" width="200" alt="Nest Logo" /></a>
-</p>
-
-[circleci-image]: https://img.shields.io/circleci/build/github/nestjs/nest/master?token=abc123def456
-[circleci-url]: https://circleci.com/gh/nestjs/nest
-
-  <p align="center">A progressive <a href="http://nodejs.org" target="_blank">Node.js</a> framework for building efficient and scalable server-side applications.</p>
-    <p align="center">
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/v/@nestjs/core.svg" alt="NPM Version" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/l/@nestjs/core.svg" alt="Package License" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/dm/@nestjs/common.svg" alt="NPM Downloads" /></a>
-<a href="https://circleci.com/gh/nestjs/nest" target="_blank"><img src="https://img.shields.io/circleci/build/github/nestjs/nest/master" alt="CircleCI" /></a>
-<a href="https://coveralls.io/github/nestjs/nest?branch=master" target="_blank"><img src="https://coveralls.io/repos/github/nestjs/nest/badge.svg?branch=master#9" alt="Coverage" /></a>
-<a href="https://discord.gg/G7Qnnhy" target="_blank"><img src="https://img.shields.io/badge/discord-online-brightgreen.svg" alt="Discord"/></a>
-<a href="https://opencollective.com/nest#backer" target="_blank"><img src="https://opencollective.com/nest/backers/badge.svg" alt="Backers on Open Collective" /></a>
-<a href="https://opencollective.com/nest#sponsor" target="_blank"><img src="https://opencollective.com/nest/sponsors/badge.svg" alt="Sponsors on Open Collective" /></a>
-  <a href="https://paypal.me/kamilmysliwiec" target="_blank"><img src="https://img.shields.io/badge/Donate-PayPal-ff3f59.svg"/></a>
-    <a href="https://opencollective.com/nest#sponsor"  target="_blank"><img src="https://img.shields.io/badge/Support%20us-Open%20Collective-41B883.svg" alt="Support us"></a>
-  <a href="https://twitter.com/nestframework" target="_blank"><img src="https://img.shields.io/twitter/follow/nestframework.svg?style=social&label=Follow"></a>
-</p>
-  <!--[![Backers on Open Collective](https://opencollective.com/nest/backers/badge.svg)](https://opencollective.com/nest#backer)
-  [![Sponsors on Open Collective](https://opencollective.com/nest/sponsors/badge.svg)](https://opencollective.com/nest#sponsor)-->
-
 ## Description
-
-[Nest](https://github.com/nestjs/nest) framework TypeScript starter repository.
+This directory contains the source code for the server component of CabbageMeet.
 
 ## Installation
-
 ```bash
 $ npm install
 ```
 
-## Running the app
+## Database setup
+In development mode, by default a SQLite database will be used (filename is `development.db`).
+This requires no setup. To use a different database, follow the instructions below.
 
+### MariaDB
+**Note**: Do not set `MARIADB_ALLOW_EMPTY_ROOT_PASSWORD` if you are running this in production.
+```bash
+docker run -d --name cabbagemeet-mariadb -e MARIADB_USER=cabbagemeet -e MARIADB_PASSWORD=cabbagemeet -e MARIADB_DATABASE=cabbagemeet -e MARIADB_ALLOW_EMPTY_ROOT_PASSWORD=yes -p 127.0.0.1:3306:3306 mariadb
+```
+
+Now open development.env and modify/set the following variables:
+```
+DATABASE_TYPE=mysql
+MYSQL_HOST=127.0.0.1
+MYSQL_PORT=3306
+MYSQL_USER=cabbagemeet
+MYSQL_PASSWORD=cabbagemeet
+MYSQL_DATABASE=cabbagemeet
+```
+
+To connect to the database:
+```bash
+docker exec -it cabbagemeet-mariadb mariadb -ucabbagemeet -pcabbagemeet cabbagemeet
+```
+
+To connect to the database as root:
+```bash
+docker exec -it cabbagemeet-mariadb mariadb -uroot
+```
+
+## Running the SMTP server
+By default, email address verification is enabled, even in development mode.
+To disable this, set `SIGNUP_REQUIRES_EMAIL_VALIDATION = false` in development.env.
+
+In development mode, you can run a mock SMTP server in a new terminal window, which
+will listen on `localhost:8025`:
+```bash
+npm run smtp
+```
+
+In development mode, whenever the server generates a verification code or link,
+it will print it to stdout after sending it via email.
+
+## Running the app
 ```bash
 # development
 $ npm run start
@@ -46,7 +62,6 @@ $ npm run start:prod
 ```
 
 ## Test
-
 ```bash
 # unit tests
 $ npm run test
@@ -59,15 +74,4 @@ $ npm run test:cov
 ```
 
 ## Support
-
 Nest is an MIT-licensed open source project. It can grow thanks to the sponsors and support by the amazing backers. If you'd like to join them, please [read more here](https://docs.nestjs.com/support).
-
-## Stay in touch
-
-- Author - [Kamil Myśliwiec](https://kamilmysliwiec.com)
-- Website - [https://nestjs.com](https://nestjs.com/)
-- Twitter - [@nestframework](https://twitter.com/nestframework)
-
-## License
-
-Nest is [MIT licensed](LICENSE).

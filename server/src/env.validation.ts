@@ -52,6 +52,7 @@ export class EnvironmentVariables {
   @IsPositive()
   HOURLY_MEETING_CREATION_LIMIT_PER_IP?: number = 100;
 
+  // Set to 0 to disable automatic deletions
   @IsOptional()
   @IsInt()
   @IsPositive()
@@ -63,6 +64,26 @@ export class EnvironmentVariables {
   @IsOptional()
   @IsString()
   SQLITE_PATH?: string;
+
+  @IsOptional()
+  @IsString()
+  MYSQL_HOST?: string;
+
+  @IsOptional()
+  @IsPort()
+  MYSQL_PORT?: string;
+
+  @IsOptional()
+  @IsString()
+  MYSQL_USER?: string;
+
+  @IsOptional()
+  @IsString()
+  MYSQL_PASSWORD?: string;
+
+  @IsOptional()
+  @IsString()
+  MYSQL_DATABASE?: string;
 
   @IsOptional()
   @IsString()
@@ -128,16 +149,6 @@ export function validate(
   const errors = validateSync(validatedConfig, { whitelist: true });
   if (errors.length > 0) {
     throw new Error(errors.toString());
-  }
-  if (validatedConfig.DATABASE_TYPE === 'sqlite') {
-    if (!validatedConfig.SQLITE_PATH) {
-      throw new Error(
-        'SQLITE_PATH must be specified for sqlite database type',
-      );
-    }
-  } else {
-    // TODO: add more databases
-    throw new Error('Unsupported database ' + validatedConfig.DATABASE_TYPE);
   }
   validatedConfig.PUBLIC_URL = stripTrailingSlash(validatedConfig.PUBLIC_URL);
   return validatedConfig;

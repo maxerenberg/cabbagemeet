@@ -26,6 +26,7 @@ export default class MeetingDeleterService {
   }
 
   private millisUntilNextJob(): number {
+    // Milliseconds until the next midnight
     const dt = new Date();
     dt.setHours(0);
     dt.setMinutes(0);

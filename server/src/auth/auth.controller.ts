@@ -13,12 +13,11 @@ import {
   UseGuards,
   Logger,
   Req,
-  InternalServerErrorException,
   Res,
+  ServiceUnavailableException,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import {
-  ApiResponse,
   ApiBadRequestResponse,
   ApiOperation,
   ApiTags,
@@ -138,7 +137,7 @@ export class AuthController {
       }
       const verificationCodeWasSent = await this.authService.generateAndSendVerificationCode(body.name, body.email);
       if (!verificationCodeWasSent) {
-        throw new InternalServerErrorException('Please try again later');
+        throw new ServiceUnavailableException('Please try again later');
       }
       return {mustVerifyEmailAddress: true};
     }
