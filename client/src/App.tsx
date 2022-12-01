@@ -29,7 +29,6 @@ import Profile from 'components/Profile';
 import Settings from 'components/Settings';
 import { selectTokenIsPresent } from 'slices/authentication';
 import { useEffect } from 'react';
-import { useToast } from 'components/Toast';
 import { useExtractTokenFromQueryParams, useGetSelfInfoIfTokenIsPresent } from 'utils/auth.hooks';
 import { getReqErrorMessage } from 'utils/requests.utils';
 import ErrorPage from 'components/ErrorPage';
@@ -57,8 +56,9 @@ export default function App() {
               <Route index element={<Profile />} />
               <Route path="settings" element={<Settings />} />
             </Route>
+            {/* TODO: use custom 404 page */}
+            <Route path="*" element={<h3>Page not found</h3>} />
           </Route>
-          {/* TODO: use custom 404 page */}
         </Routes>
       </HistoryProvider>
     </BrowserRouter>
@@ -85,16 +85,12 @@ function BrandWithLogo() {
 }
 
 function AppRoot() {
-  const {showToast} = useToast();
-  const {isError, error} = useGetSelfInfoIfTokenIsPresent();
+  const {error} = useGetSelfInfoIfTokenIsPresent();
   useEffect(() => {
-    if (isError) {
-      showToast({
-        msg: `Failed to get user info: ${getReqErrorMessage(error!)}`,
-        msgType: 'failure',
-      });
+    if (error) {
+      console.error(`Failed to get user info: ${getReqErrorMessage(error!)}`);
     }
-  }, [isError, error, showToast]);
+  }, [error]);
   const tokenIsInURL = useExtractTokenFromQueryParams();
   if (tokenIsInURL) {
     // Don't make any requests yet until the token has been saved into
@@ -103,7 +99,7 @@ function AppRoot() {
     return null;
   }
   return (
-    <div className="App light-theme d-flex flex-column">
+    <div className="App d-flex flex-column">
       <Navbar expand="md" className="mt-3 mb-5">
         <Container className="app-main-container custom-navbar-container">
           <BrandWithLogo />

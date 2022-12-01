@@ -19,7 +19,7 @@ export default function ConfirmLinkExternalCalendar({provider}: {provider: OAuth
   const tokenIsPresent = useAppSelector(selectTokenIsPresent);
   const {data: userInfo} = useGetSelfInfoIfTokenIsPresent();
   const navigate = useNavigate();
-  const [confirmLinkAccount, {isSuccess, isLoading, isError, error}] = useConfirmLinkGoogleAccountMutation();
+  const [confirmLinkAccount, {isSuccess, isLoading, error}] = useConfirmLinkGoogleAccountMutation();
   const {showToast} = useToast();
   const [searchParams] = useSearchParams();
   // The token will be removed from the URL and stored in the Redux store from
@@ -39,13 +39,8 @@ export default function ConfirmLinkExternalCalendar({provider}: {provider: OAuth
         autoClose: true,
       });
       navigate(postRedirect!);
-    } else if (isError) {
-      showToast({
-        msg: `Failed to link ${capitalizedProvider} account: ${getReqErrorMessage(error!)}`,
-        msgType: 'failure',
-      });
     }
-  }, [isSuccess, isError, error, capitalizedProvider, showToast, navigate, postRedirect]);
+  }, [isSuccess, capitalizedProvider, showToast, navigate, postRedirect]);
   useEffect(() => {
     if (shouldRedirectToHomePage) {
       navigate('/');
@@ -105,6 +100,9 @@ export default function ConfirmLinkExternalCalendar({provider}: {provider: OAuth
           Link {capitalizedProvider} account
         </ButtonWithSpinner>
       </div>
+      {error && (
+        <p className="text-danger text-center mb-0 mt-3">An error occurred: {getReqErrorMessage(error)}</p>
+      )}
     </div>
   );
 }

@@ -27,6 +27,7 @@ import {
   ApiBearerAuth,
   ApiCreatedResponse,
   ApiOkResponse,
+  ApiNotFoundResponse,
 } from '@nestjs/swagger';
 import {
   BadRequestResponse,
@@ -69,6 +70,7 @@ const RATE_LIMIT_ERROR_MESSAGE = 'Rate limit reached. Please try again later';
 export class AuthController {
   private readonly logger = new Logger(AuthController.name);
   private readonly pwresetRateLimiter: RateLimiter;
+  private readonly loginRateLimiter: RateLimiter;
   private readonly signupRateLimiter: RateLimiter;
   private readonly verifySignupEmailAddress: boolean;
 
@@ -83,6 +85,8 @@ export class AuthController {
     this.pwresetRateLimiter = new RateLimiter(SECONDS_PER_MINUTE * 10, 1);
     // A user can try to sign up at most once every 10 minutes
     this.signupRateLimiter = new RateLimiter(SECONDS_PER_MINUTE * 10, 1);
+    // A user can try to login at most 10 times per minute
+    this.loginRateLimiter = new RateLimiter(SECONDS_PER_MINUTE, 10);
     this.verifySignupEmailAddress = configService.get('VERIFY_SIGNUP_EMAIL_ADDRESS', {infer: true});
   }
 
@@ -183,6 +187,10 @@ export class AuthController {
   @Post('login')
   @HttpCode(HttpStatus.OK)
   async login(@Body() body: LocalLoginDto): Promise<UserResponseWithToken> {
+    // TODO: rate limit based on IP address as well
+    if (!this.loginRateLimiter.tryAddRequestIfWithinLimits(body.email)) {
+      throw new HttpException(RATE_LIMIT_ERROR_MESSAGE, HttpStatus.TOO_MANY_REQUESTS);
+    }
     const user = await this.authService.validateUser(body.email, body.password);
     if (user === null) {
       throw new UnauthorizedException();
@@ -256,7 +264,7 @@ export class AuthController {
       return this.oauth2Service.getRequestURL(OAuth2Provider.GOOGLE, {reason, postRedirect, nonce});
     } catch (err: any) {
       if (err instanceof OAuth2NotConfiguredError) {
-        throw new NotFoundException();
+        throw new NotFoundException('Google OAuth2 is not configured on this server');
       }
       throw err;
     }
@@ -267,7 +275,7 @@ export class AuthController {
     description: 'Returns a URL to an OAuth2 consent page where the client can sign in with their Google account',
     operationId: 'loginWithGoogle',
   })
-  @ApiResponse({type: NotFoundResponse})
+  @ApiNotFoundResponse({type: NotFoundResponse})
   @Post('login-with-google')
   @HttpCode(HttpStatus.OK)
   loginWithGoogle(@Body() body: OAuth2ConsentPostRedirectDto): CustomRedirectResponse {

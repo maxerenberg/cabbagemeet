@@ -21,7 +21,7 @@ export default function MeetingForm() {
   const dispatch = useAppDispatch();
   const dates = useAppSelector(selectSelectedDates);
   const visitedDayPicker = useAppSelector(state => state.visitedDayPicker);
-  const [createMeeting, {data, isUninitialized, isLoading, isSuccess, isError, error}] = useCreateMeetingMutation();
+  const [createMeeting, {data, isUninitialized, isLoading, isSuccess, error}] = useCreateMeetingMutation();
   const navigate = useNavigate();
   const { showToast } = useToast();
 
@@ -30,7 +30,6 @@ export default function MeetingForm() {
     //
     // The isUninitialized check is necessary because visitedDayPicker
     // gets reset to false when we call dispatch(setVisitedDayPicker(false)).
-    // FIXME: this kind of check shouldn't be necessary, it's too complicated
     if (!visitedDayPicker && isUninitialized) {
       navigate('/');
     }
@@ -47,13 +46,8 @@ export default function MeetingForm() {
       dispatch(resetSelectedDates());
       dispatch(setVisitedDayPicker(false));
       navigate('/m/' + data!.meetingID);
-    } else if (isError) {
-      showToast({
-        msg: `Failed to create meeting: ${getReqErrorMessage(error!)}`,
-        msgType: 'failure',
-      });
     }
-  }, [data, isSuccess, isError, error, dispatch, navigate, showToast]);
+  }, [data, isSuccess, dispatch, navigate, showToast]);
 
   if (isSuccess) {
     // we're about to switch to a different URL
@@ -81,6 +75,9 @@ export default function MeetingForm() {
         setMeetingName={setMeetingName}
         isLoading={isLoading}
       />
+      {error && (
+        <p className="text-danger text-center mt-3">An error occurred: {getReqErrorMessage(error)}</p>
+      )}
       <MeetingAboutPrompt
         meetingAbout={meetingAbout}
         setMeetingAbout={setMeetingAbout}

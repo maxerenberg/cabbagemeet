@@ -1,4 +1,6 @@
-import React, { useCallback, useEffect, useState } from "react";
+import type { FetchBaseQueryError } from "@reduxjs/toolkit/dist/query";
+import type { SerializedError } from "@reduxjs/toolkit";
+import React, { useEffect, useRef, useState } from "react";
 import Form from "react-bootstrap/Form";
 import { useAppDispatch, useAppSelector } from 'app/hooks';
 import BottomOverlay from "components/BottomOverlay";
@@ -13,7 +15,7 @@ import { useToast } from "components/Toast";
 import DeleteMeetingModal from "./DeleteMeetingModal";
 import ButtonWithSpinner from "components/ButtonWithSpinner";
 import { useEditMeetingMutation } from "slices/api";
-import { getReqErrorMessage } from "utils/requests.utils";
+import { getReqErrorMessage, useMutationWithPersistentError } from "utils/requests.utils";
 import { ianaTzName } from "utils/dates.utils";
 import { useGetCurrentMeetingWithSelector } from "utils/meetings.hooks";
 import { assert } from "utils/misc.utils";
@@ -34,7 +36,7 @@ export default function EditMeeting({
   const [startTime, setStartTime] = useState(Math.floor(meeting.minStartHour));
   const [endTime, setEndTime] = useState(Math.ceil(meeting.maxEndHour));
   const selectedDates = useAppSelector(selectSelectedDates);
-  const [editMeeting, {isLoading, isSuccess, isError, error}] = useEditMeetingMutation();
+  const [editMeeting, {isLoading, isSuccess, error}] = useMutationWithPersistentError(useEditMeetingMutation);
   const dispatch = useAppDispatch();
   const { showToast } = useToast();
 
@@ -58,13 +60,8 @@ export default function EditMeeting({
         autoClose: true,
       });
       setIsEditing(false);
-    } else if (isError) {
-      showToast({
-        msg: `Failed to edit meeting: ${getReqErrorMessage(error!)}`,
-        msgType: 'failure',
-      });
     }
-  }, [isSuccess, isError, error, showToast, setIsEditing]);
+  }, [isSuccess, showToast, setIsEditing]);
 
   const onSave: React.MouseEventHandler<HTMLButtonElement> = (ev) => {
     ev.preventDefault();
@@ -87,7 +84,7 @@ export default function EditMeeting({
 
   return (
     <Form className="edit-meeting">
-      <MeetingNamePrompt {...{meetingName, setMeetingName, setIsEditing, onSave, isLoading}} />
+      <MeetingNamePrompt {...{meetingName, setMeetingName, setIsEditing, onSave, isLoading, error}} />
       <MeetingAboutPrompt {...{meetingAbout, setMeetingAbout}} />
       <div className="create-meeting-form-group">
         <p className="fs-5">On which days would you like to meet?</p>
@@ -116,23 +113,36 @@ function MeetingNamePrompt({
   setIsEditing,
   onSave,
   isLoading,
+  error,
 }: {
   meetingName: string,
   setMeetingName: (name: string) => void,
   setIsEditing: (val: boolean) => void,
   onSave: React.MouseEventHandler<HTMLButtonElement>,
   isLoading: boolean,
+  error: FetchBaseQueryError | SerializedError | undefined,
 }) {
   const onMeetingNameChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setMeetingName(e.target.value);
   };
   const [showDeleteModal, setShowDeleteModal] = useState(false);
-  const onDeleteModalClose = useCallback(() => setShowDeleteModal(false), []);
+  const errorMessageElemRef = useRef<HTMLParagraphElement>(null);
+
+  useEffect(() => {
+    if (error) {
+      // We need to wait until the <p> element actually becomes visible
+      // before scrolling to it
+      setTimeout(() => {
+        errorMessageElemRef.current!.scrollIntoView(false);
+      }, 1);
+    }
+  }, [error]);
+
   const onDeleteClick = () => setShowDeleteModal(true);
   const onCancelClick = () => setIsEditing(false);
   return (
     <>
-      {showDeleteModal && <DeleteMeetingModal onClose={onDeleteModalClose} />}
+      <DeleteMeetingModal show={showDeleteModal} setShow={setShowDeleteModal} />
       <Form.Group className="d-flex align-items-center">
         <Form.Control
           placeholder="Name your meeting"
@@ -191,6 +201,14 @@ function MeetingNamePrompt({
           </ButtonWithSpinner>
         </BottomOverlay>
       </Form.Group>
+      {error && (
+        <p
+          className="text-danger text-center mb-0 mt-3"
+          ref={errorMessageElemRef}
+        >
+          Could not edit meeting: {getReqErrorMessage(error)}
+        </p>
+      )}
     </>
   );
 }

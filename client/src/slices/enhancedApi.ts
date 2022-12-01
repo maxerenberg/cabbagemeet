@@ -86,9 +86,6 @@ export const enhancedApi = replacedApi.enhanceEndpoints({
     unlinkGoogleCalendar: {
       onQueryStarted: editUser_onQueryStarted,
     },
-    getMeeting: {
-      onQueryStarted: getMeeting_onQueryStarted,
-    },
     addGuestRespondent: {
       onQueryStarted: upsertMeeting_onQueryStarted,
     },
@@ -213,17 +210,6 @@ async function upsertMeeting_onQueryStarted(
     dispatch(replacedApi.util.upsertQueryData(
       'getMeeting', meeting.meetingID, transformMeetingResponse(meeting)
     ));
-    dispatch(setCurrentMeetingID(meeting.meetingID));
-  } catch {}
-}
-
-async function getMeeting_onQueryStarted(
-  arg: number,
-  {dispatch, queryFulfilled}: QueryLifecycleApi<any, any, TransformedMeetingResponse, 'api'>,
-) {
-  try {
-    const {data: meeting} = await queryFulfilled;
-    dispatch(setCurrentMeetingID(meeting.meetingID));
   } catch {}
 }
 

@@ -1,28 +1,36 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import GenericSpinner from 'components/GenericSpinner';
 import NonFocusButton from 'components/NonFocusButton';
 import WeeklyViewTimePicker from './WeeklyTimeViewPicker';
 import './Meeting.css';
 import EditMeeting from './EditMeeting';
-import { useToast } from 'components/Toast';
 import { useGetMeetingQuery } from 'slices/enhancedApi';
 import { getReqErrorMessage } from 'utils/requests.utils';
 import { useGetCurrentMeetingWithSelector } from 'utils/meetings.hooks';
 import { useSelfInfoIsPresent } from 'utils/auth.hooks';
+import { useAppDispatch } from 'app/hooks';
+import { setCurrentMeetingID } from 'slices/currentMeeting';
+import InfoModal from 'components/InfoModal';
 
 export default function Meeting() {
   const [isEditingMeeting, setIsEditingMeeting] = useState(false);
+  const dispatch = useAppDispatch();
   const params = useParams();
   const meetingID = parseInt(params.id!);
   const skip = isNaN(meetingID);
   const {isError, error} = useGetMeetingQuery(meetingID, {skip});
-  // FIXME: this is ugly. What's happening is that there is a delay between
-  // when the data is fetched, and when the meetingID is stored in the separate
-  // Redux slice.
-  // Maybe we should store the meetingID before fetching the data?
-  const {secondaryHookIsReady} = useGetCurrentMeetingWithSelector(
-    ({data: meeting}) => ({secondaryHookIsReady: !!meeting})
+
+  useEffect(() => {
+    dispatch(setCurrentMeetingID(meetingID));
+  }, [dispatch, meetingID]);
+
+  // Wait until the data for the current meeting is ready.
+  // Since the setCurrentMeetingID call happens asynchronously, the data for
+  // a different meeting might still be loaded because the old meetingID is
+  // still present in the Redux store. So we need to check the meetingID.
+  const {isReady} = useGetCurrentMeetingWithSelector(
+    ({data: meeting}) => ({isReady: meeting && meeting.meetingID === meetingID})
   );
 
   if (skip) {
@@ -39,7 +47,7 @@ export default function Meeting() {
       </div>
     );
   }
-  if (!secondaryHookIsReady) {
+  if (!isReady) {
     return <GenericSpinner />;
   }
   if (isEditingMeeting) {
@@ -64,22 +72,18 @@ const MeetingTitleRow = React.memo(function MeetingTitleRow({
     ({data: meeting}) => ({name: meeting?.name})
   );
   const isLoggedIn = useSelfInfoIsPresent();
-  const { showToast } = useToast();
+  const [showModal, setShowModal] = useState(false);
   const onClickEditButton = () => {
     if (isLoggedIn) {
       setIsEditingMeeting(true);
     } else {
-      showToast({
-        msg: 'You must be logged in to edit a meeting',
-        msgType: 'failure',
-        autoClose: true,
-      });
+      setShowModal(true);
     }
   };
   return (
-    <div className="d-flex align-items-center justify-content-between">
-      <div style={{fontSize: '1.3em'}}>{name}</div>
-      <div>
+    <>
+      <div className="d-flex align-items-center">
+        <div className="me-auto" style={{fontSize: '1.3em'}}>{name}</div>
         <NonFocusButton
           className="btn btn-outline-secondary px-4"
           onClick={onClickEditButton}
@@ -88,7 +92,10 @@ const MeetingTitleRow = React.memo(function MeetingTitleRow({
         </NonFocusButton>
         <NonFocusButton className="btn btn-outline-primary px-4 ms-4">Share</NonFocusButton>
       </div>
-    </div>
+      <InfoModal show={showModal} setShow={setShowModal}>
+        <p className="text-center my-3">You must be logged in to edit a meeting.</p>
+      </InfoModal>
+    </>
   );
 });
 

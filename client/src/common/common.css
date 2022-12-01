@@ -10,6 +10,9 @@
   .btn {
     --bs-btn-font-size: 0.9rem;
   }
+  .w-100-md-down {
+    width: 100%;
+  }
 }
 
 .header-link {

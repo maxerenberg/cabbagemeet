@@ -1,9 +1,8 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { Form } from "react-bootstrap";
 import { useSearchParams } from "react-router-dom";
 import ButtonWithSpinner from "components/ButtonWithSpinner";
 import { useConfirmPasswordResetMutation } from "slices/enhancedApi";
-import { useToast } from "./Toast";
 import { getReqErrorMessage } from "utils/requests.utils";
 import { Link } from "react-router-dom";
 
@@ -12,18 +11,8 @@ export default function ConfirmPasswordReset() {
   const [password, setPassword] = useState('');
   const [passwordConfirmation, setPasswordConfirmation] = useState('');
   const [validated, setValidated] = useState(false);
-  const [confirmReset, {isLoading, isSuccess, isError, error}] = useConfirmPasswordResetMutation();
-  const {showToast} = useToast();
+  const [confirmReset, {isLoading, isSuccess, error}] = useConfirmPasswordResetMutation();
   const token = searchParams.get('pwresetToken');
-
-  useEffect(() => {
-    if (isError) {
-      showToast({
-        msg: getReqErrorMessage(error!),
-        msgType: 'failure',
-      });
-    }
-  }, [isError, error, showToast]);
 
   if (!token) {
     return (
@@ -102,6 +91,9 @@ export default function ConfirmPasswordReset() {
           Submit
         </ButtonWithSpinner>
       </Form>
+      {error && (
+        <p className="text-danger mb-0 mt-3">An error occurred: {getReqErrorMessage(error)}</p>
+      )}
     </div>
   );
 }

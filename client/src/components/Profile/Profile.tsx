@@ -1,7 +1,7 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import ButtonGroup from 'react-bootstrap/ButtonGroup';
 import { Link, useNavigate } from "react-router-dom";
-import { useAppDispatch, useAppSelector } from "app/hooks";
+import { useAppSelector } from "app/hooks";
 import BottomOverlay from "components/BottomOverlay";
 import ButtonWithSpinner from "components/ButtonWithSpinner";
 import GenericSpinner from "components/GenericSpinner";
@@ -11,10 +11,9 @@ import {
 } from "slices/authentication";
 import CreatedOrRespondedMeetings from "./CreatedOrRespondedMeetings";
 import styles from './Profile.module.css';
-import { useToast } from "components/Toast";
 import { useGetSelfInfoQuery, useLogoutMutation } from "slices/api";
 import { useGetSelfInfoIfTokenIsPresent } from "utils/auth.hooks";
-import { getReqErrorMessage } from "utils/requests.utils";
+import { getReqErrorMessage, useMutationWithPersistentError } from "utils/requests.utils";
 
 export default function Profile() {
   const tokenIsPresent = useAppSelector(selectTokenIsPresent);
@@ -52,20 +51,20 @@ export default function Profile() {
 // TODO: add button to sign out everywhere
 
 function Heading() {
-  const [logout, {isLoading, isError, error}] = useLogoutMutation();
+  const [logout, {isLoading, error}] = useMutationWithPersistentError(useLogoutMutation);
   const {data: userInfo} = useGetSelfInfoIfTokenIsPresent();
-  const dispatch = useAppDispatch();
   const onSignoutClick = () => logout(false);
-  const { showToast } = useToast();
+  const errorMessageElemRef = useRef<HTMLParagraphElement>(null);
 
   useEffect(() => {
-    if (isError) {
-      showToast({
-        msg: `Failed to logout: ${getReqErrorMessage(error!)}`,
-        msgType: 'failure',
-      });
+    if (error) {
+      // We need to wait until the <p> element actually becomes visible
+      // before scrolling to it
+      setTimeout(() => {
+        errorMessageElemRef.current!.scrollIntoView(false);
+      }, 1);
     }
-  }, [isError, error, dispatch, showToast]);
+  }, [error]);
 
   let visibilityClass = "visible";
   if (userInfo === null) {
@@ -78,37 +77,45 @@ function Heading() {
   const signoutBtnDisabled = isLoading;
 
   return (
-    <div className={`d-flex align-items-center ${visibilityClass}`}>
-      <h4 className="mb-0">
-        {userInfo?.name}&#39;s meetings
-      </h4>
-      <ButtonWithSpinner
-        className="d-none d-md-block btn btn-outline-primary ms-auto"
-        isLoading={signoutBtnDisabled}
-        onClick={onSignoutClick}
-      >
-        Sign out
-      </ButtonWithSpinner>
-      <Link to="/me/settings" className="text-decoration-none">
-        <button className="d-none d-md-block btn btn-primary custom-btn-min-width ms-3">
-          Settings
-        </button>
-      </Link>
-      <BottomOverlay>
-        <Link to="/me/settings" className="text-decoration-none">
-          <button className="btn btn-light custom-btn-min-width">
-            Settings
-          </button>
-        </Link>
+    <>
+      <div className={`d-flex align-items-center ${visibilityClass}`}>
+        <h4 className="mb-0">
+          {userInfo?.name}&#39;s meetings
+        </h4>
         <ButtonWithSpinner
-          className="btn btn-light ms-auto"
+          className="d-none d-md-block btn btn-outline-primary ms-auto"
           isLoading={signoutBtnDisabled}
           onClick={onSignoutClick}
         >
           Sign out
         </ButtonWithSpinner>
-      </BottomOverlay>
-    </div>
+        <Link to="/me/settings" className="text-decoration-none">
+          <button className="d-none d-md-block btn btn-primary custom-btn-min-width ms-3">
+            Settings
+          </button>
+        </Link>
+        <BottomOverlay>
+          <Link to="/me/settings" className="text-decoration-none">
+            <button className="btn btn-light custom-btn-min-width">
+              Settings
+            </button>
+          </Link>
+          <ButtonWithSpinner
+            className="btn btn-light ms-auto"
+            isLoading={signoutBtnDisabled}
+            onClick={onSignoutClick}
+          >
+            Sign out
+          </ButtonWithSpinner>
+        </BottomOverlay>
+      </div>
+      <p
+        className={`text-danger text-center mb-0 mt-3 d-${error ? 'block' : 'none'}`}
+        ref={errorMessageElemRef}
+      >
+        Could not sign out: {error ? getReqErrorMessage(error) : ''}
+      </p>
+    </>
   );
 }
 

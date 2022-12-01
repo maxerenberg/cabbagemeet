@@ -126,7 +126,7 @@ export default function WeeklyViewTimePicker() {
   return (
     <>
       <AvailabilitiesRow {...{moreDaysToRight, pageDispatch}} />
-      <div className="d-md-flex">
+      <div className="d-md-flex mt-5">
         <div
           style={{
             flexGrow: 1,

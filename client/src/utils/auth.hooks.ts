@@ -36,6 +36,14 @@ export function useExtractTokenFromQueryParams(): boolean {
   useEffect(() => {
     const token = searchParamsRef.current.get('token');
     const nonce = searchParamsRef.current.get('nonce');
+    if (token !== null && nonce === null) {
+      // The AppRoot is waiting for us to clear the token parameter, so if the URL
+      // is malformed, just fix it and return
+      const newParams = new URLSearchParams(searchParamsRef.current);
+      newParams.delete('token');
+      setSearchParams(newParams, {replace: true});
+      searchParamsRef.current = newParams;
+    }
     if (token === null || nonce === null) {
       return;
     }

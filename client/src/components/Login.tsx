@@ -3,9 +3,8 @@ import Form from 'react-bootstrap/Form';
 import { Link, useNavigate } from 'react-router-dom';
 import BottomOverlay from 'components/BottomOverlay';
 import ContinueWithGoogleButton from 'components/ContinueWithGoogleButton';
-import { useToast } from 'components/Toast';
 import styles from './Login.module.css';
-import { getReqErrorMessage } from "utils/requests.utils";
+import { getReqErrorMessage, useMutationWithPersistentError } from "utils/requests.utils";
 import ButtonWithSpinner from './ButtonWithSpinner';
 import { useLoginMutation } from 'slices/api';
 import { HistoryContext } from './HistoryProvider';
@@ -23,8 +22,7 @@ export default function Login() {
 function LoginForm() {
   const [validated, setValidated] = useState(false);
   const navigate = useNavigate();
-  const [login, {isUninitialized, isLoading, isSuccess, isError, error}] = useLoginMutation();
-  const { showToast } = useToast();
+  const [login, {isUninitialized, isLoading, isSuccess, isError, error}] = useMutationWithPersistentError(useLoginMutation);
   const emailRef = useRef<HTMLInputElement>(null);
   const passwordRef = useRef<HTMLInputElement>(null);
   const {lastNonAuthPath} = useContext(HistoryContext);
@@ -50,15 +48,10 @@ function LoginForm() {
   useEffect(() => { lastNonAuthPathRef.current = lastNonAuthPath; }, [lastNonAuthPath]);
 
   useEffect(() => {
-    if (isError) {
-      showToast({
-        msg: `An error occurred: ${getReqErrorMessage(error!)}`,
-        msgType: 'failure',
-      });
-    } else if (isSuccess) {
+    if (isSuccess) {
       navigate(lastNonAuthPathRef.current);
     }
-  }, [isError, error, isSuccess, navigate, showToast]);
+  }, [isSuccess, navigate]);
 
   return (
     <Form noValidate className={styles.loginForm} {...{validated, onSubmit}}>
@@ -101,6 +94,9 @@ function LoginForm() {
         </Form.Control.Feedback>
       </Form.Group>
       <SignUpOrLogin disabled={submitBtnDisabled} />
+      {error && (
+        <p className="text-danger text-center mb-0 mt-3">An error occurred: {getReqErrorMessage(error)}</p>
+      )}
     </Form>
   );
 }

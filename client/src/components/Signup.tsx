@@ -3,9 +3,8 @@ import Form from 'react-bootstrap/Form';
 import { Link, useNavigate } from 'react-router-dom';
 import BottomOverlay from 'components/BottomOverlay';
 import ContinueWithGoogleButton from 'components/ContinueWithGoogleButton';
-import { useToast } from 'components/Toast';
 import styles from './Signup.module.css';
-import { getReqErrorMessage } from 'utils/requests.utils';
+import { getReqErrorMessage, useMutationWithPersistentError } from 'utils/requests.utils';
 import ButtonWithSpinner from './ButtonWithSpinner';
 import { useSignupMutation } from 'slices/api';
 import { HistoryContext } from './HistoryProvider';
@@ -56,8 +55,7 @@ function SignupForm({
   redirectAfterSuccessfulSignup: () => void,
 }) {
   const [validated, setValidated] = useState(false);
-  const [signup, {data, isLoading, isSuccess, isError, error}] = useSignupMutation();
-  const { showToast } = useToast();
+  const [signup, {data, isLoading, isSuccess, error}] = useMutationWithPersistentError(useSignupMutation);
   let onSubmit: React.FormEventHandler<HTMLFormElement> | undefined;
   const submitBtnDisabled = isLoading;
   if (!submitBtnDisabled) {
@@ -77,12 +75,7 @@ function SignupForm({
   }
 
   useEffect(() => {
-    if (isError) {
-      showToast({
-        msg: `An error occurred: ${getReqErrorMessage(error!)}`,
-        msgType: 'failure',
-      });
-    } else if (isSuccess) {
+    if (isSuccess) {
       if (isVerifyEmailAddressResponse(data!)) {
         setShouldShowVerificationPage(true);
       } else {
@@ -90,9 +83,8 @@ function SignupForm({
       }
     }
   }, [
-    data, isError, error, isSuccess,
+    data, isSuccess,
     setShouldShowVerificationPage, redirectAfterSuccessfulSignup,
-    showToast,
   ]);
 
   return (
@@ -147,6 +139,9 @@ function SignupForm({
         </Form.Control.Feedback>
       </Form.Group>
       <SignUpOrLogin disabled={submitBtnDisabled} />
+      {error && (
+        <p className="text-danger text-center mb-0 mt-3">An error occurred: {getReqErrorMessage(error)}</p>
+      )}
     </Form>
   );
 }

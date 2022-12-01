@@ -1,4 +1,4 @@
-.App {
+:root {
   --bs-primary-rgb: var(--custom-primary-rgb);
   --bs-secondary-rgb: var(--custom-secondary-rgb);
 
@@ -9,8 +9,8 @@
 /* Custom colors */
 /* See https://htmlcolorcodes.com/color-names/ */
 
-/* TODO: dark theme */
-.light-theme {
+/* TODO: dark theme (will need SASS mixins to avoid code duplication) */
+:root, .light-theme {
   --custom-primary: forestgreen;
   --custom-primary-rgb: 34, 139, 34;
   --custom-primary-contrast: white;

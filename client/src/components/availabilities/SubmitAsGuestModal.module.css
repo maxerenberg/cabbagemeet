@@ -1,0 +1,8 @@
+.alreadyHaveAccount {
+  font-size: 0.9em;
+}
+
+.alreadyHaveAccount:hover {
+  color: var(--custom-primary);
+  cursor: pointer;
+}

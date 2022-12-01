@@ -12,9 +12,6 @@ export default function MeetingNamePrompt({
   setMeetingName: (name: string) => void,
   isLoading: boolean,
 }) {
-  const onMeetingNameChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setMeetingName(e.target.value);
-  };
   return (
     <Form.Group className="d-flex align-items-center">
       <Form.Control
@@ -22,7 +19,7 @@ export default function MeetingNamePrompt({
         className="create-meeting-question form-text-input flex-grow-1"
         autoFocus
         value={meetingName}
-        onChange={onMeetingNameChange}
+        onChange={(ev) => setMeetingName(ev.target.value)}
       />
       <ButtonWithSpinner
         className="btn btn-primary d-none d-md-block ms-md-4 create-meeting-button"
