@@ -19,6 +19,7 @@ import JwtAuthGuard from 'src/auth/jwt-auth.guard';
 import CustomJwtService from 'src/custom-jwt/custom-jwt.service';
 import { assertIsNever, encodeQueryParams } from 'src/misc.utils';
 import User from 'src/users/user.entity';
+import UsersService from 'src/users/users.service';
 import { DeepPartial } from 'typeorm';
 import ConfirmLinkAccountDto from './confirm-link-account.dto';
 import GoogleOAuth2 from './google-oauth2.entity';
@@ -37,8 +38,9 @@ export class Oauth2Controller {
   private readonly logger = new Logger(Oauth2Controller.name);
 
   constructor(
-    private oauth2Service: OAuth2Service,
-    private jwtService: CustomJwtService,
+    private readonly oauth2Service: OAuth2Service,
+    private readonly jwtService: CustomJwtService,
+    private readonly usersService: UsersService,
   ) {}
 
   private stateIsValid(state: any): boolean {
@@ -49,9 +51,10 @@ export class Oauth2Controller {
         && typeof state.postRedirect === 'string';
   }
 
-  private redirectWithToken(res: Response, redirectURL: string, nonce: string | undefined, user: User) {
+  private async redirectWithToken(res: Response, redirectURL: string, nonce: string | undefined, user: User) {
     // We need to "push" the response to the client
-    const {token} = this.jwtService.serializeUserToJwt(user);
+    const {payload, token} = this.jwtService.serializeUserToJwt(user);
+    await this.usersService.updateTimestamp(user, payload.iat);
     const urlParams: Record<string, string> = {token};
     if (nonce) {
       urlParams.nonce = nonce;
@@ -86,7 +89,7 @@ export class Oauth2Controller {
         res.redirect(state.postRedirect);
       } else if (state.reason === 'signup') {
         const user = await this.oauth2Service.google_fetchAndStoreUserInfoForSignup(code, state);
-        this.redirectWithToken(res, state.postRedirect, state.nonce, user);
+        await this.redirectWithToken(res, state.postRedirect, state.nonce, user);
       } else if (state.reason === 'login') {
         const {
           user,
@@ -97,7 +100,7 @@ export class Oauth2Controller {
           // The user explicitly linked their account with Google (either by signing
           // up with Google initially, or by clicking 'Link account' from the settings
           // page). We should successfully log them in.
-          this.redirectWithToken(res, state.postRedirect, state.nonce, user);
+          await this.redirectWithToken(res, state.postRedirect, state.nonce, user);
         } else if (user) {
           // The user signed up with this Gmail account, but never linked the account
           // via the settings page. We need them to confirm whether they want

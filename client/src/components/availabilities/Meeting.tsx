@@ -12,6 +12,7 @@ import { useSelfInfoIsPresent } from 'utils/auth.hooks';
 import { useAppDispatch } from 'app/hooks';
 import { setCurrentMeetingID } from 'slices/currentMeeting';
 import InfoModal from 'components/InfoModal';
+import { useToast } from 'components/Toast';
 
 export default function Meeting() {
   const [isEditingMeeting, setIsEditingMeeting] = useState(false);
@@ -72,13 +73,30 @@ const MeetingTitleRow = React.memo(function MeetingTitleRow({
     ({data: meeting}) => ({name: meeting?.name})
   );
   const isLoggedIn = useSelfInfoIsPresent();
-  const [showModal, setShowModal] = useState(false);
+  const [showMustBeLoggedInModal, setShowMustBeLoggedInModal] = useState(false);
+  const [showClipboardFailedModal, setShowClipboardFailedModal] = useState(false);
+  const {showToast} = useToast();
   const onClickEditButton = () => {
     if (isLoggedIn) {
       setIsEditingMeeting(true);
     } else {
-      setShowModal(true);
+      setShowMustBeLoggedInModal(true);
     }
+  };
+  const onClickShareButton = async () => {
+    try {
+      // Don't include the query parameters, just in case there's something sensitive in there
+      await navigator.clipboard.writeText(window.location.origin + window.location.pathname);
+    } catch (err) {
+      console.error('Failed to write to clipboard:', err);
+      setShowClipboardFailedModal(true);
+      return;
+    }
+    showToast({
+      msg: 'Successfully copied URL to clipboard',
+      msgType: 'success',
+      autoClose: true,
+    });
   };
   return (
     <>
@@ -90,10 +108,18 @@ const MeetingTitleRow = React.memo(function MeetingTitleRow({
         >
           Edit
         </NonFocusButton>
-        <NonFocusButton className="btn btn-outline-primary px-4 ms-4">Share</NonFocusButton>
+        <NonFocusButton
+          className="btn btn-outline-primary px-4 ms-4"
+          onClick={onClickShareButton}
+        >
+          Share
+        </NonFocusButton>
       </div>
-      <InfoModal show={showModal} setShow={setShowModal}>
+      <InfoModal show={showMustBeLoggedInModal} setShow={setShowMustBeLoggedInModal}>
         <p className="text-center my-3">You must be logged in to edit a meeting.</p>
+      </InfoModal>
+      <InfoModal show={showClipboardFailedModal} setShow={setShowClipboardFailedModal}>
+        <p className="text-center my-3">Could not write to clipboard. Check the console for details.</p>
       </InfoModal>
     </>
   );
