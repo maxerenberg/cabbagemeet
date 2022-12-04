@@ -56,8 +56,11 @@ export const {
   useConfirmPasswordResetMutation,
 } = replacedApi;
 
+const meetingTags = ['createdMeetings', 'respondedMeetings'] as const;
+const allTags = [...meetingTags] as const;
+
 export const enhancedApi = replacedApi.enhanceEndpoints({
-  addTagTypes: ['createdMeetings', 'respondedMeetings'],
+  addTagTypes: allTags,
   endpoints: {
     login: {
       onQueryStarted: loginOrVerifyEmail_onQueryStarted,
@@ -70,9 +73,11 @@ export const enhancedApi = replacedApi.enhanceEndpoints({
     },
     logout: {
       onQueryStarted: logoutOrDeleteAccount_onQueryStarted,
+      invalidatesTags: allTags,
     },
     deleteUser: {
       onQueryStarted: logoutOrDeleteAccount_onQueryStarted,
+      invalidatesTags: allTags,
     },
     getSelfInfo: {
       onQueryStarted: getSelfInfo_onQueryStarted,
@@ -99,23 +104,23 @@ export const enhancedApi = replacedApi.enhanceEndpoints({
       onQueryStarted: upsertMeeting_onQueryStarted,
     },
     createMeeting: {
-      invalidatesTags: ['createdMeetings', 'respondedMeetings'],
+      invalidatesTags: meetingTags,
       onQueryStarted: upsertMeeting_onQueryStarted,
     },
     editMeeting: {
-      invalidatesTags: ['createdMeetings', 'respondedMeetings'],
+      invalidatesTags: meetingTags,
       onQueryStarted: upsertMeeting_onQueryStarted,
     },
     deleteMeeting: {
-      invalidatesTags: ['createdMeetings', 'respondedMeetings'],
+      invalidatesTags: meetingTags,
       onQueryStarted: deleteMeeting_onQueryStarted,
     },
     scheduleMeeting: {
-      invalidatesTags: ['createdMeetings', 'respondedMeetings'],
+      invalidatesTags: meetingTags,
       onQueryStarted: upsertMeeting_onQueryStarted,
     },
     unscheduleMeeting: {
-      invalidatesTags: ['createdMeetings', 'respondedMeetings'],
+      invalidatesTags: meetingTags,
       onQueryStarted: upsertMeeting_onQueryStarted,
     },
     getCreatedMeetings: {
@@ -207,6 +212,7 @@ async function upsertMeeting_onQueryStarted(
 ) {
   try {
     const {data: meeting} = await queryFulfilled;
+    console.log('Dispatching data for getMeeting:', transformMeetingResponse(meeting));
     dispatch(replacedApi.util.upsertQueryData(
       'getMeeting', meeting.meetingID, transformMeetingResponse(meeting)
     ));

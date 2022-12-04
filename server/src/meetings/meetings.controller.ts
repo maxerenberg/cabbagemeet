@@ -67,8 +67,8 @@ function meetingToMeetingResponse(
   return response;
 }
 
-function meetingDtoToMeetingEntity(body: Partial<CreateMeetingDto>): DeepPartial<Meeting> {
-  const meeting: DeepPartial<Meeting> = {};
+function meetingDtoToMeetingEntity(body: Partial<CreateMeetingDto>): Partial<Meeting> {
+  const meeting: Partial<Meeting> = {};
     if (body.hasOwnProperty('name')) {
       meeting.Name = body.name;
     }
@@ -95,7 +95,7 @@ function tentativeDatesAreOutOfRange(tentativeDates: string[]): boolean {
   const maxDate = tentativeDates.reduce((a, b) => a > b ? a : b);
   const oneYearAgo = oneYearAgoDateString();
   const oneYearFromNow = oneYearFromNowDateString();
-  return minDate < oneYearAgoDateString() || maxDate > oneYearFromNow;
+  return minDate < oneYearAgo || maxDate > oneYearFromNow;
 }
 
 @ApiTags('meetings')
@@ -215,8 +215,8 @@ export class MeetingsController {
     if (Object.keys(partialUpdate).length === 0) {
       throw new BadRequestException('At least one property must be specified');
     }
-    const updatedMeeting = await this.meetingsService.editMeeting(meeting, partialUpdate);
-    return meetingToMeetingResponse(updatedMeeting, maybeUser);
+    await this.meetingsService.editMeeting(meeting, partialUpdate);
+    return meetingToMeetingResponse(meeting, maybeUser);
   }
 
   @ApiOperation({
@@ -237,9 +237,9 @@ export class MeetingsController {
     if (body.endDateTime <= body.startDateTime) {
       throw new BadRequestException('end time must be greater than start time');
     }
-    const oldMeeting = await this.checkIfMeetingExistsAndClientIsAllowedToModifyIt(meetingID, maybeUser);
-    const newMeeting = await this.meetingsService.scheduleMeeting(oldMeeting, body.startDateTime, body.endDateTime);
-    return meetingToMeetingResponse(newMeeting, maybeUser);
+    const meeting = await this.checkIfMeetingExistsAndClientIsAllowedToModifyIt(meetingID, maybeUser);
+    await this.meetingsService.scheduleMeeting(meeting, body.startDateTime, body.endDateTime);
+    return meetingToMeetingResponse(meeting, maybeUser);
   }
 
   @ApiOperation({
@@ -255,8 +255,8 @@ export class MeetingsController {
     @Param('id', ParseIntPipe) meetingID: number,
     @MaybeAuthUser() maybeUser: User | null,
   ): Promise<MeetingResponse> {
-    await this.checkIfMeetingExistsAndClientIsAllowedToModifyIt(meetingID, maybeUser);
-    const meeting = await this.meetingsService.unscheduleMeeting(meetingID);
+    const meeting = await this.checkIfMeetingExistsAndClientIsAllowedToModifyIt(meetingID, maybeUser);
+    await this.meetingsService.unscheduleMeeting(meeting);
     return meetingToMeetingResponse(meeting, maybeUser);
   }
 
@@ -289,6 +289,7 @@ export class MeetingsController {
     @Param('id', ParseIntPipe) meetingID: number,
     @Body() body: AddGuestRespondentDto,
   ): Promise<MeetingResponse> {
+    // TODO: wrap in transaction
     await this.meetingsService.addRespondent(meetingID, body.availabilities, body.name, body.email);
     const updatedMeeting = await this.meetingsService.getMeetingWithRespondents(meetingID);
     return meetingToMeetingResponse(updatedMeeting!, null);

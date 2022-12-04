@@ -28,5 +28,5 @@ export default class LocalSignupDto {
   @ApiProperty()
   @IsBoolean()
   @IsOptional()
-  subscribe_to_notifications?: boolean = true;
+  subscribe_to_notifications?: boolean;
 }

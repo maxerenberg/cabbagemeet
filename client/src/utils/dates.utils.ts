@@ -145,8 +145,8 @@ export function convertOtherTzToLocal(
     dates,
     timezone,
   }: {
-    startHour: number,
-    endHour: number,
+    startHour: number,  // can be a decimal
+    endHour: number,  // can be a decimal
     dates: string[],  // YYYY-MM-DD
     timezone: string,  // e.g. "America/Toronto"
   },
@@ -159,8 +159,12 @@ export function convertOtherTzToLocal(
   // Unfortunately this will give incorrect start/end times if e.g. the person
   // who created the meeting follows DST, but the current user does not.
   // I don't think there's anything we can do in that scenario. :/
-  const HH = String(startHour).padStart(2, '0');
-  const dt = DateTime.fromISO(`${dates[0]}T${HH}:00:00`, {zone: timezone});
+
+  const [year, month, day] = getYearMonthDayFromDateString(dates[0]);
+  const hour = Math.floor(startHour);
+  const minute = (startHour - hour) * 60;
+  assert(Number.isInteger(minute));
+  const dt = DateTime.fromObject({year, month, day, hour, minute}, {zone: timezone});
   assert(dt.isValid);
   const offsetHours = getUTCOffsetHours(getDateFromString(dates[0])) - dt.offset / 60;
   startHour += offsetHours;

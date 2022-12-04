@@ -36,6 +36,9 @@ To connect to the database as root:
 docker exec -it cabbagemeet-mariadb mariadb -uroot
 ```
 
+### Postgres
+TODO
+
 ## Running the SMTP server
 By default, email address verification is enabled, even in development mode.
 To disable this, set `SIGNUP_REQUIRES_EMAIL_VALIDATION = false` in development.env.
@@ -71,6 +74,40 @@ $ npm run test:e2e
 
 # test coverage
 $ npm run test:cov
+```
+
+## Migrations
+If you add/remove/modify any of the entity classes, you will need to create a new database migration.
+To do this, you need to first run the existing migrations on a new empty database, then generate a new migration from that one using the entity classes.
+
+For example, for SQLite:
+```bash
+# Assuming temp.db does not exist
+export SQLITE_PATH=temp.db
+npm run migration:run:sqlite
+npm run migration:generate:sqlite
+# Cleanup
+rm temp.db
+```
+
+### MariaDB
+```bash
+# Create a new empty database in the container
+docker exec -it cabbagemeet-mariadb mariadb -uroot
+# In the SQL shell
+CREATE DATABASE temp;
+GRANT ALL PRIVILEGES ON temp.* TO cabbagemeet;
+exit
+# Back to bash
+export MYSQL_DATABASE=temp
+export MYSQL_USER=cabbagemeet
+export MYSQL_PASSWORD=cabbagemeet
+export MYSQL_HOST=127.0.0.1
+export MYSQL_PORT=3306
+npm run migration:run:mysql
+npm run migration:generate:mysql
+# Cleanup
+docker exec -it cabbagemeet-mariadb mariadb -uroot -e "DROP DATABASE temp"
 ```
 
 ## Support

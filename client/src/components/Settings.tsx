@@ -78,6 +78,10 @@ function GeneralSettings() {
     editUser({name});
     setSubmittedAtLeastOnceSinceEditButtonWasClicked(true);
   };
+  const onSubmit: React.FormEventHandler<HTMLFormElement> = (ev) => {
+    ev.preventDefault();
+    onSaveClick();
+  };
   return (
     <div>
       <h4>General Settings</h4>
@@ -97,6 +101,8 @@ function GeneralSettings() {
                 Cancel
               </button>
               <ButtonWithSpinner
+                type="submit"
+                form="edit-name"
                 className="btn btn-primary ms-4"
                 onClick={onSaveClick}
                 isLoading={isLoading}
@@ -118,19 +124,19 @@ function GeneralSettings() {
       {submittedAtLeastOnceSinceEditButtonWasClicked && error && (
         <p className="text-danger text-center mb-0 mt-2">An error occurred: {getReqErrorMessage(error)}</p>
       )}
-      <div className="mt-3">
-        {
-          isEditing ? (
-            <Form.Control
-              onChange={(ev) => setName(ev.target.value)}
-              value={name}
-              autoFocus
-            />
-          ) : (
-            <span>{userInfo.name}</span>
-          )
-        }
-      </div>
+      {isEditing ? (
+        <Form className="mt-3" id="edit-name" onSubmit={onSubmit}>
+          <Form.Control
+            onChange={(ev) => setName(ev.target.value)}
+            value={name}
+            autoFocus
+          />
+        </Form>
+      ) : (
+        <div className="mt-3">
+          <span>{userInfo.name}</span>
+        </div>
+      )}
     </div>
   )
 }

@@ -93,10 +93,12 @@ function LoginForm() {
           Please enter your password.
         </Form.Control.Feedback>
       </Form.Group>
-      <SignUpOrLogin disabled={submitBtnDisabled} />
       {error && (
-        <p className="text-danger text-center mb-0 mt-3">An error occurred: {getReqErrorMessage(error)}</p>
+        <p className="text-danger text-center mb-0 mt-3">
+          An error occurred: {getReqErrorMessage(error)}
+        </p>
       )}
+      <SignUpOrLogin disabled={submitBtnDisabled} />
     </Form>
   );
 }

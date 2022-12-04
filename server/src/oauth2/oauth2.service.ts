@@ -678,7 +678,8 @@ export default class OAuth2Service {
       )
       .leftJoin(
         'GoogleOAuth2.CreatedEvents', 'GoogleCalendarCreatedEvent',
-        'GoogleCalendarCreatedEvent.MeetingID = :meetingID', {meetingID}
+        'GoogleCalendarCreatedEvent.MeetingID IS NULL OR' +
+        ' GoogleCalendarCreatedEvent.MeetingID = :meetingID', {meetingID}
       )
       .where('GoogleOAuth2.LinkedCalendar = true')
       .select(['GoogleOAuth2', 'GoogleCalendarCreatedEvent'])
@@ -768,7 +769,8 @@ export default class OAuth2Service {
       .innerJoin('GoogleOAuth2.User', 'User')
       .leftJoin(
         'GoogleOAuth2.CreatedEvents', 'GoogleCalendarCreatedEvent',
-        'GoogleCalendarCreatedEvent.MeetingID = :meetingID', {meetingID: meeting.ID}
+        'GoogleCalendarCreatedEvent.MeetingID IS NULL OR' +
+        ' GoogleCalendarCreatedEvent.MeetingID = :meetingID', {meetingID: meeting.ID}
       )
       .where('GoogleOAuth2.UserID = :userID', {userID})
       .where('GoogleOAuth2.LinkedCalendar = true')

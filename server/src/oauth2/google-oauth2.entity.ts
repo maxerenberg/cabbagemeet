@@ -1,4 +1,4 @@
-import { Entity, Column, PrimaryColumn, Index, OneToOne, JoinColumn, OneToMany } from 'typeorm';
+import { Entity, Column, PrimaryColumn, Index, JoinColumn, ManyToOne, OneToMany } from 'typeorm';
 import User from '../users/user.entity';
 import GoogleCalendarCreatedEvent from './google-calendar-created-event.entity';
 import GoogleCalendarEvents from './google-calendar-events.entity';
@@ -29,7 +29,16 @@ export default class GoogleOAuth2 {
   @Column()
   RefreshToken: string;
 
-  @OneToOne(() => User, user => user.GoogleOAuth2, {onDelete: 'CASCADE'})
+  // !!!!!!!!!!!!!!
+  // Workaround for https://github.com/typeorm/typeorm/issues/3952
+  // TypeORM was creating a UNIQUE CONSTRAINT on the UserID column, which
+  // is redundant because that already has a PRIMARY KEY.
+  // So we use ManyToOne instead, even though it really should be OneToOne.
+  // Also see https://github.com/typeorm/typeorm/blob/master/src/metadata-builder/RelationJoinColumnBuilder.ts
+  // !!!!!!!!!!!!!!
+
+  //@OneToOne(() => User, user => user.GoogleOAuth2, {onDelete: 'CASCADE'})
+  @ManyToOne(() => User, user => user.GoogleOAuth2, {onDelete: 'CASCADE'})
   @JoinColumn({name: 'UserID'})
   User: User;
 

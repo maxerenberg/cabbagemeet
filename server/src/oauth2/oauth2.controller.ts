@@ -128,6 +128,7 @@ export class Oauth2Controller {
           // The local account associated with this Google account no longer exists.
           // We need to force the user to go through the consent screen again
           // so that we can get a new refresh token.
+          this.logger.debug('Redirecting user to consent screen');
           res.redirect(this.oauth2Service.getRequestURL(OAuth2Provider.GOOGLE, {
             ...state,
             reason: 'signup',

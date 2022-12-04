@@ -1,4 +1,4 @@
-import { Entity, Column, PrimaryColumn, JoinColumn, ManyToOne } from 'typeorm';
+import { Entity, Column, PrimaryColumn, JoinColumn, ManyToOne, Index } from 'typeorm';
 import Meeting from '../meetings/meeting.entity';
 import GoogleOAuth2 from './google-oauth2.entity';
 
@@ -14,6 +14,7 @@ export default class GoogleCalendarEvents {
   @PrimaryColumn()
   MeetingID: number;
 
+  @Index()
   @PrimaryColumn()
   UserID: number;
 

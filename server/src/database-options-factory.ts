@@ -1,41 +1,78 @@
 import { ConfigService } from '@nestjs/config';
-import { TypeOrmModuleOptions } from '@nestjs/typeorm';
+import type { TypeOrmModuleOptions } from '@nestjs/typeorm';
 import type { Database } from 'better-sqlite3';
+import type { DataSourceOptions } from 'typeorm';
 import type { BetterSqlite3ConnectionOptions } from 'typeorm/driver/better-sqlite3/BetterSqlite3ConnectionOptions';
-import { MysqlConnectionOptions } from 'typeorm/driver/mysql/MysqlConnectionOptions';
-import { EnvironmentVariables } from './env.validation';
+import type { EnvironmentVariables } from './env.validation';
+
+// TODO: if using Postgres, make sure to use REPEATABLE READ
 
 type Writable<T> = {
   -readonly [P in keyof T]: T[P];
 };
 
-// TODO: if using Postgres, make sure to use REPEATABLE READ
+function checkEnvVarsExist(vars: (keyof EnvironmentVariables)[], getEnv: (key: keyof EnvironmentVariables) => string) {
+  for (const varname of vars) {
+    if (!getEnv(varname)) {
+      throw new Error('Please set the environment variable ' + varname);
+    }
+  }
+}
+
+export function createDataSourceOptions(
+  getEnv: (key: keyof EnvironmentVariables) => string,
+  cli: boolean,
+): DataSourceOptions {
+  const nodeEnv = getEnv('NODE_ENV');
+  const dbType = getEnv('DATABASE_TYPE');
+  const commonOptions: Writable<
+    Omit<TypeOrmModuleOptions, 'type' | 'database' | 'poolSize'>
+  > = {};
+  if (cli || nodeEnv === 'development') {
+    commonOptions.logging = true;
+  }
+  if (cli) {
+    commonOptions.entities = ['src/**/*.entity.ts'];
+  } else {
+    commonOptions.autoLoadEntities = true;
+  }
+  if (!cli && nodeEnv === 'development') {
+    commonOptions.synchronize = true;
+  } else {
+    commonOptions.migrations = [`migrations/${dbType}/*.js`];
+    commonOptions.migrationsRun = true;
+  }
+  if (dbType === 'sqlite') {
+    checkEnvVarsExist(['SQLITE_PATH'], getEnv);
+    return {
+      type: 'better-sqlite3',
+      database: getEnv('SQLITE_PATH'),
+      ...commonOptions,
+    };
+  } else if (dbType === 'mysql') {
+    checkEnvVarsExist(['MYSQL_HOST', 'MYSQL_PORT', 'MYSQL_USER', 'MYSQL_PASSWORD', 'MYSQL_DATABASE'], getEnv);
+    return {
+      type: 'mysql',
+      host: getEnv('MYSQL_HOST'),
+      port: +getEnv('MYSQL_PORT'),
+      username: getEnv('MYSQL_USER'),
+      password: getEnv('MYSQL_PASSWORD'),
+      database: getEnv('MYSQL_DATABASE'),
+      charset: 'utf8mb4',
+      ...commonOptions,
+    };
+  } else {
+    // TODO: PostgreSQL
+    throw new Error('Unrecognized database type ' + dbType);
+  }
+}
 
 export default (
   configService: ConfigService<EnvironmentVariables, true>,
 ): TypeOrmModuleOptions => {
   const nodeEnv = configService.get('NODE_ENV', { infer: true });
-  const envDatabaseType = configService.get('DATABASE_TYPE', { infer: true });
-  const databaseType = (
-    {
-      sqlite: 'better-sqlite3',
-      mysql: 'mysql',
-      postgres: 'postgres',
-    } as const
-  )[envDatabaseType];
-  if (databaseType === undefined) {
-    throw new Error(`Invalid database type ${envDatabaseType}`);
-  }
-  const options: Writable<TypeOrmModuleOptions> = {
-    type: databaseType,
-    autoLoadEntities: true,
-    //entities: ['dist/**/*.entity.js'],
-  };
-  if (databaseType === 'better-sqlite3') {
-    if (configService.get('SQLITE_PATH', {infer: true}) === undefined) {
-      throw new Error('Must specify SQLITE_PATH for database of type sqlite');
-    }
-    options.database = configService.get('SQLITE_PATH', {infer: true});
+  const options = createDataSourceOptions((key: keyof EnvironmentVariables) => configService.get(key), false);
+  if (options.type === 'better-sqlite3') {
     (options as Writable<BetterSqlite3ConnectionOptions>).prepareDatabase = (db: Database) => {
       if (nodeEnv === 'test') {
         db.pragma('journal_mode = MEMORY');
@@ -45,27 +82,6 @@ export default (
         db.pragma('synchronous = NORMAL');
       }
     };
-  } else if (databaseType === 'mysql') {
-    for (const option of ['MYSQL_HOST', 'MYSQL_PORT', 'MYSQL_DATABASE', 'MYSQL_USER', 'MYSQL_PASSWORD'] as const) {
-      if (configService.get(option, {infer: true}) === undefined) {
-        throw new Error(`Must specify ${option} for database of type mysql`);
-      }
-    }
-    (options as Writable<MysqlConnectionOptions>).host = configService.get('MYSQL_HOST', {infer: true});
-    (options as Writable<MysqlConnectionOptions>).port = +configService.get('MYSQL_PORT', {infer: true});
-    (options as Writable<MysqlConnectionOptions>).username = configService.get('MYSQL_USER', {infer: true});
-    (options as Writable<MysqlConnectionOptions>).password = configService.get('MYSQL_PASSWORD', {infer: true});
-    (options as Writable<MysqlConnectionOptions>).database = configService.get('MYSQL_DATABASE', {infer: true});
-    (options as Writable<MysqlConnectionOptions>).charset = 'utf8mb4';
-  } else {
-    throw new Error(`Database type ${envDatabaseType} is not supported yet`);
-  }
-  if (nodeEnv === 'development') {
-    options.logging = 'all';
-    options.synchronize = true;
-  } else {
-    options.migrations = [`migrations/${envDatabaseType}/*.js`];
-    options.migrationsRun = true;
   }
   return options;
 };

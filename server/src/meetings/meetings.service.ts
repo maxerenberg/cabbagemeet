@@ -10,8 +10,6 @@ import { DeepPartial, Repository } from 'typeorm';
 import MeetingRespondent from './meeting-respondent.entity';
 import Meeting from './meeting.entity';
 
-// TODO: delete meetings from DB after their max. tentative date or scheduled date (cron job)
-
 export class NoSuchMeetingError extends Error {}
 
 function formatScheduledTimeRange(startDateTime: string, endDateTime: string, tz: string): string {
@@ -22,6 +20,12 @@ function formatScheduledTimeRange(startDateTime: string, endDateTime: string, tz
     .toLocaleString(DateTime.TIME_SIMPLE).replace(' ', '');
   const tzShort = DateTime.fromISO(startDateTime).setZone(tz).offsetNameShort;
   return `${start} to ${end} ${tzShort}`;
+}
+
+function transformDecimals(meeting: Meeting) {
+  // Decimal types are returned as strings by MySQL
+  meeting.MinStartHour = +meeting.MinStartHour;
+  meeting.MaxEndHour = +meeting.MaxEndHour;
 }
 
 @Injectable()
@@ -44,8 +48,10 @@ export default class MeetingsService {
     this.oauth2Service = this.moduleRef.get(OAuth2Service, {strict: false});
   }
 
-  async createMeeting(meeting: DeepPartial<Meeting>): Promise<Meeting> {
-    return this.meetingsRepository.save(meeting);
+  async createMeeting(partialMeeting: DeepPartial<Meeting>): Promise<Meeting> {
+    const meeting = await this.meetingsRepository.save(partialMeeting);
+    transformDecimals(meeting);
+    return meeting;
   }
 
   async getMeetingOrThrow(meetingID: number): Promise<Meeting> {
@@ -53,17 +59,22 @@ export default class MeetingsService {
     if (!meeting) {
       throw new NoSuchMeetingError();
     }
+    transformDecimals(meeting);
     return meeting;
   }
 
-  getMeetingWithRespondents(meetingID: number): Promise<Meeting | null> {
-    return this.meetingsRepository
+  async getMeetingWithRespondents(meetingID: number): Promise<Meeting | null> {
+    const meeting = await this.meetingsRepository
       .createQueryBuilder()
       .leftJoin('Meeting.Respondents', 'MeetingRespondent')
       .leftJoin('MeetingRespondent.User', 'User')
       .select(['Meeting', 'MeetingRespondent', 'User.ID', 'User.Name'])
       .where('Meeting.ID = :meetingID', {meetingID})
       .getOne();
+    if (meeting) {
+      transformDecimals(meeting);
+    }
+    return meeting;
   }
 
   private getRespondentsWithNotificationsEnabled(meetingID: number): Promise<MeetingRespondent[]> {
@@ -75,27 +86,27 @@ export default class MeetingsService {
       .getMany();
   }
 
-  private async updateMeetingDB(meetingID: number, meetingInfo: DeepPartial<Meeting>): Promise<Meeting> {
-    // TODO: wrap in transaction
-    await this.meetingsRepository.update(meetingID, meetingInfo);
-    return this.getMeetingWithRespondents(meetingID);
+  private async updateMeetingDB(meeting: Meeting, meetingInfo: Partial<Meeting>) {
+    // TODO: use a transaction to wrap the initial read of the meeting + the update
+    await this.meetingsRepository.update(meeting.ID, meetingInfo);
+    Object.assign(meeting, meetingInfo);
   }
 
-  async editMeeting(oldMeeting: Meeting, partialUpdate: DeepPartial<Meeting>): Promise<Meeting> {
-    const newMeeting = await this.updateMeetingDB(oldMeeting.ID, partialUpdate);
+  async editMeeting(meeting: Meeting, partialUpdate: Partial<Meeting>) {
+    const {Name: oldName, About: oldAbout} = meeting;
+    await this.updateMeetingDB(meeting, partialUpdate);
     if (
-      newMeeting.ScheduledStartDateTime !== null
-      && newMeeting.ScheduledEndDateTime !== null
+      meeting.ScheduledStartDateTime !== null
+      && meeting.ScheduledEndDateTime !== null
       && (
-        oldMeeting.Name !== newMeeting.Name
-        || oldMeeting.About !== newMeeting.About
+        meeting.Name !== oldName
+        || meeting.About !== oldAbout
       )
     ) {
       // Update respondents' external calendars
       // Do not await the Promise so that we don't block the caller
-      this.oauth2Service.google_tryCreateOrUpdateEventsForMeeting(newMeeting);
+      this.oauth2Service.google_tryCreateOrUpdateEventsForMeeting(meeting);
     }
-    return newMeeting;
   }
 
   private createScheduledNotificationEmailBody(meeting: Meeting, name: string): string {
@@ -114,44 +125,43 @@ export default class MeetingsService {
     );
   }
 
-  async scheduleMeeting(oldMeeting: Meeting, startDateTime: string, endDateTime: string): Promise<Meeting> {
+  async scheduleMeeting(meeting: Meeting, startDateTime: string, endDateTime: string) {
     // Update database
-    const updatedInfo: DeepPartial<Meeting> = {
+    const {WasScheduledAtLeastOnce: wasScheduledAtLeastOnce} = meeting;
+    const updatedInfo: Partial<Meeting> = {
       ScheduledStartDateTime: startDateTime,
       ScheduledEndDateTime: endDateTime,
       WasScheduledAtLeastOnce: true,
     };
-    const newMeeting = await this.updateMeetingDB(oldMeeting.ID, updatedInfo);
+    await this.updateMeetingDB(meeting, updatedInfo);
     // Send email notifications
-    if (!oldMeeting.WasScheduledAtLeastOnce) {
-      const respondentsToBeNotified = await this.getRespondentsWithNotificationsEnabled(newMeeting.ID);
+    if (!wasScheduledAtLeastOnce) {
+      const respondentsToBeNotified = await this.getRespondentsWithNotificationsEnabled(meeting.ID);
       for (const respondent of respondentsToBeNotified) {
         const recipient = respondent.GuestEmail || respondent.User.Email;
         const name = respondent.GuestName || respondent.User.Name;
         // Do not await the Promise so that we don't block the caller
         this.mailService.sendNowOrLater({
           recipient,
-          subject: `${newMeeting.Name} has been scheduled`,
-          body: this.createScheduledNotificationEmailBody(newMeeting, name),
+          subject: `${meeting.Name} has been scheduled`,
+          body: this.createScheduledNotificationEmailBody(meeting, name),
         });
       }
     }
     // Update respondents' external calendars
     // Do not await the Promise so that we don't block the caller
-    this.oauth2Service.google_tryCreateOrUpdateEventsForMeeting(newMeeting);
-    return newMeeting;
+    this.oauth2Service.google_tryCreateOrUpdateEventsForMeeting(meeting);
   }
 
-  async unscheduleMeeting(meetingID: number): Promise<Meeting> {
-    const updatedInfo: DeepPartial<Meeting> = {
+  async unscheduleMeeting(meeting: Meeting) {
+    const updatedInfo: Partial<Meeting> = {
       ScheduledStartDateTime: null,
       ScheduledEndDateTime: null,
     };
-    const meeting = await this.updateMeetingDB(meetingID, updatedInfo);
+    await this.updateMeetingDB(meeting, updatedInfo);
     // Update respondents' external calendars
     // Do not await the Promise so that we don't block the caller
-    this.oauth2Service.google_tryDeleteEventsForMeeting(meetingID);
-    return meeting;
+    this.oauth2Service.google_tryDeleteEventsForMeeting(meeting.ID);
   }
 
   async deleteMeeting(meetingID: number): Promise<void> {
@@ -209,6 +219,7 @@ export default class MeetingsService {
     } else {
       await this.addRespondent(meetingID, availabilities, userID);
     }
+    // TODO: wrap in transaction
     const updatedMeeting = await this.getMeetingWithRespondents(meetingID);
     // Update respondent's external calendars
     // Do not await the Promise so that we don't block the caller
@@ -228,24 +239,28 @@ export default class MeetingsService {
     return this.getMeetingWithRespondents(respondent.MeetingID);
   }
 
-  getMeetingsCreatedBy(userID: number): Promise<Meeting[]> {
+  async getMeetingsCreatedBy(userID: number): Promise<Meeting[]> {
     // TODO: support cursor-based pagination
-    return this.meetingsRepository
+    const meetings = await this.meetingsRepository
       .createQueryBuilder()
       .select(['Meeting'])
       .where('CreatorID = :userID', {userID})
       .limit(100)
       .getMany();
+    meetings.forEach(transformDecimals);
+    return meetings;
   }
 
   async getMeetingsRespondedToBy(userID: number): Promise<Meeting[]> {
     // TODO: support cursor-based pagination
-    return await this.meetingsRepository
+    const meetings = await this.meetingsRepository
       .createQueryBuilder()
       .innerJoin('Meeting.Respondents', 'MeetingRespondent')
       .select(['Meeting'])
       .where('MeetingRespondent.UserID = :userID', {userID})
       .limit(100)
       .getMany();
+    meetings.forEach(transformDecimals);
+    return meetings;
   }
 }

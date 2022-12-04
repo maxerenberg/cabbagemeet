@@ -1,11 +1,14 @@
 import { Injectable, Logger } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import { InjectRepository } from "@nestjs/typeorm";
+import { Repository } from "typeorm";
+import { getUTCDateString } from "../dates.utils";
 import { DatabaseType, EnvironmentVariables } from "../env.validation";
 import { sleep } from '../misc.utils';
-import { Repository } from "typeorm";
 import Meeting from "./meeting.entity";
-import { getUTCDateString } from "src/dates.utils";
+
+// TODO: add extra column to store latest tentative date / scheduled date
+// to avoid a SCAN when deleting rows (or INDEX on expression)
 
 @Injectable()
 export default class MeetingDeleterService {
@@ -51,10 +54,10 @@ export default class MeetingDeleterService {
     // Get last element of JSON array
     if (this.dbType === 'sqlite') {
       latestTentativeDate = "json_extract(TentativeDates, '$[' || (json_array_length(TentativeDates)-1) || ']')";
+    } else if (this.dbType === 'mysql') {
+      latestTentativeDate = "json_extract(TentativeDates, CONCAT('$[', json_length(TentativeDates)-1, ']'))";
     } else {
-      // TODO: add more databases
-      // Note that in MySQL, json_extract returns a string with quotation marks (use ->> instead)
-      // See https://stackoverflow.com/questions/44404855/how-to-get-last-element-in-a-mysql-json-array
+      // TODO: Postgres
       throw new Error('Unsupported DB type ' + this.dbType);
     }
     const result = await this.meetingsRepository.createQueryBuilder()

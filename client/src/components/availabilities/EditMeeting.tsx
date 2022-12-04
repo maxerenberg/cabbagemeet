@@ -14,7 +14,7 @@ import { arrayToObject } from "utils/arrays.utils";
 import { useToast } from "components/Toast";
 import DeleteMeetingModal from "./DeleteMeetingModal";
 import ButtonWithSpinner from "components/ButtonWithSpinner";
-import { useEditMeetingMutation } from "slices/api";
+import { EditMeetingDto, useEditMeetingMutation } from "slices/api";
 import { getReqErrorMessage, useMutationWithPersistentError } from "utils/requests.utils";
 import { ianaTzName } from "utils/dates.utils";
 import { useGetCurrentMeetingWithSelector } from "utils/meetings.hooks";
@@ -69,16 +69,35 @@ export default function EditMeeting({
       // TODO: use Form validation
       return;
     }
+    const body: EditMeetingDto = {};
+    if (meetingName !== meeting.name) {
+      body.name = meetingName;
+    }
+    if (meetingAbout !== meeting.about) {
+      body.about = meetingAbout;
+    }
+    const selectedDatesFlat = Object.keys(selectedDates).sort();
+    const datesChanged =
+      selectedDatesFlat.length !== meeting.tentativeDates.length
+      || selectedDatesFlat.some((s, i) => s !== meeting.tentativeDates[i]);
+    const timesChanged =
+      startTime !== meeting.minStartHour
+      || endTime !== meeting.maxEndHour;
+    if (datesChanged || timesChanged) {
+      // dates, start/end times and timezone must all be set together
+      body.tentativeDates = selectedDatesFlat;
+      body.minStartHour = startTime;
+      body.maxEndHour = endTime;
+      body.timezone = ianaTzName;
+    }
+    if (Object.keys(body).length === 0) {
+      // no change
+      setIsEditing(false);
+      return;
+    }
     editMeeting({
       id: meeting.meetingID,
-      editMeetingDto: {
-        name: meetingName,
-        about: meetingAbout,
-        tentativeDates: Object.keys(selectedDates),
-        minStartHour: startTime,
-        maxEndHour: endTime,
-        timezone: ianaTzName,
-      }
+      editMeetingDto: body,
     });
   };
 
