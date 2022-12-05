@@ -22,12 +22,6 @@ function formatScheduledTimeRange(startDateTime: string, endDateTime: string, tz
   return `${start} to ${end} ${tzShort}`;
 }
 
-function transformDecimals(meeting: Meeting) {
-  // Decimal types are returned as strings by MySQL
-  meeting.MinStartHour = +meeting.MinStartHour;
-  meeting.MaxEndHour = +meeting.MaxEndHour;
-}
-
 @Injectable()
 export default class MeetingsService {
   private oauth2Service: OAuth2Service;
@@ -48,10 +42,8 @@ export default class MeetingsService {
     this.oauth2Service = this.moduleRef.get(OAuth2Service, {strict: false});
   }
 
-  async createMeeting(partialMeeting: DeepPartial<Meeting>): Promise<Meeting> {
-    const meeting = await this.meetingsRepository.save(partialMeeting);
-    transformDecimals(meeting);
-    return meeting;
+  createMeeting(partialMeeting: DeepPartial<Meeting>): Promise<Meeting> {
+    return this.meetingsRepository.save(partialMeeting);
   }
 
   async getMeetingOrThrow(meetingID: number): Promise<Meeting> {
@@ -59,22 +51,17 @@ export default class MeetingsService {
     if (!meeting) {
       throw new NoSuchMeetingError();
     }
-    transformDecimals(meeting);
     return meeting;
   }
 
-  async getMeetingWithRespondents(meetingID: number): Promise<Meeting | null> {
-    const meeting = await this.meetingsRepository
+  getMeetingWithRespondents(meetingID: number): Promise<Meeting | null> {
+    return this.meetingsRepository
       .createQueryBuilder()
       .leftJoin('Meeting.Respondents', 'MeetingRespondent')
       .leftJoin('MeetingRespondent.User', 'User')
       .select(['Meeting', 'MeetingRespondent', 'User.ID', 'User.Name'])
       .where('Meeting.ID = :meetingID', {meetingID})
       .getOne();
-    if (meeting) {
-      transformDecimals(meeting);
-    }
-    return meeting;
   }
 
   private getRespondentsWithNotificationsEnabled(meetingID: number): Promise<MeetingRespondent[]> {
@@ -241,26 +228,22 @@ export default class MeetingsService {
 
   async getMeetingsCreatedBy(userID: number): Promise<Meeting[]> {
     // TODO: support cursor-based pagination
-    const meetings = await this.meetingsRepository
+    return this.meetingsRepository
       .createQueryBuilder()
       .select(['Meeting'])
       .where('CreatorID = :userID', {userID})
       .limit(100)
       .getMany();
-    meetings.forEach(transformDecimals);
-    return meetings;
   }
 
   async getMeetingsRespondedToBy(userID: number): Promise<Meeting[]> {
     // TODO: support cursor-based pagination
-    const meetings = await this.meetingsRepository
+    return this.meetingsRepository
       .createQueryBuilder()
       .innerJoin('Meeting.Respondents', 'MeetingRespondent')
       .select(['Meeting'])
       .where('MeetingRespondent.UserID = :userID', {userID})
       .limit(100)
       .getMany();
-    meetings.forEach(transformDecimals);
-    return meetings;
   }
 }

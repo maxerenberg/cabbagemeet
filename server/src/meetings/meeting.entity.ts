@@ -19,6 +19,12 @@ then they would calculate the meeting times to be 09:00 to 17:00 on
 Nov. 5th (EDT) and 08:00 to 16:00 on Nov. 6th (EST). But that would be wrong.
 */
 
+// The decimal columns come back as strings for MariaDB
+const decimalTransformer = {
+  from: (s: string | number) => +s,
+  to: (x: number) => x,
+};
+
 @Entity('Meeting')
 export default class Meeting {
   @PrimaryGeneratedColumn()
@@ -35,17 +41,17 @@ export default class Meeting {
   Timezone: string;
 
   // Must be a multiple of 0.25 and be between [0, 24)
-  @Column('decimal', { precision: 4, scale: 2 })
+  @Column('decimal', { precision: 4, scale: 2, transformer: decimalTransformer })
   MinStartHour: number;
 
   // Must be a multiple of 0.25 and be between [0, 24)
-  @Column('decimal', { precision: 4, scale: 2 })
+  @Column('decimal', { precision: 4, scale: 2, transformer: decimalTransformer })
   MaxEndHour: number;
 
   // JSON array
   // e.g. '["2022-10-23", "2022-10-24"]'
-  @Column()
-  TentativeDates: string;
+  @Column({type: 'simple-json'})  // TODO: use this in other tables too
+  TentativeDates: string[];
 
   // e.g. '2022-10-23T10:00:00Z'
   @Column({nullable: true})

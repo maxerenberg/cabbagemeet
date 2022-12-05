@@ -2,6 +2,7 @@ import { Injectable, Logger } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import { InjectRepository } from "@nestjs/typeorm";
 import { Repository } from "typeorm";
+import CustomMigrationsService from "../custom-migrations/custom-migrations.service";
 import { getUTCDateString } from "../dates.utils";
 import { DatabaseType, EnvironmentVariables } from "../env.validation";
 import { sleep } from '../misc.utils';
@@ -13,17 +14,19 @@ import Meeting from "./meeting.entity";
 @Injectable()
 export default class MeetingDeleterService {
   private readonly logger = new Logger(MeetingDeleterService.name);
-  private readonly dbType: DatabaseType;
   private readonly ttlDays: number;
 
   constructor(
     @InjectRepository(Meeting) private meetingsRepository: Repository<Meeting>,
     configService: ConfigService<EnvironmentVariables, true>,
+    _customMigrationsService: CustomMigrationsService,
   ) {
-    this.dbType = configService.get('DATABASE_TYPE', {infer: true});
     this.ttlDays = configService.get('DELETE_MEETINGS_OLDER_THAN_NUM_DAYS', {infer: true});
+  }
+
+  onModuleInit() {
     if (this.ttlDays !== 0) {
-      // Make sure not to await this Promise
+      // Make sure not to await this Promise (runs forever)
       this.runRecurringJob();
     }
   }
@@ -50,21 +53,11 @@ export default class MeetingDeleterService {
     const cutoffDate = new Date();
     cutoffDate.setDate(cutoffDate.getDate() - this.ttlDays);
     const cutoffDateStr = getUTCDateString(cutoffDate);
-    let latestTentativeDate: string = '';
-    // Get last element of JSON array
-    if (this.dbType === 'sqlite') {
-      latestTentativeDate = "json_extract(TentativeDates, '$[' || (json_array_length(TentativeDates)-1) || ']')";
-    } else if (this.dbType === 'mysql') {
-      latestTentativeDate = "json_extract(TentativeDates, CONCAT('$[', json_length(TentativeDates)-1, ']'))";
-    } else {
-      // TODO: Postgres
-      throw new Error('Unsupported DB type ' + this.dbType);
-    }
+
     const result = await this.meetingsRepository.createQueryBuilder()
       .delete()
       .where(
-        `(ScheduledEndDateTime IS NULL AND ${latestTentativeDate} < :cutoff) OR ` +
-        '(ScheduledEndDateTime IS NOT NULL AND ScheduledEndDateTime < :cutoff)',
+        `LatestTentativeOrScheduledDate < :cutoff`,
         {cutoff: cutoffDateStr}
       )
       .execute();

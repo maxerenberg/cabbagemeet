@@ -18,9 +18,8 @@ export default class GoogleCalendarEvents {
   @PrimaryColumn()
   UserID: number;
 
-  // JSON-serialized array of GoogleCalendarEvent
-  @Column()
-  Events: string;
+  @Column({type: 'simple-json'})
+  Events: GoogleCalendarEvent[];
 
   // The timeMin parameter used in the previous API request
   // See https://developers.google.com/calendar/api/v3/reference/events/list#parameters

@@ -2,6 +2,7 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { validate as validateEnv } from './env.validation';
 import databaseOptionsFactory from './database-options-factory';
+import CustomMigrationsModule from './custom-migrations/custom-migrations.module';
 
 export default function getCommonImports() {
   const envFilePath = ({
@@ -25,5 +26,6 @@ export default function getCommonImports() {
       useFactory: databaseOptionsFactory,
       inject: [ConfigService],
     }),
+    CustomMigrationsModule,
   ];
 }

@@ -34,7 +34,7 @@ export function meetingToMeetingShortResponse(meeting: Meeting): MeetingShortRes
     timezone: meeting.Timezone,
     minStartHour: meeting.MinStartHour,
     maxEndHour: meeting.MaxEndHour,
-    tentativeDates: JSON.parse(meeting.TentativeDates),
+    tentativeDates: meeting.TentativeDates,
   };
   if (meeting.ScheduledStartDateTime && meeting.ScheduledEndDateTime) {
     response.scheduledStartDateTime = meeting.ScheduledStartDateTime;
@@ -85,7 +85,7 @@ function meetingDtoToMeetingEntity(body: Partial<CreateMeetingDto>): Partial<Mee
       meeting.MaxEndHour = body.maxEndHour;
     }
     if (body.hasOwnProperty('tentativeDates')) {
-      meeting.TentativeDates = JSON.stringify(body.tentativeDates.sort());
+      meeting.TentativeDates = body.tentativeDates.sort();
     }
     return meeting;
 }

@@ -20,7 +20,8 @@ import { stripTrailingSlash } from './misc.utils';
 const environments = ['development', 'production', 'test'] as const;
 type Environment = typeof environments[number];
 
-const databaseTypes = ['sqlite', 'mysql', 'postgres'] as const;
+// TODO: support MySQL too
+const databaseTypes = ['sqlite', 'mariadb', 'postgres'] as const;
 export type DatabaseType = typeof databaseTypes[number];
 
 export class EnvironmentVariables {

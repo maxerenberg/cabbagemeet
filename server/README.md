@@ -18,7 +18,7 @@ docker run -d --name cabbagemeet-mariadb -e MARIADB_USER=cabbagemeet -e MARIADB_
 
 Now open development.env and modify/set the following variables:
 ```
-DATABASE_TYPE=mysql
+DATABASE_TYPE=mariadb
 MYSQL_HOST=127.0.0.1
 MYSQL_PORT=3306
 MYSQL_USER=cabbagemeet

@@ -1,9 +1,11 @@
 import { ConfigService } from '@nestjs/config';
 import type { TypeOrmModuleOptions } from '@nestjs/typeorm';
 import type { Database } from 'better-sqlite3';
-import type { DataSourceOptions } from 'typeorm';
+import { DataSourceOptions } from 'typeorm';
 import type { BetterSqlite3ConnectionOptions } from 'typeorm/driver/better-sqlite3/BetterSqlite3ConnectionOptions';
-import type { EnvironmentVariables } from './env.validation';
+import { injectTypeOrmColumns as mysql_injectTypeOrmColumns } from './custom-columns/inject-columns-mysql';
+import { injectTypeOrmColumns as sqlite_injectTypeOrmColumns } from './custom-columns/inject-columns-sqlite';
+import type { DatabaseType, EnvironmentVariables } from './env.validation';
 
 // TODO: if using Postgres, make sure to use REPEATABLE READ
 
@@ -24,7 +26,7 @@ export function createDataSourceOptions(
   cli: boolean,
 ): DataSourceOptions {
   const nodeEnv = getEnv('NODE_ENV');
-  const dbType = getEnv('DATABASE_TYPE');
+  const dbType = getEnv('DATABASE_TYPE') as DatabaseType;
   const commonOptions: Writable<
     Omit<TypeOrmModuleOptions, 'type' | 'database' | 'poolSize'>
   > = {};
@@ -36,23 +38,31 @@ export function createDataSourceOptions(
   } else {
     commonOptions.autoLoadEntities = true;
   }
+  const customMigrationsGlobPath = `dist/src/custom-migrations/${dbType}/*-Migration.js`;
   if (!cli && nodeEnv === 'development') {
     commonOptions.synchronize = true;
+    commonOptions.migrations = [customMigrationsGlobPath];
+    // We can't run the custom migrations here unfortunately, because they will run
+    // BEFORE the synchronize step, but our migrations need the tables to be created
+    // first. So we need to explicitly run them later, in the CustomMigrationsService.
+    commonOptions.migrationsRun = false;
   } else {
-    commonOptions.migrations = [`migrations/${dbType}/*.js`];
+    commonOptions.migrations = [`migrations/${dbType}/*.js`, customMigrationsGlobPath];
     commonOptions.migrationsRun = true;
   }
   if (dbType === 'sqlite') {
+    sqlite_injectTypeOrmColumns();
     checkEnvVarsExist(['SQLITE_PATH'], getEnv);
     return {
       type: 'better-sqlite3',
       database: getEnv('SQLITE_PATH'),
       ...commonOptions,
     };
-  } else if (dbType === 'mysql') {
+  } else if (dbType === 'mariadb') {
+    mysql_injectTypeOrmColumns();
     checkEnvVarsExist(['MYSQL_HOST', 'MYSQL_PORT', 'MYSQL_USER', 'MYSQL_PASSWORD', 'MYSQL_DATABASE'], getEnv);
     return {
-      type: 'mysql',
+      type: 'mariadb',
       host: getEnv('MYSQL_HOST'),
       port: +getEnv('MYSQL_PORT'),
       username: getEnv('MYSQL_USER'),

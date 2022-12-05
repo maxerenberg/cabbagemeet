@@ -592,7 +592,7 @@ export default class OAuth2Service {
       return null;
     }
     const thereAreNewEvents = response.items.length > 0;
-    const existingEvents = JSON.parse(existingEventsData.Events) as GoogleCalendarEvent[];
+    const existingEvents = existingEventsData.Events;
     const events =
       thereAreNewEvents
       ? this.google_mergeResultsFromIncrementalSync(existingEvents, response.items)
@@ -635,7 +635,7 @@ export default class OAuth2Service {
       return [];
     }
     const meeting = await this.meetingsService.getMeetingOrThrow(meetingID);
-    const tentativeDates = JSON.parse(meeting.TentativeDates) as string[];
+    const tentativeDates = meeting.TentativeDates;
     const minDate = tentativeDates.reduce((a, b) => a < b ? a : b);
     const maxDate = tentativeDates.reduce((a, b) => a > b ? a : b);
     const google_apiTimeMin = toISOStringWithTz(minDate, meeting.MinStartHour, meeting.Timezone);
@@ -654,7 +654,7 @@ export default class OAuth2Service {
       await this.googleCalendarEventsRepository.save({
         MeetingID: meetingID,
         UserID: userID,
-        Events: JSON.stringify(events),
+        Events: events,
         PrevTimeMin: google_apiTimeMin,
         PrevTimeMax: google_apiTimeMax,
         SyncToken: nextSyncToken,

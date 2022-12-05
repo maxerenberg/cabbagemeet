@@ -51,7 +51,7 @@ export function createMeeting(meetingsService: MeetingsService, partialMeeting: 
     About: '',
     MinStartHour: 13,
     MaxEndHour: 21,
-    TentativeDates: '["2022-10-27"]',
+    TentativeDates: ["2022-10-27"],
     ...partialMeeting,
   });
 }
