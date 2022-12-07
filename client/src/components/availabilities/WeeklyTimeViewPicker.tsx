@@ -1,6 +1,6 @@
 import React, { useMemo, useReducer } from 'react';
 import { LeftArrow as SVGLeftArrow, RightArrow as SVGRightArrow } from 'components/Arrows';
-import { getDateFromString, getDayOfWeekAbbr, getMonthAbbrFromDate } from 'utils/dates.utils';
+import { getDateFromString, getDayOfWeekAbbr, getMonthAbbr, getYearMonthDayFromDateString } from 'utils/dates.utils';
 import AvailabilitiesRow from './AvailabilitiesRow';
 import MeetingGridBodyCells from './MeetingGridBodyCells';
 import MeetingRespondents from './MeetingRespondents';
@@ -158,13 +158,14 @@ export default function WeeklyViewTimePicker() {
 const MeetingGridMonthTextCell = React.memo(function MeetingGridMonthTextCell(
   { dateStrings }: { dateStrings: string[] }
 ) {
-  const startDate = getDateFromString(dateStrings[0]),
-        endDate = getDateFromString(dateStrings[dateStrings.length-1]);
-  let monthText = getMonthAbbrFromDate(startDate);
-  if (endDate.getMonth() !== startDate.getMonth()) {
-    monthText += ' \u00A0-\u00A0 ' + getMonthAbbrFromDate(endDate);
-  }
-  return <div className="weeklyview-grid__monthtext">{monthText}</div>;
+  const [startYear, startMonth] = getYearMonthDayFromDateString(dateStrings[0]);
+  const [endYear, endMonth] = getYearMonthDayFromDateString(dateStrings[dateStrings.length - 1]);
+  const startDateText = `${getMonthAbbr(startMonth-1, false)} ${startYear}`;
+  const endDateText = `${getMonthAbbr(endMonth-1, false)} ${endYear}`;
+  const dateText = startDateText === endDateText
+    ? startDateText
+    : `${startDateText} \u00A0-\u00A0 ${endDateText}`;
+  return <div className="weeklyview-grid__monthtext">{dateText}</div>;
 });
 
 const MeetingGridDayOfWeekCells = React.memo(function MeetingGridDayOfWeekCells(
