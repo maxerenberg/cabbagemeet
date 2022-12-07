@@ -1,5 +1,6 @@
 import User from '../users/user.entity';
-import { Entity, Column, PrimaryGeneratedColumn, OneToMany, Index, ManyToOne, JoinColumn } from 'typeorm';
+import { Entity, Column, PrimaryGeneratedColumn, OneToMany, Index, ManyToOne } from 'typeorm';
+import { CustomJoinColumn } from '../custom-columns/custom-join-column';
 import MeetingRespondent from './meeting-respondent.entity';
 import GoogleCalendarEvents from '../oauth2/google-calendar-events.entity';
 import GoogleCalendarCreatedEvent from '../oauth2/google-calendar-created-event.entity';
@@ -50,7 +51,7 @@ export default class Meeting {
 
   // JSON array
   // e.g. '["2022-10-23", "2022-10-24"]'
-  @Column({type: 'simple-json'})  // TODO: use this in other tables too
+  @Column({type: 'simple-json'})
   TentativeDates: string[];
 
   // e.g. '2022-10-23T10:00:00Z'
@@ -75,7 +76,7 @@ export default class Meeting {
   CreatorID?: number;
 
   @ManyToOne(() => User, (user) => user.CreatedMeetings, {onDelete: 'CASCADE'})
-  @JoinColumn({name: 'CreatorID'})
+  @CustomJoinColumn({name: 'CreatorID'})
   Creator?: User;
 
   @OneToMany(() => GoogleCalendarEvents, googleEvent => googleEvent.Meeting)

@@ -36,8 +36,35 @@ To connect to the database as root:
 docker exec -it cabbagemeet-mariadb mariadb -uroot
 ```
 
+To drop the current database and create a new one (stop the app process first):
+```bash
+docker exec -it cabbagemeet-mariadb mariadb -uroot -e "DROP DATABASE cabbagemeet; CREATE DATABASE cabbagemeet; GRANT ALL PRIVILEGES ON cabbagemeet.* TO cabbagemeet;"
+```
+
 ### Postgres
-TODO
+```bash
+docker run -d --name cabbagemeet-postgres -e POSTGRES_USER=cabbagemeet -e POSTGRES_PASSWORD=cabbagemeet -p 127.0.0.1:5432:5432 postgres
+```
+
+Now open development.env and modify/set the following variables:
+```
+DATABASE_TYPE=postgres
+POSTGRES_HOST=127.0.0.1
+POSTGRES_PORT=5432
+POSTGRES_USER=cabbagemeet
+POSTGRES_PASSWORD=cabbagemeet
+POSTGRES_DATABASE=cabbagemeet
+```
+
+To connect to the database:
+```bash
+docker exec -it cabbagemeet-postgres psql -U cabbagemeet
+```
+
+To drop the current database and create a new one (stop the app process first):
+```bash
+echo 'DROP DATABASE cabbagemeet; CREATE DATABASE cabbagemeet; \q' | docker exec -it cabbagemeet-postgres psql -U cabbagemeet postgres
+```
 
 ## Running the SMTP server
 By default, email address verification is enabled, even in development mode.
@@ -93,21 +120,31 @@ rm temp.db
 ### MariaDB
 ```bash
 # Create a new empty database in the container
-docker exec -it cabbagemeet-mariadb mariadb -uroot
-# In the SQL shell
-CREATE DATABASE temp;
-GRANT ALL PRIVILEGES ON temp.* TO cabbagemeet;
-exit
-# Back to bash
+docker exec -it cabbagemeet-mariadb mariadb -uroot -e "CREATE DATABASE temp; GRANT ALL PRIVILEGES ON temp.* TO cabbagemeet;"
 export MYSQL_DATABASE=temp
 export MYSQL_USER=cabbagemeet
 export MYSQL_PASSWORD=cabbagemeet
 export MYSQL_HOST=127.0.0.1
 export MYSQL_PORT=3306
-npm run migration:run:mysql
-npm run migration:generate:mysql
+npm run migration:run:mariadb
+npm run migration:generate:mariadb
 # Cleanup
 docker exec -it cabbagemeet-mariadb mariadb -uroot -e "DROP DATABASE temp"
+```
+
+### Postgres
+```bash
+# Create a new empty database in the container
+docker exec -it cabbagemeet-postgres psql -U cabbagemeet postgres -c "CREATE DATABASE temp"
+export POSTGRES_DATABASE=temp
+export POSTGRES_USER=cabbagemeet
+export POSTGRES_PASSWORD=cabbagemeet
+export POSTGRES_HOST=127.0.0.1
+export POSTGRES_PORT=5432
+npm run migration:run:postgres
+npm run migration:generate:postgres
+# Cleanup
+echo 'DROP DATABASE temp; \q' | docker exec -it cabbagemeet-postgres psql -U cabbagemeet postgres
 ```
 
 ## Support

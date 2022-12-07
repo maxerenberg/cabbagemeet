@@ -22,8 +22,10 @@
     "test:e2e": "jest --config ./test/jest-e2e.json",
     "migration:generate:sqlite": "DATABASE_TYPE=sqlite typeorm-ts-node-esm migration:generate -d datasource.ts --outputJs ./migrations/sqlite/Migration",
     "migration:run:sqlite": "DATABASE_TYPE=sqlite typeorm-ts-node-esm migration:run -d datasource.ts",
-    "migration:generate:mysql": "DATABASE_TYPE=mysql typeorm-ts-node-esm migration:generate -d datasource.ts --outputJs ./migrations/mysql/Migration",
-    "migration:run:mysql": "DATABASE_TYPE=mysql typeorm-ts-node-esm migration:run -d datasource.ts"
+    "migration:generate:mariadb": "DATABASE_TYPE=mariadb typeorm-ts-node-esm migration:generate -d datasource.ts --outputJs ./migrations/mariadb/Migration",
+    "migration:run:mariadb": "DATABASE_TYPE=mariadb typeorm-ts-node-esm migration:run -d datasource.ts",
+    "migration:generate:postgres": "DATABASE_TYPE=postgres typeorm-ts-node-esm migration:generate -d datasource.ts --outputJs ./migrations/postgres/Migration",
+    "migration:run:postgres": "DATABASE_TYPE=postgres typeorm-ts-node-esm migration:run -d datasource.ts"
   },
   "dependencies": {
     "@nestjs/common": "^9.0.0",
@@ -44,6 +46,7 @@
     "nodemailer": "^6.8.0",
     "passport": "^0.6.0",
     "passport-jwt": "^4.0.0",
+    "pg": "^8.8.0",
     "reflect-metadata": "^0.1.13",
     "rimraf": "^3.0.2",
     "rxjs": "^7.2.0",

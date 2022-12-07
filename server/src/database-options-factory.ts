@@ -1,11 +1,12 @@
 import { ConfigService } from '@nestjs/config';
 import type { TypeOrmModuleOptions } from '@nestjs/typeorm';
 import type { Database } from 'better-sqlite3';
-import { DataSourceOptions } from 'typeorm';
+import type { DataSourceOptions } from 'typeorm';
 import type { BetterSqlite3ConnectionOptions } from 'typeorm/driver/better-sqlite3/BetterSqlite3ConnectionOptions';
-import { injectTypeOrmColumns as mysql_injectTypeOrmColumns } from './custom-columns/inject-columns-mysql';
-import { injectTypeOrmColumns as sqlite_injectTypeOrmColumns } from './custom-columns/inject-columns-sqlite';
-import type { DatabaseType, EnvironmentVariables } from './env.validation';
+import { registerJoinColumns } from './custom-columns/custom-join-column';
+import { injectTypeOrmColumns as mysql_injectTypeOrmColumns } from './custom-columns/mysql-inject-columns';
+import type { DatabaseType, Environment, EnvironmentVariables } from './env.validation';
+import LowerCaseNamingStrategy from './lower-case-naming-strategy';
 
 // TODO: if using Postgres, make sure to use REPEATABLE READ
 
@@ -25,7 +26,7 @@ export function createDataSourceOptions(
   getEnv: (key: keyof EnvironmentVariables) => string,
   cli: boolean,
 ): DataSourceOptions {
-  const nodeEnv = getEnv('NODE_ENV');
+  const nodeEnv = getEnv('NODE_ENV') as Environment;
   const dbType = getEnv('DATABASE_TYPE') as DatabaseType;
   const commonOptions: Writable<
     Omit<TypeOrmModuleOptions, 'type' | 'database' | 'poolSize'>
@@ -33,25 +34,25 @@ export function createDataSourceOptions(
   if (cli || nodeEnv === 'development') {
     commonOptions.logging = true;
   }
+  const customMigrationsGlobPath = `dist/src/custom-migrations/${dbType}/*-Migration.js`;
   if (cli) {
     commonOptions.entities = ['src/**/*.entity.ts'];
   } else {
     commonOptions.autoLoadEntities = true;
+    if (nodeEnv === 'development') {
+      commonOptions.synchronize = true;
+      commonOptions.migrations = [customMigrationsGlobPath];
+      // We can't run the custom migrations here unfortunately, because they will run
+      // BEFORE the synchronize step, but our migrations need the tables to be created
+      // first. So we need to explicitly run them later, in the CustomMigrationsService.
+      commonOptions.migrationsRun = false;
+    } else {
+      commonOptions.migrations = [`migrations/${dbType}/*.js`, customMigrationsGlobPath];
+      commonOptions.migrationsRun = true;
+    }
   }
-  const customMigrationsGlobPath = `dist/src/custom-migrations/${dbType}/*-Migration.js`;
-  if (!cli && nodeEnv === 'development') {
-    commonOptions.synchronize = true;
-    commonOptions.migrations = [customMigrationsGlobPath];
-    // We can't run the custom migrations here unfortunately, because they will run
-    // BEFORE the synchronize step, but our migrations need the tables to be created
-    // first. So we need to explicitly run them later, in the CustomMigrationsService.
-    commonOptions.migrationsRun = false;
-  } else {
-    commonOptions.migrations = [`migrations/${dbType}/*.js`, customMigrationsGlobPath];
-    commonOptions.migrationsRun = true;
-  }
+  registerJoinColumns(dbType);
   if (dbType === 'sqlite') {
-    sqlite_injectTypeOrmColumns();
     checkEnvVarsExist(['SQLITE_PATH'], getEnv);
     return {
       type: 'better-sqlite3',
@@ -71,8 +72,22 @@ export function createDataSourceOptions(
       charset: 'utf8mb4',
       ...commonOptions,
     };
+  } else if (dbType === 'postgres') {
+    checkEnvVarsExist(['POSTGRES_HOST', 'POSTGRES_PORT', 'POSTGRES_USER', 'POSTGRES_PASSWORD', 'POSTGRES_DATABASE'], getEnv);
+    return {
+      type: 'postgres',
+      host: getEnv('POSTGRES_HOST'),
+      port: +getEnv('POSTGRES_PORT'),
+      username: getEnv('POSTGRES_USER'),
+      password: getEnv('POSTGRES_PASSWORD'),
+      database: getEnv('POSTGRES_DATABASE'),
+      // In Postgres, unquoted identifiers are case-insensitive, but TypeORM quotes
+      // all identifiers, so we want to make everything lower case so that we don't
+      // need to place quotes in all of our queries
+      namingStrategy: new LowerCaseNamingStrategy(),
+      ...commonOptions,
+    };
   } else {
-    // TODO: PostgreSQL
     throw new Error('Unrecognized database type ' + dbType);
   }
 }

@@ -18,7 +18,7 @@ import { stripTrailingSlash } from './misc.utils';
 
 // Adapted from https://stackoverflow.com/a/68800520
 const environments = ['development', 'production', 'test'] as const;
-type Environment = typeof environments[number];
+export type Environment = typeof environments[number];
 
 // TODO: support MySQL too
 const databaseTypes = ['sqlite', 'mariadb', 'postgres'] as const;
@@ -85,6 +85,26 @@ export class EnvironmentVariables {
   @IsOptional()
   @IsString()
   MYSQL_DATABASE?: string;
+
+  @IsOptional()
+  @IsString()
+  POSTGRES_HOST?: string;
+
+  @IsOptional()
+  @IsPort()
+  POSTGRES_PORT?: string;
+
+  @IsOptional()
+  @IsString()
+  POSTGRES_USER?: string;
+
+  @IsOptional()
+  @IsString()
+  POSTGRES_PASSWORD?: string;
+
+  @IsOptional()
+  @IsString()
+  POSTGRES_DATABASE?: string;
 
   @IsOptional()
   @IsString()

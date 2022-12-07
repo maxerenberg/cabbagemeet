@@ -1,4 +1,5 @@
-import { Entity, Column, PrimaryColumn, JoinColumn, ManyToOne, Index } from 'typeorm';
+import { Entity, Column, PrimaryColumn, ManyToOne, Index } from 'typeorm';
+import { CustomJoinColumn } from '../custom-columns/custom-join-column';
 import Meeting from '../meetings/meeting.entity';
 import GoogleOAuth2 from './google-oauth2.entity';
 
@@ -36,10 +37,10 @@ export default class GoogleCalendarEvents {
   SyncToken?: string;
 
   @ManyToOne(() => Meeting, meeting => meeting.GoogleCalendarEvents, {onDelete: 'CASCADE'})
-  @JoinColumn({name: 'MeetingID'})
+  @CustomJoinColumn({name: 'MeetingID'})
   Meeting: Meeting;
 
   @ManyToOne(() => GoogleOAuth2, googleOAuth2 => googleOAuth2.Events, {onDelete: 'CASCADE'})
-  @JoinColumn({name: 'UserID'})
+  @CustomJoinColumn({name: 'UserID'})
   GoogleOAuth2: GoogleOAuth2;
 }

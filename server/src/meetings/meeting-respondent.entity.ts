@@ -1,4 +1,5 @@
-import { Entity, Column, PrimaryGeneratedColumn, Index, ManyToOne, JoinColumn } from 'typeorm';
+import { Entity, Column, PrimaryGeneratedColumn, Index, ManyToOne } from 'typeorm';
+import { CustomJoinColumn } from '../custom-columns/custom-join-column';
 import User from '../users/user.entity';
 import Meeting from './meeting.entity';
 
@@ -14,7 +15,7 @@ export default class MeetingRespondent {
   MeetingID: number;
 
   @ManyToOne(() => Meeting, meeting => meeting.Respondents, {onDelete: 'CASCADE'})
-  @JoinColumn({name: 'MeetingID'})
+  @CustomJoinColumn({name: 'MeetingID'})
   Meeting: Meeting;
 
   @Index({where: 'UserID IS NOT NULL'})
@@ -22,7 +23,7 @@ export default class MeetingRespondent {
   UserID?: number;
 
   @ManyToOne(() => User, user => user.Respondents, {onDelete: 'CASCADE'})
-  @JoinColumn({name: 'UserID'})
+  @CustomJoinColumn({name: 'UserID'})
   User?: User;
 
   @Column({nullable: true})
