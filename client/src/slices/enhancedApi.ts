@@ -6,13 +6,12 @@ import type {
   TransformedMeetingResponse,
   TransformedMeetingsShortResponse,
 } from 'utils/response-transforms';
-import { api, SignupApiResponse, VerifyEmailAddressResponse } from './api';
+import { api, SignupApiResponse, UserResponse, VerifyEmailAddressResponse } from './api';
 import type {
   MeetingResponse,
   GetMeetingApiArg,
   GetCreatedMeetingsApiArg,
   GetRespondedMeetingsApiArg,
-  EditUserApiResponse,
   UserResponseWithToken,
   DeleteMeetingApiResponse,
   GetSelfInfoApiResponse,
@@ -62,72 +61,72 @@ export const enhancedApi = replacedApi.enhanceEndpoints({
   addTagTypes: allTags,
   endpoints: {
     login: {
-      onQueryStarted: loginOrVerifyEmail_onQueryStarted,
+      onQueryStarted: (arg, api) => loginOrVerifyEmail_onQueryStarted(arg, api),
     },
     signup: {
-      onQueryStarted: signup_onQueryStarted,
+      onQueryStarted: (arg, api) => signup_onQueryStarted(arg, api),
     },
     verifyEmail: {
-      onQueryStarted: loginOrVerifyEmail_onQueryStarted,
+      onQueryStarted: (arg, api) => loginOrVerifyEmail_onQueryStarted(arg, api),
     },
     logout: {
-      onQueryStarted: logoutOrDeleteAccount_onQueryStarted,
+      onQueryStarted: (arg, api) => logoutOrDeleteAccount_onQueryStarted(arg, api),
       invalidatesTags: allTags,
     },
     deleteUser: {
-      onQueryStarted: logoutOrDeleteAccount_onQueryStarted,
+      onQueryStarted: (arg, api) => logoutOrDeleteAccount_onQueryStarted(arg, api),
       invalidatesTags: allTags,
     },
     getSelfInfo: {
-      onQueryStarted: getSelfInfo_onQueryStarted,
+      onQueryStarted: (arg, api) => getSelfInfo_onQueryStarted(arg, api),
     },
     editUser: {
-      onQueryStarted: editUser_onQueryStarted,
+      onQueryStarted: (arg, api) => editUser_onQueryStarted(arg, api),
       // If a user changed their name, the respondents data for a meeting
       // could now be invalid
       invalidatesTags: ['meeting'],
     },
     confirmLinkGoogleAccount: {
-      onQueryStarted: editUser_onQueryStarted,
+      onQueryStarted: (arg, api) => editUser_onQueryStarted(arg, api),
     },
     unlinkGoogleCalendar: {
-      onQueryStarted: editUser_onQueryStarted,
+      onQueryStarted: (arg, api) => editUser_onQueryStarted(arg, api),
     },
     getMeeting: {
       providesTags: (result, error, arg) => [{type: 'meeting', id: arg}],
     },
     addGuestRespondent: {
-      onQueryStarted: upsertMeeting_onQueryStarted,
+      onQueryStarted: (arg, api) => upsertMeeting_onQueryStarted(arg, api),
     },
     putSelfRespondent: {
-      onQueryStarted: upsertMeeting_onQueryStarted,
+      onQueryStarted: (arg, api) => upsertMeeting_onQueryStarted(arg, api),
     },
     updateAvailabilities: {
-      onQueryStarted: upsertMeeting_onQueryStarted,
+      onQueryStarted: (arg, api) => upsertMeeting_onQueryStarted(arg, api),
     },
     deleteRespondent: {
-      onQueryStarted: upsertMeeting_onQueryStarted,
+      onQueryStarted: (arg, api) => upsertMeeting_onQueryStarted(arg, api),
     },
     createMeeting: {
       invalidatesTags: ['createdMeetings', 'respondedMeetings'],
-      onQueryStarted: upsertMeeting_onQueryStarted,
+      onQueryStarted: (arg, api) => upsertMeeting_onQueryStarted(arg, api),
     },
     editMeeting: {
       invalidatesTags: (result, error, arg) =>
         ['createdMeetings', 'respondedMeetings', {type: 'googleCalendarEvents', id: arg.id}],
-      onQueryStarted: upsertMeeting_onQueryStarted,
+      onQueryStarted: (arg, api) => upsertMeeting_onQueryStarted(arg, api),
     },
     deleteMeeting: {
       invalidatesTags: ['createdMeetings', 'respondedMeetings'],
-      onQueryStarted: deleteMeeting_onQueryStarted,
+      onQueryStarted: (arg, api) => deleteMeeting_onQueryStarted(arg, api),
     },
     scheduleMeeting: {
       invalidatesTags: ['createdMeetings', 'respondedMeetings'],
-      onQueryStarted: upsertMeeting_onQueryStarted,
+      onQueryStarted: (arg, api) => upsertMeeting_onQueryStarted(arg, api),
     },
     unscheduleMeeting: {
       invalidatesTags: ['createdMeetings', 'respondedMeetings'],
-      onQueryStarted: upsertMeeting_onQueryStarted,
+      onQueryStarted: (arg, api) => upsertMeeting_onQueryStarted(arg, api),
     },
     getCreatedMeetings: {
       providesTags: ['createdMeetings'],
@@ -158,7 +157,7 @@ function updateStoreForUserResponseWithToken(
 
 async function loginOrVerifyEmail_onQueryStarted(
   arg: unknown,
-  {dispatch, queryFulfilled}: MutationLifecycleApi<any, any, UserResponseWithToken, 'api'>,
+  {dispatch, queryFulfilled}: MutationLifecycleApi<unknown, any, UserResponseWithToken, 'api'>,
 ) {
   // pessimistic update
   // https://redux-toolkit.js.org/rtk-query/usage/manual-cache-updates#pessimistic-updates
@@ -170,7 +169,7 @@ async function loginOrVerifyEmail_onQueryStarted(
 
 async function signup_onQueryStarted(
   arg: unknown,
-  {dispatch, queryFulfilled}: MutationLifecycleApi<any, any, SignupApiResponse, 'api'>,
+  {dispatch, queryFulfilled}: MutationLifecycleApi<unknown, any, SignupApiResponse, 'api'>,
 ) {
   try {
     const {data} = await queryFulfilled;
@@ -183,7 +182,7 @@ async function signup_onQueryStarted(
 
 async function logoutOrDeleteAccount_onQueryStarted(
   arg: unknown,
-  {dispatch, queryFulfilled}: MutationLifecycleApi<any, any, void, 'api'>,
+  {dispatch, queryFulfilled}: MutationLifecycleApi<unknown, any, unknown, 'api'>,
 ) {
   try {
     await queryFulfilled;
@@ -193,7 +192,7 @@ async function logoutOrDeleteAccount_onQueryStarted(
 
 async function getSelfInfo_onQueryStarted(
   arg: unknown,
-  {dispatch, queryFulfilled}: QueryLifecycleApi<any, any, GetSelfInfoApiResponse, 'api'>,
+  {dispatch, queryFulfilled}: QueryLifecycleApi<unknown, any, GetSelfInfoApiResponse, 'api'>,
 ) {
   try {
     await queryFulfilled;
@@ -205,7 +204,7 @@ async function getSelfInfo_onQueryStarted(
 
 async function editUser_onQueryStarted(
   arg: unknown,
-  {dispatch, queryFulfilled}: MutationLifecycleApi<any, any, EditUserApiResponse, 'api'>,
+  {dispatch, queryFulfilled}: MutationLifecycleApi<unknown, any, UserResponse, 'api'>,
 ) {
   try {
     const {data: selfInfo} = await queryFulfilled;
@@ -217,7 +216,7 @@ async function editUser_onQueryStarted(
 
 async function upsertMeeting_onQueryStarted(
   arg: unknown,
-  {dispatch, queryFulfilled}: MutationLifecycleApi<any, any, MeetingResponse, 'api'>,
+  {dispatch, queryFulfilled}: MutationLifecycleApi<unknown, any, MeetingResponse, 'api'>,
 ) {
   try {
     const {data: meeting} = await queryFulfilled;
@@ -230,7 +229,7 @@ async function upsertMeeting_onQueryStarted(
 
 async function deleteMeeting_onQueryStarted(
   arg: number,
-  {dispatch, queryFulfilled}: QueryLifecycleApi<any, any, DeleteMeetingApiResponse, 'api'>,
+  {dispatch, queryFulfilled}: MutationLifecycleApi<unknown, any, DeleteMeetingApiResponse, 'api'>,
 ) {
   try {
     await queryFulfilled;

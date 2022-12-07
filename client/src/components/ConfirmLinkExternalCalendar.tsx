@@ -29,7 +29,8 @@ export default function ConfirmLinkExternalCalendar({provider}: {provider: OAuth
   const encryptedEntity = searchParams.get('encryptedEntity');
   const iv = searchParams.get('iv');
   const salt = searchParams.get('salt');
-  const requiredParamsArePresent = !!(postRedirect && encryptedEntity && iv && salt);
+  const tag = searchParams.get('tag');
+  const requiredParamsArePresent = !!(postRedirect && encryptedEntity && iv && salt && tag);
   const shouldRedirectToHomePage = !requiredParamsArePresent || (!tokenIsPresent && !token)
   useEffect(() => {
     if (isSuccess) {
@@ -56,6 +57,7 @@ export default function ConfirmLinkExternalCalendar({provider}: {provider: OAuth
     encrypted_entity: encryptedEntity,
     iv,
     salt,
+    tag,
   });
   const btnDisabled = isLoading;
   return (
@@ -82,6 +84,9 @@ export default function ConfirmLinkExternalCalendar({provider}: {provider: OAuth
         <li>See your {capitalizedProvider} calendar events when adding your availabilities</li>
         <li>Synchronize your scheduled meetings with {capitalizedProvider} calendar</li>
       </ul>
+      {error && (
+        <p className="text-danger text-center mb-0 mt-4">An error occurred: {getReqErrorMessage(error)}</p>
+      )}
       <div className="mt-5 d-flex justify-content-between">
         <Link to={postRedirect}>
           <button
@@ -100,9 +105,6 @@ export default function ConfirmLinkExternalCalendar({provider}: {provider: OAuth
           Link {capitalizedProvider} account
         </ButtonWithSpinner>
       </div>
-      {error && (
-        <p className="text-danger text-center mb-0 mt-3">An error occurred: {getReqErrorMessage(error)}</p>
-      )}
     </div>
   );
 }

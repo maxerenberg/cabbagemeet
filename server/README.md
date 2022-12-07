@@ -103,6 +103,16 @@ $ npm run test:e2e
 $ npm run test:cov
 ```
 
+## Modifying the public API
+If you modify the public API (e.g. add a new endpoint, modify the request
+parameters of an existing endpoint), you must regenerate the RTK Query hooks
+for the frontend:
+```bash
+cd ../client
+wget -O openapi.json localhost:3001/swagger-json
+npx @rtk-query/codegen-openapi openapi-config.ts
+```
+
 ## Migrations
 If you add/remove/modify any of the entity classes, you will need to create a new database migration.
 To do this, you need to first run the existing migrations on a new empty database, then generate a new migration from that one using the entity classes.

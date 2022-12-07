@@ -258,9 +258,9 @@ export class AuthController {
     await this.authService.confirmResetPassword(user, body.password);
   }
 
-  private redirectToGoogle(reason: OAuth2Reason, postRedirect: string, nonce?: string): string {
+  private redirectToGoogle(reason: OAuth2Reason, postRedirect: string, promptConsent: boolean, nonce?: string): string {
     try {
-      return this.oauth2Service.getRequestURL(OAuth2Provider.GOOGLE, {reason, postRedirect, nonce});
+      return this.oauth2Service.getRequestURL(OAuth2Provider.GOOGLE, {reason, postRedirect, nonce}, promptConsent);
     } catch (err: any) {
       if (err instanceof OAuth2NotConfiguredError) {
         throw new NotFoundException('Google OAuth2 is not configured on this server');
@@ -279,7 +279,7 @@ export class AuthController {
   @HttpCode(HttpStatus.OK)
   loginWithGoogle(@Body() body: OAuth2ConsentPostRedirectDto): CustomRedirectResponse {
     return {
-      redirect: this.redirectToGoogle('login', body.post_redirect, body.nonce)
+      redirect: this.redirectToGoogle('login', body.post_redirect, false, body.nonce)
     };
   }
 
@@ -292,7 +292,7 @@ export class AuthController {
   @HttpCode(HttpStatus.OK)
   signupWithGoogle(@Body() body: OAuth2ConsentPostRedirectDto): CustomRedirectResponse {
     return {
-      redirect: this.redirectToGoogle('signup', body.post_redirect, body.nonce)
+      redirect: this.redirectToGoogle('signup', body.post_redirect, true, body.nonce)
     };
   }
 }

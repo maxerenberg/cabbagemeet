@@ -138,6 +138,7 @@ export default class OAuth2Service {
   }
 
   private async request(...args: Parameters<typeof request>) {
+    this.logger.debug(`${args[1]?.method || 'GET'} ${args[0]}`);
     const response = await request(...args);
     const {statusCode, body} = response;
     if (!this.isSuccessStatusCode(statusCode)) {
@@ -177,7 +178,7 @@ export default class OAuth2Service {
     );
   }
 
-  getRequestURL(provider: OAuth2Provider, state: OAuth2State): string {
+  getRequestURL(provider: OAuth2Provider, state: OAuth2State, promptConsent: boolean): string {
     const {client_id, secret, redirect_uri} = this.getEnvConfigOrThrow(provider);
     if (!client_id || !secret || !redirect_uri) {
       throw new OAuth2NotConfiguredError();
@@ -192,7 +193,7 @@ export default class OAuth2Service {
       access_type: 'offline',
       state: JSON.stringify(state),
     };
-    if (state.reason === 'link' || state.reason === 'signup') {
+    if (promptConsent) {
       params.prompt = 'consent';
     }
     return authzEndpoint + '?' + encodeQueryParams(params);
@@ -235,7 +236,6 @@ export default class OAuth2Service {
       grant_type: 'refresh_token',
       refresh_token: creds.RefreshToken,
     });
-    this.logger.debug(`POST ${tokenEndpoint}`);
     let data: GoogleRefreshTokenResponse | undefined;
     try {
       data = await this.requestJSON<GoogleRefreshTokenResponse>(tokenEndpoint, {
@@ -478,8 +478,6 @@ export default class OAuth2Service {
     } else {
       args[1].headers.authorization = `Bearer ${accessToken}`;
     }
-    // Log the method and URL
-    this.logger.debug((args[1]?.method || 'GET') + ' ' + args[0]);
     try {
       const {headers, body} = await this.request(...args);
       // The content-type can be e.g. "application/json; charset=UTF-8"

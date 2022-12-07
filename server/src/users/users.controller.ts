@@ -120,19 +120,6 @@ export class UsersController {
     };
   }
 
-  private redirectToGoogle(userID: number, reason: OAuth2Reason, postRedirect: string): string {
-    try {
-      return this.oauth2Service.getRequestURL(
-        OAuth2Provider.GOOGLE, {reason, postRedirect, userID}
-      );
-    } catch (err: any) {
-      if (err instanceof OAuth2NotConfiguredError) {
-        throw new NotFoundException();
-      }
-      throw err;
-    }
-  }
-
   @ApiOperation({
     summary: 'Link Google calendar',
     description: (
@@ -148,9 +135,22 @@ export class UsersController {
     @AuthUser() user: User,
     @Body() body: LinkExternalCalendarDto,
   ): CustomRedirectResponse {
-    return {
-      redirect: this.redirectToGoogle(user.ID, 'link', body.post_redirect)
-    };
+    // TODO: if the user already has a linked calendar, ignore
+    // TODO: if the user already has OAuth2 creds, just set the linked calendar
+    //       flag to true in the DB
+    try {
+      const redirectURL = this.oauth2Service.getRequestURL(
+        OAuth2Provider.GOOGLE,
+        {reason: 'link', postRedirect: body.post_redirect, userID: user.ID},
+        true
+      );
+      return {redirect: redirectURL};
+    } catch (err: any) {
+      if (err instanceof OAuth2NotConfiguredError) {
+        throw new NotFoundException();
+      }
+      throw err;
+    }
   }
 
   @ApiOperation({

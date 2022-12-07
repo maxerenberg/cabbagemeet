@@ -144,6 +144,12 @@ export default class AuthService {
       this.logger.debug(`User not found for email=${email}`);
       return;
     }
+    if (!user.PasswordHash) {
+      // If the user signed up via OAuth2, they should not be allowed to reset
+      // their password, because they never had one to begin with
+      this.logger.debug(`User for email=${email} does not have a password`);
+      return;
+    }
     this.mailService.sendNowOrLater({
       recipient: email,
       subject: 'CabbageMeet password reset',

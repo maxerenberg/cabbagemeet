@@ -12,16 +12,18 @@ import {
   Res,
   UseGuards,
 } from '@nestjs/common';
-import { ApiExcludeEndpoint, ApiOperation, ApiTags } from '@nestjs/swagger';
-import { Response } from 'express';
+import { ApiBearerAuth, ApiExcludeEndpoint, ApiOperation, ApiTags } from '@nestjs/swagger';
+import type { Response } from 'express';
 import { AuthUser } from 'src/auth/auth-user.decorator';
 import JwtAuthGuard from 'src/auth/jwt-auth.guard';
 import CustomJwtService from 'src/custom-jwt/custom-jwt.service';
 import { assertIsNever, encodeQueryParams } from 'src/misc.utils';
+import UserResponse from 'src/users/user-response';
 import User from 'src/users/user.entity';
+import { UserToUserResponse } from 'src/users/users.controller';
 import UsersService from 'src/users/users.service';
 import ConfirmLinkAccountDto from './confirm-link-account.dto';
-import GoogleOAuth2 from './google-oauth2.entity';
+import type GoogleOAuth2 from './google-oauth2.entity';
 import OAuth2Service, {
   oauth2Reasons,
   OAuth2State,
@@ -96,14 +98,21 @@ export class Oauth2Controller {
           pendingOAuth2Entity,
         } = await this.oauth2Service.google_handleLogin(code, state);
         if (isLinkedToAccountFromOIDCResponse) {
-          // The user explicitly linked their account with Google (either by signing
-          // up with Google initially, or by clicking 'Link account' from the settings
-          // page). We should successfully log them in.
+          // The user already explicitly linked their account with Google (either by
+          // signing up with Google initially, or by clicking 'Link account' from the
+          // settings page). We should successfully log them in.
           await this.redirectWithToken(res, state.postRedirect, state.nonce, user);
         } else if (user) {
           // The user signed up with this Gmail account, but never linked the account
           // via the settings page. We need them to confirm whether they want
           // to link the accounts together.
+          if (!pendingOAuth2Entity.RefreshToken) {
+            this.logger.debug('User exists, but OIDC response has no refresh token. Redirecting to consent page.');
+            res.redirect(this.oauth2Service.getRequestURL(
+              OAuth2Provider.GOOGLE, {...state, reason: state.reason}, true)
+            );
+            return;
+          }
           const {token} = this.jwtService.serializeUserToJwt(user);
           // To avoid showing OAuth2 tokens in the browser URL bar, we encrypt the
           // entity first
@@ -111,6 +120,7 @@ export class Oauth2Controller {
             encrypted: encryptedEntity,
             iv,
             salt,
+            tag,
           } = await this.jwtService.encryptText(JSON.stringify(pendingOAuth2Entity!));
           const urlParams: Record<string, string> = {
             postRedirect: state.postRedirect,
@@ -118,6 +128,7 @@ export class Oauth2Controller {
             encryptedEntity: encryptedEntity.toString('base64url'),
             iv: iv.toString('base64url'),
             salt: salt.toString('base64url'),
+            tag: tag.toString('base64url'),
           };
           if (state.nonce) {
             urlParams.nonce = state.nonce;
@@ -127,11 +138,10 @@ export class Oauth2Controller {
           // The local account associated with this Google account no longer exists.
           // We need to force the user to go through the consent screen again
           // so that we can get a new refresh token.
-          this.logger.debug('Redirecting user to consent screen');
-          res.redirect(this.oauth2Service.getRequestURL(OAuth2Provider.GOOGLE, {
-            ...state,
-            reason: 'signup',
-          }));
+          this.logger.debug('User does not exist. Redirecting to consent page.');
+          res.redirect(this.oauth2Service.getRequestURL(
+            OAuth2Provider.GOOGLE, {...state, reason: state.reason}, true)
+          );
         }
       } else {
         assertIsNever(state.reason);
@@ -159,18 +169,20 @@ export class Oauth2Controller {
     ),
     operationId: 'confirmLinkGoogleAccount',
   })
+  @ApiBearerAuth()
   @Post('confirm-link-google-account')
-  @HttpCode(HttpStatus.NO_CONTENT)
+  @HttpCode(HttpStatus.OK)
   @UseGuards(JwtAuthGuard)
   async confirmLinkGoogleAccount(
     @AuthUser() user: User,
     @Body() body: ConfirmLinkAccountDto,
-  ) {
+  ): Promise<UserResponse> {
+    const encryptedEntity = Buffer.from(body.encrypted_entity, 'base64url');
     const iv = Buffer.from(body.iv, 'base64url');
     const salt = Buffer.from(body.salt, 'base64url');
-    const encryptedEntity = Buffer.from(body.encrypted_entity, 'base64url');
+    const tag = Buffer.from(body.tag, 'base64url');
     const oauth2Entity = JSON.parse(
-      await this.jwtService.decryptText(encryptedEntity, iv, salt)
+      await this.jwtService.decryptText(encryptedEntity, iv, salt, tag)
     ) as Partial<GoogleOAuth2>;
     // sanity check
     if (!(
@@ -188,5 +200,8 @@ export class Oauth2Controller {
       }
       throw err;
     }
+    // Return the modified user
+    user.GoogleOAuth2 = {LinkedCalendar: true} as GoogleOAuth2;
+    return UserToUserResponse(user);
   }
 }

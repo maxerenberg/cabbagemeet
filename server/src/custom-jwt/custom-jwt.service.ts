@@ -2,7 +2,6 @@ import { Inject, Injectable } from '@nestjs/common';
 import User from '../users/user.entity';
 import { decryptText, encryptText } from './encryption';
 import JwtStrategy, { TokenPurpose } from './jwt.strategy';
-import type { SerializedUserJwt } from './jwt.strategy';
 
 @Injectable()
 export default class CustomJwtService {
@@ -11,10 +10,7 @@ export default class CustomJwtService {
     private jwtStrategy: JwtStrategy,
   ) {}
 
-  serializeUserToJwt(user: User, purpose?: TokenPurpose): {
-    payload: SerializedUserJwt,
-    token: string,
-  } {
+  serializeUserToJwt(user: User, purpose?: TokenPurpose) {
     return this.jwtStrategy.serializeUserToJwt(user, purpose);
   }
 
@@ -22,15 +18,11 @@ export default class CustomJwtService {
   // I don't think that this is a problem because if the JWT secret is
   // leaked, we're screwed anyways.
 
-  async encryptText(text: string): Promise<{
-    encrypted: Buffer;
-    iv: Buffer;
-    salt: Buffer;
-  }> {
+  encryptText(text: string) {
     return encryptText(text, this.secret);
   }
 
-  async decryptText(encrypted: Buffer, iv: Buffer, salt: Buffer): Promise<string> {
-    return decryptText(encrypted, iv, salt, this.secret);
+  decryptText(encrypted: Buffer, iv: Buffer, salt: Buffer, tag: Buffer) {
+    return decryptText(encrypted, iv, salt, tag, this.secret);
   }
 }

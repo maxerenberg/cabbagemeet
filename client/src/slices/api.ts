@@ -241,7 +241,8 @@ export type LoginWithGoogleApiArg = OAuth2ConsentPostRedirectDto;
 export type SignupWithGoogleApiResponse =
   /** status 200  */ CustomRedirectResponse;
 export type SignupWithGoogleApiArg = OAuth2ConsentPostRedirectDto;
-export type ConfirmLinkGoogleAccountApiResponse = unknown;
+export type ConfirmLinkGoogleAccountApiResponse =
+  /** status 200  */ UserResponse;
 export type ConfirmLinkGoogleAccountApiArg = ConfirmLinkAccountDto;
 export type GetSelfInfoApiResponse = /** status 200  */ UserResponse;
 export type GetSelfInfoApiArg = void;
@@ -357,17 +358,18 @@ export type OAuth2ConsentPostRedirectDto = {
   post_redirect: string;
   nonce?: string;
 };
-export type ConfirmLinkAccountDto = {
-  encrypted_entity: string;
-  iv: string;
-  salt: string;
-};
 export type UserResponse = {
   userID: number;
   name: string;
   email: string;
   isSubscribedToNotifications: boolean;
   hasLinkedGoogleAccount: boolean;
+};
+export type ConfirmLinkAccountDto = {
+  encrypted_entity: string;
+  iv: string;
+  salt: string;
+  tag: string;
 };
 export type EditUserDto = {
   name?: string;
