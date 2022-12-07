@@ -1,5 +1,5 @@
 import { useAppSelector } from "app/hooks";
-import { useGetGoogleCalendarEventsQuery } from "slices/api";
+import { useGetGoogleCalendarEventsQuery, useGetSelfInfoQuery } from "slices/api";
 import { selectTokenIsPresent } from "slices/authentication";
 import { selectCurrentMeetingID } from "slices/currentMeeting";
 import { useGetMeetingQuery } from "slices/enhancedApi";
@@ -24,6 +24,8 @@ export function useGetCurrentMeetingWithSelector<T extends Record<string, any>>(
 
 export function useGetGoogleCalendarEventsIfTokenIsPresent(meetingID: number) {
   const tokenIsPresent = useAppSelector(selectTokenIsPresent);
-  const queryInfo = useGetGoogleCalendarEventsQuery(meetingID, {skip: !tokenIsPresent});
+  const {data: userInfo} = useGetSelfInfoQuery(undefined, {skip: !tokenIsPresent});
+  const hasLinkedGoogleAccount = userInfo?.hasLinkedGoogleAccount || false;
+  const queryInfo = useGetGoogleCalendarEventsQuery(meetingID, {skip: !tokenIsPresent || !hasLinkedGoogleAccount});
   return queryInfo;
 }

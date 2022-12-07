@@ -1,4 +1,5 @@
-import { MutationLifecycleApi, QueryLifecycleApi } from '@reduxjs/toolkit/dist/query/endpointDefinitions';
+import type { AnyAction, ThunkDispatch } from '@reduxjs/toolkit';
+import type { MutationLifecycleApi, QueryLifecycleApi } from '@reduxjs/toolkit/dist/query/endpointDefinitions';
 import { removeToken, setToken } from './authentication';
 import { transformMeetingResponse, transformMeetingsShortResponse } from 'utils/response-transforms';
 import type {
@@ -19,7 +20,6 @@ import type {
   ConfirmPasswordResetApiArg,
 } from './api';
 import { setCurrentMeetingID } from './currentMeeting';
-import { AnyAction, ThunkDispatch } from '@reduxjs/toolkit';
 
 const replacedApi = api.injectEndpoints({
   endpoints: (build) => ({
@@ -56,8 +56,7 @@ export const {
   useConfirmPasswordResetMutation,
 } = replacedApi;
 
-const meetingTags = ['createdMeetings', 'respondedMeetings'] as const;
-const allTags = [...meetingTags] as const;
+const allTags = ['createdMeetings', 'respondedMeetings', 'meeting', 'googleCalendarEvents'] as const;
 
 export const enhancedApi = replacedApi.enhanceEndpoints({
   addTagTypes: allTags,
@@ -84,12 +83,18 @@ export const enhancedApi = replacedApi.enhanceEndpoints({
     },
     editUser: {
       onQueryStarted: editUser_onQueryStarted,
+      // If a user changed their name, the respondents data for a meeting
+      // could now be invalid
+      invalidatesTags: ['meeting'],
     },
     confirmLinkGoogleAccount: {
       onQueryStarted: editUser_onQueryStarted,
     },
     unlinkGoogleCalendar: {
       onQueryStarted: editUser_onQueryStarted,
+    },
+    getMeeting: {
+      providesTags: (result, error, arg) => [{type: 'meeting', id: arg}],
     },
     addGuestRespondent: {
       onQueryStarted: upsertMeeting_onQueryStarted,
@@ -104,23 +109,24 @@ export const enhancedApi = replacedApi.enhanceEndpoints({
       onQueryStarted: upsertMeeting_onQueryStarted,
     },
     createMeeting: {
-      invalidatesTags: meetingTags,
+      invalidatesTags: ['createdMeetings', 'respondedMeetings'],
       onQueryStarted: upsertMeeting_onQueryStarted,
     },
     editMeeting: {
-      invalidatesTags: meetingTags,
+      invalidatesTags: (result, error, arg) =>
+        ['createdMeetings', 'respondedMeetings', {type: 'googleCalendarEvents', id: arg.id}],
       onQueryStarted: upsertMeeting_onQueryStarted,
     },
     deleteMeeting: {
-      invalidatesTags: meetingTags,
+      invalidatesTags: ['createdMeetings', 'respondedMeetings'],
       onQueryStarted: deleteMeeting_onQueryStarted,
     },
     scheduleMeeting: {
-      invalidatesTags: meetingTags,
+      invalidatesTags: ['createdMeetings', 'respondedMeetings'],
       onQueryStarted: upsertMeeting_onQueryStarted,
     },
     unscheduleMeeting: {
-      invalidatesTags: meetingTags,
+      invalidatesTags: ['createdMeetings', 'respondedMeetings'],
       onQueryStarted: upsertMeeting_onQueryStarted,
     },
     getCreatedMeetings: {
@@ -128,6 +134,9 @@ export const enhancedApi = replacedApi.enhanceEndpoints({
     },
     getRespondedMeetings: {
       providesTags: ['respondedMeetings'],
+    },
+    getGoogleCalendarEvents: {
+      providesTags: (result, error, arg) => [{type: 'googleCalendarEvents', id: arg}],
     },
   },
 });

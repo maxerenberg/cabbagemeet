@@ -12,7 +12,13 @@ import { useToast } from "./Toast";
 import styles from './Settings.module.css';
 import GenericSpinner from "./GenericSpinner";
 import { getReqErrorMessage, useMutationWithPersistentError } from "utils/requests.utils";
-import { useEditUserMutation, useGetSelfInfoQuery, useLinkGoogleCalendarMutation, useLogoutMutation, useUnlinkGoogleCalendarMutation } from "slices/api";
+import {
+  useEditUserMutation,
+  useGetSelfInfoQuery,
+  useLinkGoogleCalendarMutation,
+  useLogoutMutation,
+  useUnlinkGoogleCalendarMutation,
+} from "slices/api";
 import ButtonWithSpinner from "./ButtonWithSpinner";
 import { useGetSelfInfoIfTokenIsPresent } from "utils/auth.hooks";
 
@@ -74,13 +80,10 @@ function GeneralSettings() {
       onCancelClick();
     }
   }, [isSuccess, onCancelClick]);
-  const onSaveClick = () => {
-    editUser({name});
-    setSubmittedAtLeastOnceSinceEditButtonWasClicked(true);
-  };
   const onSubmit: React.FormEventHandler<HTMLFormElement> = (ev) => {
     ev.preventDefault();
-    onSaveClick();
+    editUser({name});
+    setSubmittedAtLeastOnceSinceEditButtonWasClicked(true);
   };
   return (
     <div>
@@ -104,7 +107,6 @@ function GeneralSettings() {
                 type="submit"
                 form="edit-name"
                 className="btn btn-primary ms-4"
-                onClick={onSaveClick}
                 isLoading={isLoading}
               >
                 Save
@@ -251,7 +253,7 @@ function NotificationSettings() {
       <h4>Notification Settings</h4>
       <div className="mt-4">
         <div className="d-flex flex-wrap align-items-center justify-content-between">
-          <h5 className="text-primary">Email Updates</h5>
+          <h5 className="text-primary">Email updates</h5>
           <ButtonWithSpinner
             as="NonFocusButton"
             style={{minWidth: 'max-content'}}
@@ -306,7 +308,7 @@ function AccountSettings() {
       </div>
       <div className="mt-5">
         <div className="d-flex flex-wrap align-items-center justify-content-between">
-          <h5 className="text-primary">Delete Account</h5>
+          <h5 className="text-primary">Delete account</h5>
           <NonFocusButton
             type="button"
             className="btn btn-outline-danger custom-btn-min-width w-100-md-down mt-3 mt-md-0"

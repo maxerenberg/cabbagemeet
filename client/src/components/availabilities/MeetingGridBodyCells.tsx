@@ -74,12 +74,7 @@ function cellIsInSelectionColumn(
   );
 }
 
-function MouseupProvider({
-  children,
-  dateTimes,
-}: React.PropsWithChildren<{
-  dateTimes: string[][],
-}>) {
+function useMouseupListener(dateTimes: string[][]) {
   const dispatch = useAppDispatch();
   const selMode = useAppSelector(selectSelMode);
   const mouseState = useAppSelector(selectMouseState);
@@ -131,8 +126,6 @@ function MouseupProvider({
       dispatch(addDateTimesAndResetMouse(dateTimesInSelectionArea));
     }
   }, [mouseState, selMode.type, dispatch, dateTimes]);
-
-  return <>{children}</>;
 }
 
 function MeetingGridBodyCells({
@@ -212,9 +205,9 @@ function MeetingGridBodyCells({
   const selMode = useAppSelector(selectSelMode);
   const hoverUser = useAppSelector(selectHoverUser);
   const somebodyIsHovered = hoverUser !== null;
-
+  useMouseupListener(dateTimes);
   return (
-    <MouseupProvider dateTimes={dateTimes}>
+    <>
       {
         gridCoords.map(([colIdx, rowIdx], i) => {
           const dateTime = dateTimes[rowIdx][colIdx];
@@ -246,7 +239,7 @@ function MeetingGridBodyCells({
           );
         })
       }
-    </MouseupProvider>
+    </>
   )
 }
 export default React.memo(MeetingGridBodyCells);
