@@ -20,7 +20,6 @@ import CustomJwtService from 'src/custom-jwt/custom-jwt.service';
 import { assertIsNever, encodeQueryParams } from 'src/misc.utils';
 import User from 'src/users/user.entity';
 import UsersService from 'src/users/users.service';
-import { DeepPartial } from 'typeorm';
 import ConfirmLinkAccountDto from './confirm-link-account.dto';
 import GoogleOAuth2 from './google-oauth2.entity';
 import OAuth2Service, {
@@ -172,7 +171,7 @@ export class Oauth2Controller {
     const encryptedEntity = Buffer.from(body.encrypted_entity, 'base64url');
     const oauth2Entity = JSON.parse(
       await this.jwtService.decryptText(encryptedEntity, iv, salt)
-    ) as DeepPartial<GoogleOAuth2>;
+    ) as Partial<GoogleOAuth2>;
     // sanity check
     if (!(
       typeof oauth2Entity === 'object'

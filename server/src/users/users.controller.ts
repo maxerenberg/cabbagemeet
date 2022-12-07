@@ -1,7 +1,6 @@
 import { BadRequestException, Body, Controller, Delete, Get, HttpCode, HttpException, HttpStatus, NotFoundException, ParseIntPipe, Patch, Post, Query, Redirect, UseGuards } from '@nestjs/common';
 import { ModuleRef } from '@nestjs/core';
 import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags, ApiUnauthorizedResponse } from '@nestjs/swagger';
-import type { DeepPartial } from 'typeorm';
 import { GoogleCalendarEvent } from '../oauth2/google-calendar-events.entity';
 import { AuthUser } from '../auth/auth-user.decorator';
 import JwtAuthGuard from '../auth/jwt-auth.guard';
@@ -73,7 +72,7 @@ export class UsersController {
     @AuthUser() user: User,
     @Body() body: EditUserDto
   ): Promise<UserResponse> {
-    const updateInfo: DeepPartial<User> = {};
+    const updateInfo: Partial<User> = {};
     if (body.name) updateInfo.Name = body.name;
     if (body.email) updateInfo.Email = body.email;
     if (body.hasOwnProperty('subscribe_to_notifications')) updateInfo.IsSubscribedToNotifications = body.subscribe_to_notifications;

@@ -5,7 +5,7 @@ import { Dispatcher, request } from 'undici';
 import { EnvironmentVariables } from '../env.validation';
 import { InjectRepository } from '@nestjs/typeorm';
 import GoogleOAuth2 from './google-oauth2.entity';
-import { DataSource, DeepPartial, Repository } from 'typeorm';
+import { DataSource, Repository } from 'typeorm';
 import { normalizeDBError, UniqueConstraintFailed } from '../database.utils';
 import User from '../users/user.entity';
 import { assert, encodeQueryParams } from '../misc.utils';
@@ -285,7 +285,7 @@ export default class OAuth2Service {
   async google_handleLogin(code: string, state: OAuth2State): Promise<{
     isLinkedToAccountFromOIDCResponse: boolean;
     user?: User;
-    pendingOAuth2Entity?: DeepPartial<GoogleOAuth2>;
+    pendingOAuth2Entity?: Partial<GoogleOAuth2>;
   }> {
     assert(state.reason === 'login');
     const {data, decodedIDToken} = await this.google_getTokenFromCode(code, state);
@@ -343,7 +343,7 @@ export default class OAuth2Service {
     userID: number,
     data: GoogleOIDCResponse,
     decodedIDToken: GoogleDecodedOIDCIDToken,
-  ): DeepPartial<GoogleOAuth2> {
+  ): Partial<GoogleOAuth2> {
     return {
       UserID: userID,
       Sub: decodedIDToken.sub,
@@ -424,7 +424,7 @@ export default class OAuth2Service {
     }
   }
 
-  async google_linkAccountFromConfirmation(oauth2Entity: DeepPartial<GoogleOAuth2>) {
+  async google_linkAccountFromConfirmation(oauth2Entity: Partial<GoogleOAuth2>) {
     try {
       await this.googleOAuth2Repository.insert(oauth2Entity);
     } catch (err: any) {

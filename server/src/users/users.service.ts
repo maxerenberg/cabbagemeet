@@ -3,7 +3,7 @@ import { ModuleRef } from '@nestjs/core';
 import { InjectRepository } from '@nestjs/typeorm';
 import { normalizeDBError, UniqueConstraintFailed } from '../database.utils';
 import OAuth2Service from '../oauth2/oauth2.service';
-import { DeepPartial, Repository } from 'typeorm';
+import { Repository } from 'typeorm';
 import User from './user.entity';
 
 export class UserAlreadyExistsError extends Error {}
@@ -53,7 +53,7 @@ export default class UsersService {
     return this.userRepository.findOneBy({ Email: email });
   }
 
-  async create(user: DeepPartial<User>): Promise<User> {
+  async create(user: Partial<User>): Promise<User> {
     try {
       return await this.userRepository.save(user);
     } catch (err: any) {
@@ -71,7 +71,7 @@ export default class UsersService {
     await this.userRepository.delete(userID);
   }
 
-  async editUser(userID: number, userInfo: DeepPartial<User>): Promise<User> {
+  async editUser(userID: number, userInfo: Partial<User>): Promise<User> {
     await this.userRepository.update({ID: userID}, userInfo);
     return this.findOneByID(userID);
   }

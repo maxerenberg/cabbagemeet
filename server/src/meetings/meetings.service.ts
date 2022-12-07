@@ -6,7 +6,7 @@ import { DateTime } from 'luxon';
 import { EnvironmentVariables } from '../env.validation';
 import MailService from '../mail/mail.service';
 import OAuth2Service from '../oauth2/oauth2.service';
-import { DeepPartial, Repository } from 'typeorm';
+import { Repository } from 'typeorm';
 import MeetingRespondent from './meeting-respondent.entity';
 import Meeting from './meeting.entity';
 
@@ -42,7 +42,7 @@ export default class MeetingsService {
     this.oauth2Service = this.moduleRef.get(OAuth2Service, {strict: false});
   }
 
-  createMeeting(partialMeeting: DeepPartial<Meeting>): Promise<Meeting> {
+  createMeeting(partialMeeting: Partial<Meeting>): Promise<Meeting> {
     return this.meetingsRepository.save(partialMeeting);
   }
 
@@ -177,7 +177,7 @@ export default class MeetingsService {
   async addRespondent(meetingID: number, availabilities: string[], userID: number): Promise<MeetingRespondent>;
   async addRespondent(meetingID: number, availabilities: string[], guestName: string, guestEmail?: string): Promise<MeetingRespondent>;
   async addRespondent(meetingID: number, availabilities: string[], userIDOrGuestName: number | string, guestEmail?: string): Promise<MeetingRespondent> {
-    const respondent: DeepPartial<MeetingRespondent> = {
+    const respondent: Partial<MeetingRespondent> = {
       MeetingID: meetingID,
       Availabilities: JSON.stringify(availabilities),
     };

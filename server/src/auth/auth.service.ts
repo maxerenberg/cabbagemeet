@@ -2,7 +2,6 @@ import { randomInt as randomIntWithCb } from 'crypto';
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import * as bcrypt from 'bcrypt';
-import { DeepPartial } from 'typeorm';
 import { EnvironmentVariables } from '../env.validation';
 import User from '../users/user.entity';
 import UsersService from '../users/users.service';
@@ -97,7 +96,7 @@ export default class AuthService {
     password,
     subscribe_to_notifications
   }: LocalSignupDto): Promise<User> {
-    const user: DeepPartial<User> = {
+    const user: Partial<User> = {
       Name: name,
       Email: email,
       IsSubscribedToNotifications: subscribe_to_notifications,
