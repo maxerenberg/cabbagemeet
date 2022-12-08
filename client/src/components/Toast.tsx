@@ -1,4 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, useRef, useReducer } from 'react';
+import BootstrapToast from 'react-bootstrap/Toast';
+import type { Variant } from 'react-bootstrap/esm/types';
 import styles from './Toast.module.css';
 
 interface ToastData {
@@ -52,15 +54,6 @@ function Toasts({
   );
 }
 
-function CloseButton(props: React.HTMLAttributes<SVGElement>) {
-  // Copied from https://icons.getbootstrap.com/icons/x-lg/
-  return (
-    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" className={`bi bi-x-lg ${styles.toastCloseBtn}`} viewBox="0 0 16 16" {...props}>
-      <path d="M2.146 2.854a.5.5 0 1 1 .708-.708L8 7.293l5.146-5.147a.5.5 0 0 1 .708.708L8.707 8l5.147 5.146a.5.5 0 0 1-.708.708L8 8.707l-5.146 5.147a.5.5 0 0 1-.708-.708L7.293 8 2.146 2.854Z"/>
-    </svg>
-  );
-}
-
 function Toast({
   toastID, toastData, removeToast,
 }: {
@@ -71,9 +64,11 @@ function Toast({
   // (see https://stackoverflow.com/a/54069332), which means that we might not
   // read our own write from a previous render
   const autoCloseTimeoutIDRef = useRef(0);
-  
+
+  let bg: Variant = 'primary';
   let className = styles.toast;
   if (toastData.msgType === 'failure') {
+    bg = 'danger';
     className += ` ${styles.error}`;
   }
   if (closed) {
@@ -92,18 +87,19 @@ function Toast({
     setTimeout(() => removeToast(toastID), 500);
   }, [closed, removeToast, toastID]);
 
-  useEffect(() => {
-    if (toastData.autoClose && !autoCloseTimeoutIDRef.current) {
-      const timeoutID = setTimeout(onClose, 2000) as unknown as number;
-      autoCloseTimeoutIDRef.current = timeoutID;
-    }
-  }, [toastData.autoClose, onClose]);
+  if (toastData.autoClose && !autoCloseTimeoutIDRef.current) {
+    const timeoutID = setTimeout(onClose, 3000) as unknown as number;
+    autoCloseTimeoutIDRef.current = timeoutID;
+  }
 
   return (
-    <div className={className}>
-      <div className="me-auto">{toastData.msg}</div>
-      <CloseButton onClick={onClose} />
-    </div>
+    <BootstrapToast className={className} onClose={onClose} bg={bg}>
+      {/* See custom.css (couldn't use CSS module due to global Bootstrap CSS names) */}
+      <BootstrapToast.Header className="toast-header-no-title"></BootstrapToast.Header>
+      <BootstrapToast.Body>
+        {toastData.msg}
+      </BootstrapToast.Body>
+    </BootstrapToast>
   );
 }
 
@@ -132,7 +128,7 @@ export function ToastProvider({ children }: React.PropsWithChildren<{}>) {
       //'0': {msg: 'This is a test', msgType: 'success'},
     },
   });
-  
+
   const showToast = useCallback(
     (toastData: ToastData) => toastDispatch({type: 'add', toastData}),
     []

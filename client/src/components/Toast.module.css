@@ -18,34 +18,20 @@
 }
 
 .toast {
-  box-sizing: content-box;
   animation: appear 0.5s;
-  background-color: white;
-  border-width: 2px;
-  border-style: solid;
-  border-color: gray;
-  border-radius: 8px;
-  padding: 1rem 2rem;
-  margin: 0 auto 1rem;
-  display: flex;
-  align-items: center;
-  min-width: 10rem;
-  max-width: min(90vw, 25rem);
+  margin-bottom: 1rem;
+  color: var(--custom-primary-contrast);
+}
+
+/* We want the bottom toast to be far above the BottomOverlay on small screens */
+@media (max-width: 767.98px) {
+  .toast:last-child {
+    margin-bottom: 4rem;
+  }
 }
 
 .toast.error {
-  border-color: red;
-}
-
-.toastCloseBtn {
-  flex-shrink: 0;
-  margin-left: 1.5rem;
-  fill: gray;
-}
-
-.toastCloseBtn:hover {
-  cursor: pointer;
-  fill: black;
+  color: var(--custom-danger-contrast);
 }
 
 .toastHidden {
