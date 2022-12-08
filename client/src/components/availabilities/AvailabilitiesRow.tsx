@@ -11,7 +11,7 @@ import {
 import { useAppSelector, useAppDispatch } from 'app/hooks';
 import SubmitAsGuestModal from './SubmitAsGuestModal';
 import { useToast } from 'components/Toast';
-import { assert, assertIsNever } from 'utils/misc.utils';
+import { assert, assertIsNever, scrollUpIntoViewIfNeeded } from 'utils/misc.utils';
 import { addMinutesToDateTimeString, daysOfWeek, months, to12HourClock } from 'utils/dates.utils';
 import ButtonWithSpinner from 'components/ButtonWithSpinner';
 import { useGetCurrentMeetingWithSelector } from 'utils/meetings.hooks';
@@ -60,31 +60,30 @@ function AvailabilitiesRow({
   // submitSelf is ONLY used for adding or updating one's availabilities when logged in
   const [
     submitSelf,
-    {isSuccess: submitSelf_isSuccess, isLoading: submitSelf_isLoading, error: submitSelf_error}
+    {isSuccess: submitSelf_isSuccess, isLoading: submitSelf_isLoading, error: submitSelf_error, reset: submitSelf_reset}
   ] = usePutSelfRespondentMutation();
   // updateRespondent is used for updating some existing respondent, who may be the current
   // user who is logged in
   const [
     updateRespondent,
-    {isSuccess: updateRespondent_isSuccess, isLoading: updateRespondent_isLoading, error: updateRespondent_error}
+    {isSuccess: updateRespondent_isSuccess, isLoading: updateRespondent_isLoading, error: updateRespondent_error, reset: updateRespondent_reset}
   ] = useUpdateAvailabilitiesMutation();
   const [
     deleteRespondent,
-    {isSuccess: deleteRespondent_isSuccess, isLoading: deleteRespondent_isLoading, error: deleteRespondent_error}
+    {isSuccess: deleteRespondent_isSuccess, isLoading: deleteRespondent_isLoading, error: deleteRespondent_error, reset: deleteRespondent_reset}
   ] = useDeleteRespondentMutation();
   const [
     schedule,
-    {isSuccess: schedule_isSuccess, isLoading: schedule_isLoading, error: schedule_error}
+    {isSuccess: schedule_isSuccess, isLoading: schedule_isLoading, error: schedule_error, reset: schedule_reset}
   ] = useScheduleMeetingMutation();
   const [
     unschedule,
-    {isSuccess: unschedule_isSuccess, isLoading: unschedule_isLoading, error: unschedule_error}
+    {isSuccess: unschedule_isSuccess, isLoading: unschedule_isLoading, error: unschedule_error, reset: unschedule_reset}
   ] = useUnscheduleMeetingMutation();
   const dispatch = useAppDispatch();
   const { showToast } = useToast();
   const [showGuestModal, setShowGuestModal] = useState(false);
   const [showInfoModal, setShowInfoModal] = useState(false);
-  const [atLeastOneRequestSentSinceLastCancel, setAtLeastOneRequestSentSinceLastCancel] = useState(false);
   const errorMessageElemRef = useRef<HTMLParagraphElement>(null);
   let title = 'Availabilities';
   const [selectedUserName, setSelectedUserName] = useState<string | null>(null);
@@ -169,15 +168,20 @@ function AvailabilitiesRow({
     setSelectedUserName(selectedUserNameRef.current);
   }, [selMode, respondents]);
 
+  const clearErrors = () => {
+    if (submitSelf_error) submitSelf_reset();
+    if (updateRespondent_error) updateRespondent_reset();
+    if (deleteRespondent_error) deleteRespondent_reset();
+    if (schedule_error) schedule_reset();
+    if (unschedule_error) unschedule_reset();
+  };
   const error = submitSelf_error || updateRespondent_error || deleteRespondent_error || schedule_error || unschedule_error;
-  // Don't show the error if the user pressed Cancel
-  const showError = error !== undefined && atLeastOneRequestSentSinceLastCancel;
 
   useEffect(() => {
-    if (showError) {
-      errorMessageElemRef.current!.scrollIntoView(false);
+    if (error) {
+      scrollUpIntoViewIfNeeded(errorMessageElemRef.current!, 48);
     }
-  }, [showError]);
+  }, [error]);
 
   const btnDisabled = submitSelf_isLoading || updateRespondent_isLoading || deleteRespondent_isLoading || schedule_isLoading || unschedule_isLoading;
   let rightBtnText: string | undefined;
@@ -204,7 +208,6 @@ function AvailabilitiesRow({
               availabilities: Object.keys(selectedTimes),
             },
           });
-          setAtLeastOneRequestSentSinceLastCancel(true);
         };
         rightBtn_isLoading = submitSelf_isLoading;
       } else {
@@ -229,7 +232,6 @@ function AvailabilitiesRow({
             availabilities: Object.keys(selectedTimes),
           },
         });
-        setAtLeastOneRequestSentSinceLastCancel(true);
       };
       rightBtn_isLoading = updateRespondent_isLoading;
     }
@@ -249,7 +251,6 @@ function AvailabilitiesRow({
           endDateTime: addMinutesToDateTimeString(selectedTimesFlat[selectedTimesFlat.length - 1], 30),
         }
       });
-      setAtLeastOneRequestSentSinceLastCancel(true);
     };
     rightBtn_isLoading = schedule_isLoading;
   } else if (selMode.type === 'selectedUser') {
@@ -274,7 +275,6 @@ function AvailabilitiesRow({
       leftBtnText = 'Unschedule';
       onLeftBtnClick = () => {
         unschedule(meetingID);
-        setAtLeastOneRequestSentSinceLastCancel(true);
       };
       leftBtn_isLoading = unschedule_isLoading;
     } else {
@@ -285,7 +285,8 @@ function AvailabilitiesRow({
     leftBtnText = 'Cancel';
     onLeftBtnClick = () => {
       dispatch(resetSelection());
-      setAtLeastOneRequestSentSinceLastCancel(false);
+      // Don't show the error if the user pressed Cancel
+      clearErrors();
     };
   }
 
@@ -297,7 +298,6 @@ function AvailabilitiesRow({
         id: meetingID,
         respondentId: selMode.respondentID,
       });
-      setAtLeastOneRequestSentSinceLastCancel(true);
     };
   }
 
@@ -372,7 +372,7 @@ function AvailabilitiesRow({
           {rightBtnText}
         </ButtonWithSpinner>
       </BottomOverlay>
-      {showError && (
+      {error && (
         <p
           className="text-danger text-center mb-0 mt-3"
           ref={errorMessageElemRef}

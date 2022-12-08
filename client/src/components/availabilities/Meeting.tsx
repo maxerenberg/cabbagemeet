@@ -13,6 +13,7 @@ import { useAppDispatch } from 'app/hooks';
 import { setCurrentMeetingID } from 'slices/currentMeeting';
 import InfoModal from 'components/InfoModal';
 import { useToast } from 'components/Toast';
+import { resetSelection } from 'slices/availabilitiesSelection';
 
 export default function Meeting() {
   const [isEditingMeeting, setIsEditingMeeting] = useState(false);
@@ -25,6 +26,14 @@ export default function Meeting() {
   useEffect(() => {
     dispatch(setCurrentMeetingID(meetingID));
   }, [dispatch, meetingID]);
+
+  useEffect(() => {
+    // Reset the datetime selections when this component unmounts so
+    // that the selections from one meeting don't carry over to another
+    return () => {
+      dispatch(resetSelection());
+    };
+  }, [dispatch]);
 
   // Wait until the data for the current meeting is ready.
   // Since the setCurrentMeetingID call happens asynchronously, the data for

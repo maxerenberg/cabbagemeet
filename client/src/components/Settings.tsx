@@ -56,16 +56,15 @@ export default function Settings() {
 function GeneralSettings() {
   const {data: userInfo} = useGetSelfInfoIfTokenIsPresent();
   assert(userInfo !== undefined);
-  const [editUser, {isSuccess, isLoading, error}] = useEditUserMutation();
+  const [editUser, {isSuccess, isLoading, error, reset}] = useEditUserMutation();
   const [isEditing, setIsEditing] = useState(false);
-  const [submittedAtLeastOnceSinceEditButtonWasClicked, setSubmittedAtLeastOnceSinceEditButtonWasClicked] = useState(false);
   const [name, setName] = useState(userInfo.name);
   const {showToast} = useToast();
   const onCancelClick = useCallback(() => {
     setIsEditing(false);
-    setSubmittedAtLeastOnceSinceEditButtonWasClicked(false);
+    reset();
     setName(userInfo.name);
-  }, [userInfo.name]);
+  }, [reset, userInfo.name]);
   useEffect(() => {
     if (isSuccess) {
       showToast({
@@ -83,7 +82,6 @@ function GeneralSettings() {
   const onSubmit: React.FormEventHandler<HTMLFormElement> = (ev) => {
     ev.preventDefault();
     editUser({name});
-    setSubmittedAtLeastOnceSinceEditButtonWasClicked(true);
   };
   return (
     <div>
@@ -123,7 +121,7 @@ function GeneralSettings() {
           )
         }
       </div>
-      {submittedAtLeastOnceSinceEditButtonWasClicked && error && (
+      {error && (
         <p className="text-danger text-center mb-0 mt-2">An error occurred: {getReqErrorMessage(error)}</p>
       )}
       {isEditing ? (

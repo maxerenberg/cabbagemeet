@@ -18,7 +18,7 @@ import { EditMeetingDto, useEditMeetingMutation } from "slices/api";
 import { getReqErrorMessage, useMutationWithPersistentError } from "utils/requests.utils";
 import { ianaTzName } from "utils/dates.utils";
 import { useGetCurrentMeetingWithSelector } from "utils/meetings.hooks";
-import { assert } from "utils/misc.utils";
+import { assert, scrollUpIntoViewIfNeeded } from "utils/misc.utils";
 
 // TODO: reduce code duplication with MeetingForm
 
@@ -152,7 +152,7 @@ function MeetingNamePrompt({
       // We need to wait until the <p> element actually becomes visible
       // before scrolling to it
       setTimeout(() => {
-        errorMessageElemRef.current!.scrollIntoView(false);
+        scrollUpIntoViewIfNeeded(errorMessageElemRef.current!, 48);
       }, 1);
     }
   }, [error]);

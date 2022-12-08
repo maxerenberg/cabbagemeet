@@ -96,21 +96,14 @@ function PasswordResetConfirmation({
 }) {
   const { showToast } = useToast();
   const [resetPassword, {isLoading, isSuccess, error}] = useResetPasswordMutation();
-  const canSendRequest = !isLoading;
-  const submitBtnDisabled = !canSendRequest;
-  const [clickedResendAtLeastOnce, setClickedResendAtLeastOnce] = useState(false);
+  const submitBtnDisabled = isLoading;
+  const canSendRequest = !submitBtnDisabled;
   let onClick: React.MouseEventHandler | undefined;
   if (canSendRequest) {
-    onClick = () => {
-      resetPassword({email});
-      setClickedResendAtLeastOnce(true);
-    };
+    onClick = () => resetPassword({email});
   }
 
   useEffect(() => {
-    if (!clickedResendAtLeastOnce) {
-      return;
-    }
     if (isSuccess) {
       showToast({
         msg: 'Request successfully submitted',
@@ -118,7 +111,7 @@ function PasswordResetConfirmation({
         autoClose: true,
       });
     }
-  }, [clickedResendAtLeastOnce, isSuccess, showToast]);
+  }, [isSuccess, showToast]);
 
   return (
     <div className={styles.passwordResetConfirmation}>

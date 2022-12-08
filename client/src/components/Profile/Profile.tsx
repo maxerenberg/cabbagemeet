@@ -14,6 +14,7 @@ import styles from './Profile.module.css';
 import { useGetSelfInfoQuery, useLogoutMutation } from "slices/api";
 import { useGetSelfInfoIfTokenIsPresent } from "utils/auth.hooks";
 import { getReqErrorMessage, useMutationWithPersistentError } from "utils/requests.utils";
+import { scrollUpIntoViewIfNeeded } from "utils/misc.utils";
 
 export default function Profile() {
   const tokenIsPresent = useAppSelector(selectTokenIsPresent);
@@ -48,8 +49,6 @@ export default function Profile() {
   );
 };
 
-// TODO: add button to sign out everywhere
-
 function Heading() {
   const [logout, {isLoading, error}] = useMutationWithPersistentError(useLogoutMutation);
   const {data: userInfo} = useGetSelfInfoIfTokenIsPresent();
@@ -61,7 +60,7 @@ function Heading() {
       // We need to wait until the <p> element actually becomes visible
       // before scrolling to it
       setTimeout(() => {
-        errorMessageElemRef.current!.scrollIntoView(false);
+        scrollUpIntoViewIfNeeded(errorMessageElemRef.current!, 48);
       }, 1);
     }
   }, [error]);

@@ -20,8 +20,7 @@ function SaveTimesModal({
   assert(meetingID !== undefined);
   const selectedTimes = useAppSelector(selectSelectedTimes);
   const dispatch = useAppDispatch();
-  const [atLeastOneRequestSentSinceLastTimeModalWasOpened, setAtLeastOneRequestSentSinceLastTimeModalWasOpened] = useState(false);
-  const [addGuest, {isSuccess, isLoading, error}] = useAddGuestRespondentMutation();
+  const [addGuest, {isSuccess, isLoading, error, reset}] = useAddGuestRespondentMutation();
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [validated, setValidated] = useState(false);
@@ -29,9 +28,9 @@ function SaveTimesModal({
 
   useEffect(() => {
     if (!show) {
-      setAtLeastOneRequestSentSinceLastTimeModalWasOpened(false);
+      reset();
     }
-  }, [show]);
+  }, [show, reset]);
 
   useEffect(() => {
     if (isSuccess) {
@@ -61,13 +60,11 @@ function SaveTimesModal({
         email: email || undefined,
       },
     });
-    setAtLeastOneRequestSentSinceLastTimeModalWasOpened(true);
   };
   const onClose = () => {
     if (isLoading) return;
     setShow(false);
   };
-  const showError = error !== undefined && atLeastOneRequestSentSinceLastTimeModalWasOpened;
 
   const submitBtnDisabled = isLoading || name === '';
   return (
@@ -109,7 +106,7 @@ function SaveTimesModal({
             </Form.Control.Feedback>
           </Form.Group>
         </Form>
-        <div className={`text-danger text-center ${showError ? '' : 'in'}visible`}>
+        <div className={`text-danger text-center ${error ? '' : 'in'}visible`}>
           Error submitting availabilities: {error ? getReqErrorMessage(error) : ''}
         </div>
       </Modal.Body>
