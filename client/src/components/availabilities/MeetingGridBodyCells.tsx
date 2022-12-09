@@ -407,7 +407,7 @@ const Cell = React.memo(function Cell({
       onMouseLeave={onMouseLeave}
       onMouseDown={onMouseDown}
     >
-      {/* at most of one of these will be shown */}
+      {/* at most one of these will be shown */}
       {scheduledTimeBox}
       {externalEventBox}
     </div>

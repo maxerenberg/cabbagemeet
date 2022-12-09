@@ -126,7 +126,7 @@ export default function WeeklyViewTimePicker() {
   return (
     <>
       <AvailabilitiesRow {...{moreDaysToRight, pageDispatch}} />
-      <div className="d-md-flex mt-5">
+      <div className="d-md-flex mt-3 mt-md-5">
         <div
           style={{
             flexGrow: 1,
@@ -183,7 +183,7 @@ const MeetingGridDayOfWeekCells = React.memo(function MeetingGridDayOfWeekCells(
               style={{gridArea: `w${i}`}}
             >
               <div>{getDayOfWeekAbbr(date).toUpperCase()}</div>
-              <div style={{fontSize: '2em'}}>{date.getDate()}</div>
+              <div style={{fontSize: '1.5em'}}>{date.getDate()}</div>
             </div>
           );
         })

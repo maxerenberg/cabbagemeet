@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect, useCallback, useRef, useReducer } from 'react';
+import React, { createContext, useContext, useState, useCallback, useRef, useReducer } from 'react';
 import BootstrapToast from 'react-bootstrap/Toast';
 import type { Variant } from 'react-bootstrap/esm/types';
 import styles from './Toast.module.css';

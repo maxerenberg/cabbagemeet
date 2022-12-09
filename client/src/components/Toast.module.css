@@ -3,6 +3,7 @@
   z-index: 2;
   bottom: 0;
   width: max-content;
+  max-width: 90vw;
   /* horizontally center */
   left: 50%;
   transform: translateX(-50%);

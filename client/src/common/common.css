@@ -5,13 +5,28 @@
 /* media-breakpoint-down(md) */
 @media (max-width: 767.98px) {
   .App {
-    font-size: 0.8rem;
+    font-size: 0.9rem;
   }
   .btn {
     --bs-btn-font-size: 0.9rem;
   }
   .w-100-md-down {
     width: 100%;
+  }
+  .container.custom-navbar-container {
+    position: relative;
+    justify-content: center;
+  }
+  .custom-navbar-container > .custom-navbar-toggle {
+    position: absolute;
+    left: 15px;
+    border: none;
+  }
+  .custom-navbar-container > .navbar-brand {
+    /* Bootstrap default is 1.25rem */
+    --bs-navbar-brand-font-size: 1rem;
+    /* Bootstrap default is 1rem */
+    --bs-navbar-brand-margin-end: 0;
   }
 }
 
@@ -33,10 +48,7 @@
   .header-link:hover,
   .header-link_active
  ) {
-  /* We can't use our CSS variables which we set in .App because the offcanvas
-     element isn't inside <App>. Should we store the variables under <body> instead?
-   */
-  color: forestgreen;
+  color: var(--custom-primary);
 }
 
 .custom-link {
@@ -58,6 +70,16 @@
 
 .custom-btn-min-width {
   min-width: 6.5em;
+}
+
+.form-control:focus,
+.form-select:focus {
+  box-shadow: 0 0 0 0.25rem rgba(var(--custom-primary-weak-rgb), 0.25);
+}
+
+.toast-header-no-title .btn-close {
+  display: block;
+  --bs-toast-padding-x: auto;
 }
 
 footer {

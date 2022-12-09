@@ -1,18 +1,6 @@
 @use "sass:map";
 @import "~bootstrap/scss/bootstrap";
 
-@include media-breakpoint-down(md) {
-  .container.custom-navbar-container {
-    position: relative;
-    justify-content: center;
-
-    > .custom-navbar-toggle {
-      position: absolute;
-      left: 15px;
-    }
-  }
-}
-
 @include media-breakpoint-only(sm) {
   .app-main-container {
     max-width: 100%;

@@ -99,13 +99,3 @@
   --bs-btn-disabled-bg: transparent;
   --bs-btn-disabled-border-color: var(--custom-danger-weak);
 }
-
-.form-control:focus,
-.form-select:focus {
-  box-shadow: 0 0 0 0.25rem rgba(var(--custom-primary-weak-rgb), 0.25);
-}
-
-.toast-header-no-title .btn-close {
-  display: block;
-  --bs-toast-padding-x: auto;
-}

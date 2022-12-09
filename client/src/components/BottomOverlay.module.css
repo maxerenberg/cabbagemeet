@@ -13,9 +13,13 @@
 
 .overlay {
   height: 4rem;
-  padding: 2rem 3rem 2rem 2rem;
+  padding: 2rem 1.5rem;
   display: flex;
   align-items: center;
   justify-content: space-between;
   background-color: var(--custom-primary);
+}
+
+.overlay button {
+  --bs-btn-font-size: 0.8rem;
 }

@@ -96,6 +96,13 @@
   align-items: center;
 }
 
+/* media-breakpoint-down(md) */
+@media (max-width: 767.98px) {
+  .weeklyview__colheadercell, .weeklyview__hourcell, .weeklyview__bodycell {
+    font-size: 0.8rem;
+  }
+}
+
 .respondents-container {
   margin-top: 4em;
   margin-left: 1em;
@@ -118,6 +125,6 @@
 }
 
 .respondents-container li:hover {
-  color: forestgreen;
+  color: var(--custom-primary);
   cursor: pointer;
 }
