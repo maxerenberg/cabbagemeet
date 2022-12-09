@@ -94,7 +94,7 @@ function Toast({
 
   return (
     <BootstrapToast className={className} onClose={onClose} bg={bg}>
-      {/* See custom.css (couldn't use CSS module due to global Bootstrap CSS names) */}
+      {/* See common.css (couldn't use CSS module due to global Bootstrap CSS names) */}
       <BootstrapToast.Header className="toast-header-no-title"></BootstrapToast.Header>
       <BootstrapToast.Body>
         {toastData.msg}

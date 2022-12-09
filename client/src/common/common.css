@@ -80,6 +80,9 @@
 .toast-header-no-title .btn-close {
   display: block;
   --bs-toast-padding-x: auto;
+  /* default is 1em */
+  width: 0.5em;
+  height: 0.5em;
 }
 
 footer {

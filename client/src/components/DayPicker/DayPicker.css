@@ -34,6 +34,17 @@
   justify-content: center;
 }
 
+/* media-breakpoint-down(md) */
+@media (max-width: 767.98px) {
+  .daypicker-calendar__cell {
+    height: 4em;
+  }
+  .daypicker-calendar__cell__button {
+    width: 2em;
+    height: 2em;
+  }
+}
+
 .daypicker-calendar__cell__button:hover {
   cursor: pointer;
 }

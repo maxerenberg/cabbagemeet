@@ -278,6 +278,7 @@ function AvailabilitiesRow({
       };
       leftBtn_isLoading = unschedule_isLoading;
     } else {
+      // TODO: only show Schedule button if there is at least one respondent
       leftBtnText = 'Schedule';
       onLeftBtnClick = () => dispatch(createSchedule());
     }

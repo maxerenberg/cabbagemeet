@@ -66,8 +66,8 @@ export default function Meeting() {
   return (
     <div className="meeting-container">
       <MeetingTitleRow setIsEditingMeeting={setIsEditingMeeting} />
-      <hr className="my-4 my-md-5" />
       <MeetingAboutRow />
+      <hr className="my-4 my-md-5" />
       <WeeklyViewTimePicker />
     </div>
   );
@@ -112,16 +112,16 @@ const MeetingTitleRow = React.memo(function MeetingTitleRow({
       <div className="d-flex align-items-center">
         <div className="me-auto" style={{fontSize: '1.3em'}}>{name}</div>
         <NonFocusButton
-          className="btn btn-outline-secondary px-4"
+          className="btn btn-outline-secondary ps-3 ps-md-4 pe-3 d-flex align-items-center"
           onClick={onClickEditButton}
         >
-          Edit
+          <span className="me-3 d-none d-md-inline">Edit</span> {<PencilIcon />}
         </NonFocusButton>
         <NonFocusButton
-          className="btn btn-outline-primary px-4 ms-4"
+          className="btn btn-outline-primary ms-4 ps-3 ps-md-4 pe-3 d-flex align-items-center"
           onClick={onClickShareButton}
         >
-          Share
+          <span className="me-3 d-none d-md-inline">Share</span> {<ShareIcon />}
         </NonFocusButton>
       </div>
       <InfoModal show={showMustBeLoggedInModal} setShow={setShowMustBeLoggedInModal}>
@@ -140,8 +140,26 @@ const MeetingAboutRow = React.memo(function MeetingAboutRow() {
   );
   if (!about) return null;
   return (
-    <div style={{marginTop: '3em', fontSize: '0.8em'}}>
+    <div style={{marginTop: '1.5em', fontSize: '0.9em'}}>
       {about}
     </div>
   );
 });
+
+function PencilIcon() {
+  // Adapted from https://icons.getbootstrap.com/icons/pencil/
+  return (
+    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" className="bi bi-pencil" viewBox="0 0 16 16" style={{position: 'relative', top: '0.05em'}}>
+      <path d="M12.146.146a.5.5 0 0 1 .708 0l3 3a.5.5 0 0 1 0 .708l-10 10a.5.5 0 0 1-.168.11l-5 2a.5.5 0 0 1-.65-.65l2-5a.5.5 0 0 1 .11-.168l10-10zM11.207 2.5 13.5 4.793 14.793 3.5 12.5 1.207 11.207 2.5zm1.586 3L10.5 3.207 4 9.707V10h.5a.5.5 0 0 1 .5.5v.5h.5a.5.5 0 0 1 .5.5v.5h.293l6.5-6.5zm-9.761 5.175-.106.106-1.528 3.821 3.821-1.528.106-.106A.5.5 0 0 1 5 12.5V12h-.5a.5.5 0 0 1-.5-.5V11h-.5a.5.5 0 0 1-.468-.325z"/>
+    </svg>
+  );
+}
+
+function ShareIcon() {
+  // Copied from https://icons.getbootstrap.com/icons/share/
+  return (
+    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" className="bi bi-share" viewBox="0 0 16 16" style={{position: 'relative', top: '0.1em'}}>
+      <path d="M13.5 1a1.5 1.5 0 1 0 0 3 1.5 1.5 0 0 0 0-3zM11 2.5a2.5 2.5 0 1 1 .603 1.628l-6.718 3.12a2.499 2.499 0 0 1 0 1.504l6.718 3.12a2.5 2.5 0 1 1-.488.876l-6.718-3.12a2.5 2.5 0 1 1 0-3.256l6.718-3.12A2.5 2.5 0 0 1 11 2.5zm-8.5 4a1.5 1.5 0 1 0 0 3 1.5 1.5 0 0 0 0-3zm11 5.5a1.5 1.5 0 1 0 0 3 1.5 1.5 0 0 0 0-3z"/>
+    </svg>
+  );
+}
