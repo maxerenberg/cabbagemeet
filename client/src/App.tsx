@@ -28,7 +28,7 @@ import Meeting from 'components/availabilities/Meeting';
 import Profile from 'components/Profile';
 import Settings from 'components/Settings';
 import { selectTokenIsPresent } from 'slices/authentication';
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useExtractTokenFromQueryParams, useGetSelfInfoIfTokenIsPresent } from 'utils/auth.hooks';
 import { getReqErrorMessage } from 'utils/requests.utils';
 import ErrorPage from 'components/ErrorPage';
@@ -65,9 +65,9 @@ export default function App() {
   );
 }
 
-function BrandWithLogo() {
+function BrandWithLogo({onClick}: {onClick: () => void}) {
   return (
-    <LinkContainer to="/">
+    <LinkContainer to="/" onClick={onClick}>
       <Navbar.Brand>
         <div className="d-inline-block me-1" style={{
           height: '1.5em',
@@ -91,6 +91,7 @@ function AppRoot() {
       console.error(`Failed to get user info: ${getReqErrorMessage(error!)}`);
     }
   }, [error]);
+  const [showToggle, setShowToggle] = useState(false);
   const tokenIsInURL = useExtractTokenFromQueryParams();
   if (tokenIsInURL) {
     // Don't make any requests yet until the token has been saved into
@@ -98,27 +99,34 @@ function AppRoot() {
     // Otherwise the requests will be prematurely unauthenticated.
     return null;
   }
+  const onClickToggle = () => setShowToggle(true);
+  const onHideToggle = () => setShowToggle(false);
   return (
     <div className="App d-flex flex-column">
       <Navbar expand="md" className="mt-3 mb-5">
         <Container className="app-main-container custom-navbar-container">
-          <BrandWithLogo />
-          <Navbar.Toggle aria-controls="app-navbar-nav" className="custom-navbar-toggle" />
-          {/* TODO: hide offcanvas when link is clicked */}
+          <BrandWithLogo onClick={onHideToggle} />
+          <Navbar.Toggle
+            aria-controls="app-navbar-nav"
+            className="custom-navbar-toggle"
+            onClick={onClickToggle}
+          />
           <Navbar.Offcanvas
             id="app-navbar-nav"
             aria-labelledby="app-navbar-offcanvas-label"
             placement="start"
+            onHide={onHideToggle}
+            show={showToggle}
           >
             <Offcanvas.Header closeButton className="mt-3">
               <Offcanvas.Title id="app-navbar-offcanvas-label" className="fs-4">
-                <BrandWithLogo />
+                <BrandWithLogo onClick={onHideToggle} />
               </Offcanvas.Title>
             </Offcanvas.Header>
             <Offcanvas.Body>
               <div className="px-3"><hr className="mt-0 mb-4" /></div>
               <Nav className="ms-auto">
-                <HeaderLinks />
+                <HeaderLinks onClick={onHideToggle} />
               </Nav>
             </Offcanvas.Body>
           </Navbar.Offcanvas>
@@ -133,7 +141,7 @@ function AppRoot() {
   );
 }
 
-function HeaderLinks() {
+function HeaderLinks({onClick}: {onClick: () => void}) {
   // assume that user info will be successfully fetched if token is present (optimistic)
   const isOrWillBeLoggedIn = useAppSelector(selectTokenIsPresent);
   const links = [
@@ -177,7 +185,7 @@ function HeaderLinks() {
             key={lnk.to}
             {...linkProps}
           >
-            <Nav.Link>{lnk.desc}</Nav.Link>
+            <Nav.Link onClick={onClick}>{lnk.desc}</Nav.Link>
           </LinkContainer>
         ))
       }
@@ -186,6 +194,7 @@ function HeaderLinks() {
           <LinkContainer
             to={lnk.to}
             key={lnk.to}
+            onClick={onClick}
             {...offcanvasOnlyLinksProps}
           >
             <Nav.Link>{lnk.desc}</Nav.Link>

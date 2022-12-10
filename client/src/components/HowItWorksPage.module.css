@@ -9,6 +9,7 @@
 
 .imageContainer img {
   max-height: 8rem;
+  object-fit: contain;
 }
 
 /* media-breakpoint-down(md) */

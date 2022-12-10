@@ -60,19 +60,24 @@ export default function CreatedMeetings({showCreatedMeetings}: {showCreatedMeeti
             <h5>{meeting.name}</h5>
             {
               (meeting.scheduledStartDateTime === undefined) && (
-                <div>
-                  <CalendarIcon />
-                  <span className="ms-2">
+                <div className="d-flex align-items-start">
+                  {/*
+                    Wrap the SVG in a div so that it's aligned on the same baseline
+                    as the text in the adjacent div (Bootstrap sets vertical-align: middle
+                    on svg and img elements)
+                  */}
+                  <div><CalendarIcon /></div>
+                  <div className="ms-2">
                     {meetingDatesRangeString(meeting.tentativeDates)}
-                  </span>
+                  </div>
                 </div>
               )
             }
-            <div>
-              <ClockIcon />
-              <span className="ms-2">
+            <div className="d-flex align-items-start">
+              <div><ClockIcon /></div>
+              <div className="ms-2">
                 {meetingTimesRangeString(meeting)}
-              </span>
+              </div>
             </div>
             <div>
               <GlobeIcon />
@@ -91,9 +96,9 @@ export default function CreatedMeetings({showCreatedMeetings}: {showCreatedMeeti
 function ScheduleInfo({meeting}: {meeting: TransformedMeetingShortResponse}) {
   if (!meeting.scheduledStartDateTime) {
     return (
-      <h4 className="my-auto pe-4">
+      <p className="my-auto pe-3 pe-md-4 fs-6 fs-md-4">
         Not scheduled
-      </h4>
+      </p>
     );
   }
   const [year, month, day] = getLocalYearMonthDayFromDate(new Date(meeting.scheduledStartDateTime));
