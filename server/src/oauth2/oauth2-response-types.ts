@@ -1,28 +1,22 @@
 // See https://developers.google.com/identity/openid-connect/openid-connect#exchangecode
-export interface GoogleOIDCResponse {
+//     https://learn.microsoft.com/en-us/azure/active-directory/develop/v2-oauth2-auth-code-flow#successful-response-2
+export interface OIDCResponse {
   access_token: string;
   expires_in: number;
   id_token: string;
   scope: string;
-  token_type: string;
+  token_type: 'Bearer';
   refresh_token?: string;
 }
 
 // See https://developers.google.com/identity/protocols/oauth2/web-server#offline
-// The id_token wasn't in the sample response in the docs, but it is there if the
-// 'oidc' scope was requested
-export interface GoogleRefreshTokenResponse {
-  access_token: string;
-  expires_in: number;
-  id_token: string;
-  scope: string;
-  token_type: string;
-}
+//     https://learn.microsoft.com/en-us/graph/auth-v2-user#response
+export type RefreshTokenResponse = OIDCResponse;
 
-// See:
-// https://developers.google.com/identity/openid-connect/openid-connect#an-id-tokens-payload
-// https://www.rfc-editor.org/rfc/rfc7519#section-4.1
-export interface GoogleDecodedOIDCIDToken {
+// See https://developers.google.com/identity/openid-connect/openid-connect#an-id-tokens-payload
+//     https://learn.microsoft.com/en-us/azure/active-directory/develop/id-tokens#payload-claims
+//     https://www.rfc-editor.org/rfc/rfc7519#section-4.1
+export interface DecodedIDToken {
   // claims in which we are not interested have been omitted
   exp: number;
   iat: number;

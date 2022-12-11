@@ -10,6 +10,7 @@ import { useSignupMutation } from 'slices/api';
 import { HistoryContext } from './HistoryProvider';
 import { isVerifyEmailAddressResponse } from 'slices/enhancedApi';
 import VerifyEmailAddress from './VerifyEmailAddress';
+import ContinueWithMicrosoftButton from './ContinueWithMicrosoftButton';
 
 export default function Signup() {
   const [name, setName] = useState('');
@@ -40,6 +41,16 @@ export default function Signup() {
     </div>
   );
 };
+
+function ORBar() {
+  return (
+    <div className="d-flex align-items-center my-4">
+      <div className="border-top flex-grow-1"></div>
+      <span className="fw-bold mx-2">OR</span>
+      <div className="border-top flex-grow-1"></div>
+    </div>
+  );
+}
 
 function SignupForm({
   name, setName,
@@ -91,11 +102,8 @@ function SignupForm({
     <Form noValidate className={styles.signupForm} {...{validated, onSubmit}}>
       <h4 className="mb-5">Sign up</h4>
       <ContinueWithGoogleButton reason='signup' />
-      <div className="d-flex align-items-center my-4">
-        <div className="border-top flex-grow-1"></div>
-        <span className="fw-bold mx-2">OR</span>
-        <div className="border-top flex-grow-1"></div>
-      </div>
+      <ContinueWithMicrosoftButton reason='login' className="mt-4" />
+      <ORBar />
       <Form.Group controlId="signup-form-name">
         <Form.Label>Name</Form.Label>
         <Form.Control

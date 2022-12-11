@@ -3,6 +3,10 @@
 *.db-shm
 *.db-wal
 
+# Secrets
+*.key
+*.crt
+
 # compiled output
 /dist
 /node_modules

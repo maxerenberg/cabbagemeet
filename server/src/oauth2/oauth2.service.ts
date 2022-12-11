@@ -9,28 +9,64 @@ import { DataSource, Repository } from 'typeorm';
 import { normalizeDBError, UniqueConstraintFailed } from '../database.utils';
 import User from '../users/user.entity';
 import { assert, encodeQueryParams } from '../misc.utils';
-import { columnsForGetUser } from 'src/users/users.service';
-import type { GoogleOIDCResponse, GoogleDecodedOIDCIDToken, GoogleRefreshTokenResponse, GoogleListEventsResponse, GoogleListEventsResponseItem, GoogleInsertEventResponse } from './oauth2-response-types';
+import { selectUserLeftJoinOAuth2Tables } from '../users/users.service';
+import type { OIDCResponse, DecodedIDToken, RefreshTokenResponse, GoogleListEventsResponse, GoogleListEventsResponseItem, GoogleInsertEventResponse } from './oauth2-response-types';
 import { toISOStringUTC, getSecondsSinceUnixEpoch, toISOStringWithTz } from '../dates.utils';
 import MeetingsService from '../meetings/meetings.service';
 import GoogleCalendarEvents, { GoogleCalendarEvent } from './google-calendar-events.entity';
 import GoogleCalendarCreatedEvent from './google-calendar-created-event.entity';
 import Meeting from '../meetings/meeting.entity';
+import { oidcScopes, oauth2Reasons, OAuth2ProviderType, oauth2ProviderTypes } from './oauth2-common';
+import GoogleOAuth2Provider from './google-oauth2-provider';
+import MicrosoftOAuth2Provider from './microsoft-oauth2-provider';
+import AbstractOAuth2 from './abstract-oauth2.entity';
+import MicrosoftOAuth2 from './microsoft-oauth2.entity';
 
 // TODO: use truncated exponential backoff
 // See https://developers.google.com/calendar/api/guides/quota
 
-// TODO: add Microsoft
-export enum OAuth2Provider {
-  GOOGLE = 1,
+const oauth2EntityClasses: Record<OAuth2ProviderType, typeof GoogleOAuth2 | typeof MicrosoftOAuth2> = {
+  [OAuth2ProviderType.GOOGLE]: GoogleOAuth2,
+  [OAuth2ProviderType.MICROSOFT]: MicrosoftOAuth2,
+};
+
+export enum OIDCLoginResultType {
+  // The response from the OIDC server was successfully associated with
+  // an existing account and the user may be logged in.
+  USER_EXISTS_AND_IS_LINKED,
+  // An account exists with the email address received from the OIDC server,
+  // but it was never explicitly linked. We need to ask the user for confirmation
+  // that they want to link these accounts.
+  USER_EXISTS_BUT_IS_NOT_LINKED,
+  // An account was previously linked to this OAuth2 account, but it is now
+  // unlinked, and the OIDC server still thinks that we own the credentials.
+  // We need to force the user to go through the consent screen again.
+  USER_EXISTS_BUT_IS_NOT_LINKED_AND_NEED_A_NEW_REFRESH_TOKEN,
+  // An account linked to this Google account existed previously, but it was
+  // deleted, and the OIDC server still thinks that we own the credentials.
+  // We need to force the user to go through the consent screen again.
+  USER_DOES_NOT_EXIST_AND_NEED_A_NEW_REFRESH_TOKEN,
 }
-export const oauth2Reasons = ['link', 'signup', 'login'] as const;
+export type OIDCLoginResult = {
+  type: OIDCLoginResultType.USER_EXISTS_AND_IS_LINKED
+      | OIDCLoginResultType.USER_EXISTS_BUT_IS_NOT_LINKED_AND_NEED_A_NEW_REFRESH_TOKEN;
+  user: User;
+} | {
+  type: OIDCLoginResultType.USER_EXISTS_BUT_IS_NOT_LINKED;
+  user: User;
+  pendingOAuth2Entity: Partial<AbstractOAuth2>;
+} | {
+  type: OIDCLoginResultType.USER_DOES_NOT_EXIST_AND_NEED_A_NEW_REFRESH_TOKEN;
+};
 export type OAuth2Reason = typeof oauth2Reasons[number];
 export type OAuth2State = {
   reason: OAuth2Reason;
   postRedirect: string;
   userID?: number;
-  nonce?: string;
+  // This is a nonce passed from the client (browser) to the app server.
+  clientNonce?: string;
+  // This is a nonce passed from the app server to the OIDC server.
+  serverNonce?: string;
 };
 export class OAuth2NotConfiguredError extends Error {}
 export class OAuth2ErrorResponseError extends Error {
@@ -41,40 +77,56 @@ export class OAuth2ErrorResponseError extends Error {
     super();
   }
 }
+// TODO: replace these with a single class and an enum argument
+export class OAuth2InvalidStateError extends Error {}
+export class OAuth2InvalidOrExpiredNonceError extends Error {}
 export class OAuth2NoRefreshTokenError extends Error {}
 export class OAuth2NotAllScopesGrantedError extends Error {}
 export class OAuth2AccountAlreadyLinkedError extends Error {}
 export class OAuth2AccountNotLinkedError extends Error {}
 
-type OAuth2Config = {
+export interface OAuth2Config {
   authzEndpoint: string;
   tokenEndpoint: string;
-  revokeEndpoint: string;
+  revokeEndpoint?: string;
   scopes: string[];
 };
-type OAuth2Configs = {
-  [key in OAuth2Provider]: OAuth2Config;
-};
-type OAuth2EnvConfig = {
+export interface PartialAuthzQueryParams {
   client_id: string;
-  secret: string;
   redirect_uri: string;
-};
+  access_type?: 'offline';  // Google only
+  code_challenge?: string;  // Microsoft only (PKCE)
+  code_challenge_method?: 'S256';  // Microsoft only (PKCE)
 
-const oidcScopes = ['openid', 'profile', 'email'] as const;
-const oauth2Configs: OAuth2Configs = {
-  [OAuth2Provider.GOOGLE]: {
-    // See https://developers.google.com/identity/protocols/oauth2/web-server
-    authzEndpoint: 'https://accounts.google.com/o/oauth2/v2/auth',
-    tokenEndpoint: 'https://oauth2.googleapis.com/token',
-    revokeEndpoint: 'https://oauth2.googleapis.com/revoke',
-    scopes: [
-      ...oidcScopes,
-      'https://www.googleapis.com/auth/calendar.readonly',
-      'https://www.googleapis.com/auth/calendar.events.owned',
-    ],
-  },
-};
+  // This isn't actually a query param; it gets inserted into the 'state' param.
+  // Used only for Microsoft so that we can lookup the code verifier.
+  serverNonce?: string;
+}
+export interface PartialTokenFormParams {
+  client_id: string;
+  redirect_uri: string;
+  client_secret?: string;  // Google only
+  code_verifier?: string;  // Microsoft only (PKCE)
+  client_assertion_type?: string;  // Microsoft only (certificate credential)
+  client_assertion?: string;  // Microsoft only (certificate credential)
+}
+export interface PartialRefreshParams {
+  client_id: string;
+  client_secret?: string;  // Google only
+  client_assertion_type?: string;  // Microsoft only (certificate credential)
+  client_assertion?: string;  // Microsoft only (certificate credential)
+}
+export interface IOAuth2Provider {
+  type: OAuth2ProviderType;
+  isConfigured(): boolean;
+  getStaticOAuth2Config(): OAuth2Config;
+  getScopesToExpectInResponse(): string[];
+  getPartialAuthzQueryParams(): Promise<PartialAuthzQueryParams>;
+  getPartialTokenFormParams(serverNonce?: string): Promise<PartialTokenFormParams>;
+  getPartialRefreshParams(): Promise<PartialRefreshParams>;
+  setLinkedCalendarToTrue(user: User): void;
+}
+
 const GOOGLE_API_BASE_URL = 'https://www.googleapis.com';
 const GOOGLE_API_CALENDAR_EVENTS_BASE_URL = `${GOOGLE_API_BASE_URL}/calendar/v3/calendars/primary/events`;
 const MAX_EVENT_RESULTS = 100;
@@ -91,39 +143,29 @@ function errorIsGoogleCalendarEventNoLongerExists(err: any): boolean {
 export default class OAuth2Service {
   private readonly logger = new Logger(OAuth2Service.name);
   private readonly publicURL: string;
+  private readonly oauth2Providers: Record<OAuth2ProviderType, IOAuth2Provider>;
+  private readonly oauth2Repositories: Record<OAuth2ProviderType, Repository<AbstractOAuth2>>;
 
   constructor(
-    private configService: ConfigService<EnvironmentVariables, true>,
+    configService: ConfigService<EnvironmentVariables, true>,
     private meetingsService: MeetingsService,
     private dataSource: DataSource,
+    // TODO: make these non members
     @InjectRepository(GoogleOAuth2) private googleOAuth2Repository: Repository<GoogleOAuth2>,
     @InjectRepository(GoogleCalendarEvents) private googleCalendarEventsRepository: Repository<GoogleCalendarEvents>,
     @InjectRepository(GoogleCalendarCreatedEvent) private googleCalendarCreatedEventsRepository: Repository<GoogleCalendarCreatedEvent>,
+    @InjectRepository(MicrosoftOAuth2) microsoftOAuth2Repository: Repository<MicrosoftOAuth2>,
     @InjectRepository(User) private usersRepository: Repository<User>,
   ) {
     this.publicURL = configService.get('PUBLIC_URL', {infer: true});
-  }
-
-  private getEnvKey<K extends keyof EnvironmentVariables>(key: K): EnvironmentVariables[K] {
-    return this.configService.get(key, {infer: true});
-  }
-
-  private getEnvKeyOrThrow<K extends keyof EnvironmentVariables>(key: K): EnvironmentVariables[K] {
-    const val = this.getEnvKey(key);
-    if (!val) {
-      throw new OAuth2NotConfiguredError();
-    }
-    return val;
-  }
-
-  private getEnvConfigOrThrow(provider: OAuth2Provider): OAuth2EnvConfig {
-    if (provider === OAuth2Provider.GOOGLE) {
-      return {
-        client_id: this.getEnvKeyOrThrow('OAUTH2_GOOGLE_CLIENT_ID'),
-        secret: this.getEnvKeyOrThrow('OAUTH2_GOOGLE_CLIENT_SECRET'),
-        redirect_uri: this.getEnvKeyOrThrow('OAUTH2_GOOGLE_REDIRECT_URI'),
-      };
-    }
+    this.oauth2Providers = {
+      [OAuth2ProviderType.GOOGLE]: new GoogleOAuth2Provider(configService),
+      [OAuth2ProviderType.MICROSOFT]: new MicrosoftOAuth2Provider(configService),
+    };
+    this.oauth2Repositories = {
+      [OAuth2ProviderType.GOOGLE]: googleOAuth2Repository,
+      [OAuth2ProviderType.MICROSOFT]: microsoftOAuth2Repository,
+    };
   }
 
   // When submitting content of type application/x-www-form-urlencoded,
@@ -166,31 +208,27 @@ export default class OAuth2Service {
     return (await this.request(...args)).body.json();
   }
 
-  private allRequestedScopesArePresent(provider: OAuth2Provider, scopeStr: string): boolean {
+  private allRequestedScopesArePresent(provider: IOAuth2Provider, scopeStr: string): boolean {
     const responseScopes = scopeStr.split(' ');
-    const requestedScopes = oauth2Configs[provider].scopes;
-    // I've noticed that Google renames some of the common OIDC scopes
-    // (e.g. profile => https://www.googleapis.com/auth/userinfo.profile),
-    // so we don't need to check those ones.
-    return requestedScopes.every(
-      reqScope => (oidcScopes as readonly string[]).includes(reqScope)
-               || responseScopes.includes(reqScope)
+    const expectedScopes = provider.getScopesToExpectInResponse();
+    return expectedScopes.every(
+      scope => responseScopes.includes(scope)
     );
   }
 
-  getRequestURL(provider: OAuth2Provider, state: OAuth2State, promptConsent: boolean): string {
-    const {client_id, secret, redirect_uri} = this.getEnvConfigOrThrow(provider);
-    if (!client_id || !secret || !redirect_uri) {
-      throw new OAuth2NotConfiguredError();
+  async getRequestURL(providerType: OAuth2ProviderType, state: OAuth2State, promptConsent: boolean): Promise<string> {
+    const provider = this.oauth2Providers[providerType];
+    if (!provider.isConfigured()) throw new OAuth2NotConfiguredError();
+    const {authzEndpoint, scopes} = provider.getStaticOAuth2Config();
+    const {serverNonce, ...partialParams} = await provider.getPartialAuthzQueryParams();
+    if (serverNonce) {
+      state.serverNonce = serverNonce;
     }
-    const {authzEndpoint, scopes} = oauth2Configs[provider];
-    // TODO: nonce (required by Microsoft API)
     const params: Record<string, string> = {
-      client_id,
-      redirect_uri,
+      ...partialParams,
       response_type: 'code',
+      response_mode: 'query',
       scope: scopes.join(' '),
-      access_type: 'offline',
       state: JSON.stringify(state),
     };
     if (promptConsent) {
@@ -199,46 +237,46 @@ export default class OAuth2Service {
     return authzEndpoint + '?' + encodeQueryParams(params);
   }
 
-  private async google_getTokenFromCode(code: string, state: OAuth2State): Promise<{
-    data: GoogleOIDCResponse;
-    decodedIDToken: GoogleDecodedOIDCIDToken;
+  private async getTokenFromCode(provider: IOAuth2Provider, code: string, state: OAuth2State): Promise<{
+    data: OIDCResponse;
+    decodedIDToken: DecodedIDToken;
   }> {
-    const provider = OAuth2Provider.GOOGLE;
-    const {client_id, secret, redirect_uri} = this.getEnvConfigOrThrow(provider);
-    const {tokenEndpoint} = oauth2Configs[provider];
+    if (!provider.isConfigured()) throw new OAuth2NotConfiguredError();
+    const partialParams = await provider.getPartialTokenFormParams(state.serverNonce);
+    const {tokenEndpoint} = provider.getStaticOAuth2Config();
     // See https://developers.google.com/identity/protocols/oauth2/web-server#exchange-authorization-code
+    //     https://learn.microsoft.com/en-us/azure/active-directory/develop/v2-oauth2-auth-code-flow#request-an-access-token-with-a-certificate-credential
     const requestBody = this.encodeFormQueryParams({
+      ...partialParams,
       code,
-      client_id,
-      client_secret: secret,
-      redirect_uri,
       grant_type: 'authorization_code',
     });
-    const data = await this.requestJSON<GoogleOIDCResponse>(tokenEndpoint, {
+    const data = await this.requestJSON<OIDCResponse>(tokenEndpoint, {
       method: 'POST',
       body: requestBody,
       headers: {'content-type': 'application/x-www-form-urlencoded'},
     });
     this.logger.debug(data);
-    const decodedIDToken = jwt.decode(data.id_token) as GoogleDecodedOIDCIDToken;
+    // TODO: validate the ID token
+    const decodedIDToken = jwt.decode(data.id_token) as DecodedIDToken;
     this.logger.debug(decodedIDToken);
     return {data, decodedIDToken};
   }
 
   private async google_refreshAccessToken(creds: GoogleOAuth2): Promise<GoogleOAuth2> {
-    const provider = OAuth2Provider.GOOGLE;
-    const {client_id, secret} = this.getEnvConfigOrThrow(provider);
-    const {tokenEndpoint} = oauth2Configs[provider];
+    const provider = this.oauth2Providers[OAuth2ProviderType.GOOGLE];
+    const partialParams = await provider.getPartialRefreshParams();
+    const {tokenEndpoint} = provider.getStaticOAuth2Config();
     // See https://developers.google.com/identity/protocols/oauth2/web-server#offline
+    //     https://learn.microsoft.com/en-us/graph/auth-v2-user#request
     const requestBody = this.encodeFormQueryParams({
-      client_id,
-      client_secret: secret,
+      ...partialParams,
       grant_type: 'refresh_token',
       refresh_token: creds.RefreshToken,
     });
-    let data: GoogleRefreshTokenResponse | undefined;
+    let data: RefreshTokenResponse | undefined;
     try {
-      data = await this.requestJSON<GoogleRefreshTokenResponse>(tokenEndpoint, {
+      data = await this.requestJSON<RefreshTokenResponse>(tokenEndpoint, {
         method: 'POST',
         body: requestBody,
         headers: {'content-type': 'application/x-www-form-urlencoded'},
@@ -251,6 +289,9 @@ export default class OAuth2Service {
       AccessToken: data.access_token,
       AccessTokenExpiresAt: this.calculateTokenExpirationTime(data.expires_in),
     };
+    if (data.refresh_token) {
+      partialCreds.RefreshToken = data.refresh_token;
+    }
     await this.googleOAuth2Repository.update({UserID: creds.UserID}, partialCreds);
     return {...creds, ...partialCreds};
   }
@@ -267,59 +308,44 @@ export default class OAuth2Service {
     }
   }
 
-  /*
-    Three possible response types:
-    1. user: set; isLinkedToAccountFromOIDCResponse: true; pendingOAuth2Entity: not set
-       The response from the OIDC server was successfully associated with
-       an existing account and the user may be logged in.
-    2. user: set; isLinkedToAccountFromOIDCResponse: false; pendingOAuth2Entity: set
-       An account exists with the email address received from the OIDC server,
-       but it was never explicitly linked. We need to ask the user for confirmation
-       that they want to link these accounts.
-    3. user: not set; isLinkedToAccountFromOIDCResponse: false; pendingOAuth2Entity: not set
-       An account linked to this Google account existed previously, but it was
-       deleted, and the OIDC server still thinks that we own the credentials, so
-       it's not giving us a refresh token, but we already discarded the credentials.
-       We need to force the user to go through the consent screen again.
-  */
-  async google_handleLogin(code: string, state: OAuth2State): Promise<{
-    isLinkedToAccountFromOIDCResponse: boolean;
-    user?: User;
-    pendingOAuth2Entity?: Partial<GoogleOAuth2>;
-  }> {
+  async handleLogin(providerType: OAuth2ProviderType, code: string, state: OAuth2State): Promise<OIDCLoginResult> {
     assert(state.reason === 'login');
-    const {data, decodedIDToken} = await this.google_getTokenFromCode(code, state);
+    const provider = this.oauth2Providers[providerType];
+    const oauth2ClassName = oauth2EntityClasses[providerType].name;
+    const oauth2Repository = this.oauth2Repositories[providerType];
+    const {data, decodedIDToken} = await this.getTokenFromCode(provider, code, state);
     this.checkThatNameAndEmailClaimsArePresent(decodedIDToken);
-    const userBySub: User | null = await this.usersRepository
-      .createQueryBuilder('User')
-      .leftJoin('User.GoogleOAuth2', 'GoogleOAuth2')
-      .select(columnsForGetUser)
-      .where('GoogleOAuth2.Sub = :sub', {sub: decodedIDToken.sub})
+    const userBySub: User | null = await selectUserLeftJoinOAuth2Tables(this.usersRepository)
+      .where(`${oauth2ClassName}.Sub = :sub`, {sub: decodedIDToken.sub})
       .getOne();
     if (userBySub) {
       // update the credentials stored in the database
-      const partialCreds: Partial<GoogleOAuth2> = {
+      const partialCreds: Partial<AbstractOAuth2> = {
         AccessToken: data.access_token,
         AccessTokenExpiresAt: this.calculateTokenExpirationTime(data.expires_in),
       };
       if (data.refresh_token) {
         partialCreds.RefreshToken = data.refresh_token;
       }
-      await this.googleOAuth2Repository.update({UserID: userBySub.ID}, partialCreds);
-      return {user: userBySub, isLinkedToAccountFromOIDCResponse: true};
+      await oauth2Repository.update({UserID: userBySub.ID}, partialCreds);
+      return {type: OIDCLoginResultType.USER_EXISTS_AND_IS_LINKED, user: userBySub};
     }
-    const userByEmail: User | null = await this.usersRepository
-      .createQueryBuilder('User')
-      .leftJoin('User.GoogleOAuth2', 'GoogleOAuth2')
-      .select(columnsForGetUser)
+    const userByEmail: User | null = await selectUserLeftJoinOAuth2Tables(this.usersRepository)
       .where('User.Email = :email', {email: decodedIDToken.email!})
       .getOne();
     if (userByEmail) {
-      return {
-        user: userByEmail,
-        isLinkedToAccountFromOIDCResponse: false,
-        pendingOAuth2Entity: this.google_createOAuth2Entity(userByEmail.ID, data, decodedIDToken),
-      };
+      if (data.refresh_token) {
+        return {
+          type: OIDCLoginResultType.USER_EXISTS_BUT_IS_NOT_LINKED,
+          user: userByEmail,
+          pendingOAuth2Entity: this.createPartialOAuth2Entity(userByEmail.ID, data, decodedIDToken),
+        };
+      } else {
+        return {
+          type: OIDCLoginResultType.USER_EXISTS_BUT_IS_NOT_LINKED_AND_NEED_A_NEW_REFRESH_TOKEN,
+          user: userByEmail,
+        };
+      }
     }
     // At this point, assume that the user actually wanted to sign up
     // rather than logging in. This is an easy mistake to make, given
@@ -327,10 +353,10 @@ export default class OAuth2Service {
     // new users.
     if (!data.refresh_token) {
       // We need to force the user to go through the consent screen again
-      return {isLinkedToAccountFromOIDCResponse: false};
+      return {type: OIDCLoginResultType.USER_DOES_NOT_EXIST_AND_NEED_A_NEW_REFRESH_TOKEN};
     }
-    const newUser = await this.google_updateDatabaseFromOIDCResponseForSignup(data, decodedIDToken);
-    return {user: newUser, isLinkedToAccountFromOIDCResponse: true};
+    const newUser = await this.updateDatabaseFromOIDCResponseForSignup(provider, data, decodedIDToken);
+    return {type: OIDCLoginResultType.USER_EXISTS_AND_IS_LINKED, user: newUser};
   }
 
   private calculateTokenExpirationTime(expires_in: number): number {
@@ -339,11 +365,11 @@ export default class OAuth2Service {
     return getSecondsSinceUnixEpoch() + expires_in - 5;
   }
 
-  private google_createOAuth2Entity(
+  private createPartialOAuth2Entity(
     userID: number,
-    data: GoogleOIDCResponse,
-    decodedIDToken: GoogleDecodedOIDCIDToken,
-  ): Partial<GoogleOAuth2> {
+    data: OIDCResponse,
+    decodedIDToken: DecodedIDToken,
+  ): Partial<AbstractOAuth2> {
     return {
       UserID: userID,
       Sub: decodedIDToken.sub,
@@ -353,20 +379,19 @@ export default class OAuth2Service {
     };
   }
 
-  async google_fetchAndStoreUserInfoForSignup(code: string, state: OAuth2State): Promise<User> {
-    const {data, decodedIDToken} = await this.google_getTokenFromCode(code, state);
-    this.google_checkThatRefreshTokenAndScopesArePresent(data, decodedIDToken);
-    return this.google_updateDatabaseFromOIDCResponseForSignup(data, decodedIDToken);
+  async fetchAndStoreUserInfoForSignup(providerType: OAuth2ProviderType, code: string, state: OAuth2State): Promise<User> {
+    const provider = this.oauth2Providers[providerType];
+    const {data, decodedIDToken} = await this.getTokenFromCode(provider, code, state);
+    return this.updateDatabaseFromOIDCResponseForSignup(provider, data, decodedIDToken);
   }
 
-  async google_fetchAndStoreUserInfoForLinking(code: string, state: OAuth2State) {
-    const {data, decodedIDToken} = await this.google_getTokenFromCode(code, state);
-    this.google_checkThatRefreshTokenAndScopesArePresent(data, decodedIDToken);
-    await this.google_updateDatabaseFromOIDCResponseForLinking(state.userID!, data, decodedIDToken);
+  async fetchAndStoreUserInfoForLinking(providerType: OAuth2ProviderType, code: string, state: OAuth2State) {
+    const provider = this.oauth2Providers[providerType];
+    const {data, decodedIDToken} = await this.getTokenFromCode(provider, code, state);
+    await this.updateDatabaseFromOIDCResponseForLinking(provider, state.userID!, data, decodedIDToken);
   }
 
-  private google_checkThatRefreshTokenAndScopesArePresent(data: GoogleOIDCResponse, decodedIDToken: GoogleDecodedOIDCIDToken) {
-    const provider = OAuth2Provider.GOOGLE;
+  private checkThatRefreshTokenAndScopesArePresent(provider: IOAuth2Provider, data: OIDCResponse) {
     if (!data.refresh_token) {
       this.logger.error('Refresh token was not present');
       throw new OAuth2NoRefreshTokenError();
@@ -377,12 +402,13 @@ export default class OAuth2Service {
     }
   }
 
-  private async google_updateDatabaseFromOIDCResponseForSignup(
-    data: GoogleOIDCResponse,
-    decodedIDToken: GoogleDecodedOIDCIDToken,
+  private async updateDatabaseFromOIDCResponseForSignup(
+    provider: IOAuth2Provider,
+    data: OIDCResponse,
+    decodedIDToken: DecodedIDToken,
   ): Promise<User> {
+    this.checkThatRefreshTokenAndScopesArePresent(provider, data);
     this.checkThatNameAndEmailClaimsArePresent(decodedIDToken);
-    this.google_checkThatRefreshTokenAndScopesArePresent(data, decodedIDToken);
     try {
       let newUser: User;
       await this.dataSource.transaction(async manager => {
@@ -390,10 +416,11 @@ export default class OAuth2Service {
           Name: decodedIDToken.name!,
           Email: decodedIDToken.email!,
         });
+        // TODO: use RETURNING clause to avoid reading the row which we just created
         newUser = await manager.findOneBy(User, {Email: decodedIDToken.email!});
         await manager.insert(
-          GoogleOAuth2,
-          this.google_createOAuth2Entity(newUser.ID, data, decodedIDToken)
+          oauth2EntityClasses[provider.type],
+          this.createPartialOAuth2Entity(newUser.ID, data, decodedIDToken)
         );
       });
       return newUser;
@@ -406,14 +433,18 @@ export default class OAuth2Service {
     }
   }
 
-  private async google_updateDatabaseFromOIDCResponseForLinking(
+  private async updateDatabaseFromOIDCResponseForLinking(
+    provider: IOAuth2Provider,
     userID: number,
-    data: GoogleOIDCResponse,
-    decodedIDToken: GoogleDecodedOIDCIDToken,
+    data: OIDCResponse,
+    decodedIDToken: DecodedIDToken,
   ) {
+    this.checkThatRefreshTokenAndScopesArePresent(provider, data);
+    this.checkThatNameAndEmailClaimsArePresent(decodedIDToken);
+    const repository = this.oauth2Repositories[provider.type];
     try {
-      await this.googleOAuth2Repository.insert(
-        this.google_createOAuth2Entity(userID, data, decodedIDToken)
+      await repository.insert(
+        this.createPartialOAuth2Entity(userID, data, decodedIDToken)
       );
     } catch (err: any) {
       err = normalizeDBError(err as Error);
@@ -424,9 +455,12 @@ export default class OAuth2Service {
     }
   }
 
-  async google_linkAccountFromConfirmation(oauth2Entity: Partial<GoogleOAuth2>) {
+  async linkAccountFromConfirmation(providerType: OAuth2ProviderType, user: User, oauth2Entity: Partial<AbstractOAuth2>) {
+    const provider = this.oauth2Providers[providerType];
+    const repository = this.oauth2Repositories[providerType];
     try {
-      await this.googleOAuth2Repository.insert(oauth2Entity);
+      await repository.insert(oauth2Entity);
+      provider.setLinkedCalendarToTrue(user);
     } catch (err: any) {
       err = normalizeDBError(err as Error);
       if (err instanceof UniqueConstraintFailed) {
@@ -493,9 +527,9 @@ export default class OAuth2Service {
     }
   }
 
-  async google_unlinkAccount(userID: number) {
-    const {revokeEndpoint} = oauth2Configs[OAuth2Provider.GOOGLE];
-    const creds = await this.googleOAuth2Repository.findOneBy({UserID: userID});
+  async unlinkAccount(providerType: OAuth2ProviderType, userID: number) {
+    const oauth2Repository = this.oauth2Repositories[providerType];
+    const creds = await oauth2Repository.findOneBy({UserID: userID});
     if (!creds) {
       return;
     }
@@ -504,19 +538,38 @@ export default class OAuth2Service {
       // We want to make sure that the user has at least one way to sign in.
       // If they originally signed up via an OAuth2 provider, then we'll delete
       // the calendar data, but keep the OAuth2 token so that they can still sign in.
+      const oauth2EntityClass = oauth2EntityClasses[providerType];
+      // FIXME: MicrosoftCalendarEvents
+      const oauth2CalendarEventsClass = GoogleCalendarEvents;
       await this.dataSource.transaction(async manager => {
-        await manager.update(GoogleOAuth2, {UserID: userID}, {LinkedCalendar: false});
-        await manager.delete(GoogleCalendarEvents, {UserID: userID});
+        await manager.update(oauth2EntityClass, {UserID: userID}, {LinkedCalendar: false});
+        await manager.delete(oauth2CalendarEventsClass, {UserID: userID});
       });
       return;
     }
-    // See https://developers.google.com/identity/protocols/oauth2/web-server#tokenrevoke
-    await this.request(revokeEndpoint, {
-      method: 'POST',
-      body: this.encodeFormQueryParams({token: creds.RefreshToken}),
-      headers: {'content-type': 'application/x-www-form-urlencoded'},
-    });
-    await this.googleOAuth2Repository.delete(userID);
+    const provider = this.oauth2Providers[providerType];
+    const {revokeEndpoint} = provider.getStaticOAuth2Config();
+    // Microsoft doesn't have a revocation endpoint
+    if (revokeEndpoint) {
+      // See https://developers.google.com/identity/protocols/oauth2/web-server#tokenrevoke
+      await this.request(revokeEndpoint, {
+        method: 'POST',
+        body: this.encodeFormQueryParams({token: creds.RefreshToken}),
+        headers: {'content-type': 'application/x-www-form-urlencoded'},
+      });
+      await oauth2Repository.delete(userID);
+    }
+  }
+
+  async unlinkAllOAuth2Accounts(userID: number) {
+    const results = await Promise.allSettled(oauth2ProviderTypes.map(
+      providerType => this.unlinkAccount(providerType, userID)
+    ));
+    for (const result of results) {
+      if (result.status === 'rejected') {
+        this.logger.error(result.reason);
+      }
+    }
   }
 
   private GoogleListEventsResponseItem_to_GoogleCalendarEvent(item: GoogleListEventsResponseItem): GoogleCalendarEvent {

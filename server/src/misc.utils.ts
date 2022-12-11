@@ -28,3 +28,8 @@ export function sleep(millis: number): Promise<void> {
     }, millis);
   });
 }
+
+export function capitalize(s: string): string {
+  s = s.toLowerCase();
+  return s.charAt(0).toUpperCase() + s.slice(1);
+}

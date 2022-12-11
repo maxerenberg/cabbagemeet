@@ -11,7 +11,8 @@ import {
 } from '../common-responses';
 import { meetingToMeetingShortResponse } from '../meetings/meetings.controller';
 import MeetingsService, { NoSuchMeetingError } from '../meetings/meetings.service';
-import OAuth2Service, { OAuth2Provider, OAuth2NotConfiguredError, OAuth2Reason } from '../oauth2/oauth2.service';
+import OAuth2Service, { OAuth2NotConfiguredError } from '../oauth2/oauth2.service';
+import { OAuth2ProviderType } from '../oauth2/oauth2-common';
 import EditUserDto from './edit-user.dto';
 import GoogleCalendarEventsResponse from './google-calendar-events.response';
 import LinkExternalCalendarDto from './link-external-calendar.dto';
@@ -26,7 +27,8 @@ export function UserToUserResponse(user: User): UserResponse {
     name: user.Name,
     email: user.Email,
     isSubscribedToNotifications: user.IsSubscribedToNotifications,
-    hasLinkedGoogleAccount: !!user.GoogleOAuth2,
+    hasLinkedGoogleAccount: user.GoogleOAuth2?.LinkedCalendar ?? false,
+    hasLinkedMicrosoftAccount: user.MicrosoftOAuth2?.LinkedCalendar ?? false,
   };
 }
 
@@ -120,6 +122,29 @@ export class UsersController {
     };
   }
 
+  private async linkCalendar(
+    providerType: OAuth2ProviderType,
+    user: User,
+    body: LinkExternalCalendarDto
+  ): Promise<CustomRedirectResponse> {
+    // TODO: if the user already has a linked calendar, ignore
+    // TODO: if the user already has OAuth2 creds, just set the linked calendar
+    //       flag to true in the DB
+    try {
+      const redirectURL = await this.oauth2Service.getRequestURL(
+        providerType,
+        {reason: 'link', postRedirect: body.post_redirect, userID: user.ID},
+        true
+      );
+      return {redirect: redirectURL};
+    } catch (err: any) {
+      if (err instanceof OAuth2NotConfiguredError) {
+        throw new NotFoundException();
+      }
+      throw err;
+    }
+  }
+
   @ApiOperation({
     summary: 'Link Google calendar',
     description: (
@@ -134,23 +159,32 @@ export class UsersController {
   linkGoogleCalendar(
     @AuthUser() user: User,
     @Body() body: LinkExternalCalendarDto,
-  ): CustomRedirectResponse {
-    // TODO: if the user already has a linked calendar, ignore
-    // TODO: if the user already has OAuth2 creds, just set the linked calendar
-    //       flag to true in the DB
-    try {
-      const redirectURL = this.oauth2Service.getRequestURL(
-        OAuth2Provider.GOOGLE,
-        {reason: 'link', postRedirect: body.post_redirect, userID: user.ID},
-        true
-      );
-      return {redirect: redirectURL};
-    } catch (err: any) {
-      if (err instanceof OAuth2NotConfiguredError) {
-        throw new NotFoundException();
-      }
-      throw err;
-    }
+  ): Promise<CustomRedirectResponse> {
+    return this.linkCalendar(OAuth2ProviderType.GOOGLE, user, body);
+  }
+
+  @ApiOperation({
+    summary: 'Link Outlook calendar',
+    description: (
+      'Link Outlook calendar events to the account of the user who is logged in.'
+      + ' The client should navigate to the returned OAuth2 consent page URL.'
+    ),
+    operationId: 'linkMicrosoftCalendar',
+  })
+  @ApiResponse({type: NotFoundResponse})
+  @Post('link-microsoft-calendar')
+  @HttpCode(HttpStatus.OK)
+  linkMicrosoftCalendar(
+    @AuthUser() user: User,
+    @Body() body: LinkExternalCalendarDto,
+  ): Promise<CustomRedirectResponse> {
+    return this.linkCalendar(OAuth2ProviderType.MICROSOFT, user, body);
+  }
+
+  private async unlinkCalendar(providerType: OAuth2ProviderType, user: User): Promise<UserResponse> {
+    await this.oauth2Service.unlinkAccount(providerType, user.ID);
+    const updatedUser = await this.usersService.findOneByID(user.ID);
+    return UserToUserResponse(updatedUser);
   }
 
   @ApiOperation({
@@ -163,10 +197,22 @@ export class UsersController {
   })
   @Delete('link-google-calendar')
   @HttpCode(HttpStatus.OK)
-  async unlinkGoogleCalendar(@AuthUser() user: User): Promise<UserResponse> {
-    await this.oauth2Service.google_unlinkAccount(user.ID);
-    const updatedUser = await this.usersService.findOneByID(user.ID);
-    return UserToUserResponse(updatedUser);
+  unlinkGoogleCalendar(@AuthUser() user: User): Promise<UserResponse> {
+    return this.unlinkCalendar(OAuth2ProviderType.GOOGLE, user);
+  }
+
+  @ApiOperation({
+    summary: 'Unlink Outlook calendar',
+    description: (
+      'Unlink the Microsoft account which is linked to the account of the user who is logged in.'
+      + ' The OAuth2 access token will be revoked.'
+    ),
+    operationId: 'unlinkMicrosoftCalendar',
+  })
+  @Delete('link-microsoft-calendar')
+  @HttpCode(HttpStatus.OK)
+  unlinkMicrosoftCalendar(@AuthUser() user: User): Promise<UserResponse> {
+    return this.unlinkCalendar(OAuth2ProviderType.MICROSOFT, user);
   }
 
   @ApiOperation({

@@ -75,7 +75,7 @@ export default class JwtStrategy extends PassportStrategy(Strategy) {
         this.logger.debug('Detected attempt to re-use password reset token');
         return null;
       }
-      this.cacher.add(token, PWRESET_TOKEN_LIFETIME_SECONDS);
+      this.cacher.add(token, true, PWRESET_TOKEN_LIFETIME_SECONDS);
     } else {
       if (
         user.TimestampOfEarliestValidToken === null

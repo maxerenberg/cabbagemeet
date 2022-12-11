@@ -1,28 +1,34 @@
 import { useSearchParams } from "react-router-dom";
 
-type ErrorCode =
-    'E_GOOGLE_OAUTH2_NOT_AVAILABLE'
-  | 'E_GOOGLE_ACCOUNT_ALREADY_LINKED'
-  | 'E_NOT_ALL_OAUTH2_SCOPES_GRANTED'
-  | 'E_INTERNAL_SERVER_ERROR';
+function capitalize(s: string): string {
+  s = s.toLowerCase();
+  return s.charAt(0).toUpperCase() + s.slice(1);
+}
 
-const ERROR_MESSAGES: Record<ErrorCode, string> = {
-  // TODO: use hyperlink on "you must login" text
-  E_GOOGLE_ACCOUNT_ALREADY_LINKED: (
-    'This Google account is already linked to another local account. ' +
-    'You must login using this Google account to unlink it.'
-  ),
-  E_GOOGLE_OAUTH2_NOT_AVAILABLE: 'Google OAuth2 has not been configured on this server.',
-  E_NOT_ALL_OAUTH2_SCOPES_GRANTED: 'Not all required OAuth2 scopes were granted.',
-  E_INTERNAL_SERVER_ERROR: 'Internal server error. :((((((((((',
-};
+function getOAuth2ErrorMessage(e: string, provider: string | null): string {
+  provider = provider ?? 'Unknown';
+  provider = capitalize(provider);
+  if (e === 'E_OAUTH2_ACCOUNT_ALREADY_LINKED') {
+    return (
+      `This ${provider} account is already linked to another local account. ` +
+      `You must login using this ${provider} account to unlink it.`
+    );
+  } else if (e === 'E_OAUTH2_NOT_AVAILABLE') {
+    return `${provider} OAuth2 has not been configured on this server.`;
+  } else if (e === 'E_OAUTH2_NOT_ALL_SCOPES_GRANTED') {
+    return 'Not all required OAuth2 scopes were granted.';
+  }
+  return 'Unknown OAuth2 error.';
+}
 
 export default function ErrorPage() {
   const [searchParams] = useSearchParams();
   const errorCode = searchParams.get('e');
-  const errorMessage = errorCode
-    ? ERROR_MESSAGES[errorCode as ErrorCode]
-    : null;
+  const errorMessage = errorCode === null
+    ? null
+    : errorCode.startsWith('E_OAUTH2')
+    ? getOAuth2ErrorMessage(errorCode, searchParams.get('provider'))
+    : 'Internal server error. :((((((((((';
   return (
     <>
       <p>An error occurred{errorMessage ? ':' : '.'}</p>

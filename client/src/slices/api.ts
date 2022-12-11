@@ -59,6 +59,16 @@ const injectedRtkApi = api.injectEndpoints({
         body: queryArg,
       }),
     }),
+    loginWithMicrosoft: build.mutation<
+      LoginWithMicrosoftApiResponse,
+      LoginWithMicrosoftApiArg
+    >({
+      query: (queryArg) => ({
+        url: `/api/login-with-microsoft`,
+        method: "POST",
+        body: queryArg,
+      }),
+    }),
     signupWithGoogle: build.mutation<
       SignupWithGoogleApiResponse,
       SignupWithGoogleApiArg
@@ -69,12 +79,32 @@ const injectedRtkApi = api.injectEndpoints({
         body: queryArg,
       }),
     }),
+    signupWithMicrosoft: build.mutation<
+      SignupWithMicrosoftApiResponse,
+      SignupWithMicrosoftApiArg
+    >({
+      query: (queryArg) => ({
+        url: `/api/signup-with-microsoft`,
+        method: "POST",
+        body: queryArg,
+      }),
+    }),
     confirmLinkGoogleAccount: build.mutation<
       ConfirmLinkGoogleAccountApiResponse,
       ConfirmLinkGoogleAccountApiArg
     >({
       query: (queryArg) => ({
         url: `/api/confirm-link-google-account`,
+        method: "POST",
+        body: queryArg,
+      }),
+    }),
+    confirmLinkMicrosoftAccount: build.mutation<
+      ConfirmLinkMicrosoftAccountApiResponse,
+      ConfirmLinkMicrosoftAccountApiArg
+    >({
+      query: (queryArg) => ({
+        url: `/api/confirm-link-microsoft-account`,
         method: "POST",
         body: queryArg,
       }),
@@ -119,6 +149,25 @@ const injectedRtkApi = api.injectEndpoints({
       UnlinkGoogleCalendarApiArg
     >({
       query: () => ({ url: `/api/me/link-google-calendar`, method: "DELETE" }),
+    }),
+    linkMicrosoftCalendar: build.mutation<
+      LinkMicrosoftCalendarApiResponse,
+      LinkMicrosoftCalendarApiArg
+    >({
+      query: (queryArg) => ({
+        url: `/api/me/link-microsoft-calendar`,
+        method: "POST",
+        body: queryArg,
+      }),
+    }),
+    unlinkMicrosoftCalendar: build.mutation<
+      UnlinkMicrosoftCalendarApiResponse,
+      UnlinkMicrosoftCalendarApiArg
+    >({
+      query: () => ({
+        url: `/api/me/link-microsoft-calendar`,
+        method: "DELETE",
+      }),
     }),
     getGoogleCalendarEvents: build.query<
       GetGoogleCalendarEventsApiResponse,
@@ -238,12 +287,21 @@ export type ConfirmPasswordResetApiArg = ConfirmResetPasswordDto;
 export type LoginWithGoogleApiResponse =
   /** status 200  */ CustomRedirectResponse;
 export type LoginWithGoogleApiArg = OAuth2ConsentPostRedirectDto;
+export type LoginWithMicrosoftApiResponse =
+  /** status 200  */ CustomRedirectResponse;
+export type LoginWithMicrosoftApiArg = OAuth2ConsentPostRedirectDto;
 export type SignupWithGoogleApiResponse =
   /** status 200  */ CustomRedirectResponse;
 export type SignupWithGoogleApiArg = OAuth2ConsentPostRedirectDto;
+export type SignupWithMicrosoftApiResponse =
+  /** status 200  */ CustomRedirectResponse;
+export type SignupWithMicrosoftApiArg = OAuth2ConsentPostRedirectDto;
 export type ConfirmLinkGoogleAccountApiResponse =
   /** status 200  */ UserResponse;
 export type ConfirmLinkGoogleAccountApiArg = ConfirmLinkAccountDto;
+export type ConfirmLinkMicrosoftAccountApiResponse =
+  /** status 200  */ UserResponse;
+export type ConfirmLinkMicrosoftAccountApiArg = ConfirmLinkAccountDto;
 export type GetSelfInfoApiResponse = /** status 200  */ UserResponse;
 export type GetSelfInfoApiArg = void;
 export type EditUserApiResponse = /** status 200  */ UserResponse;
@@ -261,6 +319,12 @@ export type LinkGoogleCalendarApiResponse =
 export type LinkGoogleCalendarApiArg = LinkExternalCalendarDto;
 export type UnlinkGoogleCalendarApiResponse = /** status 200  */ UserResponse;
 export type UnlinkGoogleCalendarApiArg = void;
+export type LinkMicrosoftCalendarApiResponse =
+  /** status 200  */ CustomRedirectResponse;
+export type LinkMicrosoftCalendarApiArg = LinkExternalCalendarDto;
+export type UnlinkMicrosoftCalendarApiResponse =
+  /** status 200  */ UserResponse;
+export type UnlinkMicrosoftCalendarApiArg = void;
 export type GetGoogleCalendarEventsApiResponse =
   /** status 200  */ GoogleCalendarEventsResponse;
 export type GetGoogleCalendarEventsApiArg = number;
@@ -313,6 +377,7 @@ export type UserResponseWithToken = {
   email: string;
   isSubscribedToNotifications: boolean;
   hasLinkedGoogleAccount: boolean;
+  hasLinkedMicrosoftAccount: boolean;
   token: string;
 };
 export type BadRequestResponse = {
@@ -364,6 +429,7 @@ export type UserResponse = {
   email: string;
   isSubscribedToNotifications: boolean;
   hasLinkedGoogleAccount: boolean;
+  hasLinkedMicrosoftAccount: boolean;
 };
 export type ConfirmLinkAccountDto = {
   encrypted_entity: string;
@@ -458,8 +524,11 @@ export const {
   useResetPasswordMutation,
   useConfirmPasswordResetMutation,
   useLoginWithGoogleMutation,
+  useLoginWithMicrosoftMutation,
   useSignupWithGoogleMutation,
+  useSignupWithMicrosoftMutation,
   useConfirmLinkGoogleAccountMutation,
+  useConfirmLinkMicrosoftAccountMutation,
   useGetSelfInfoQuery,
   useEditUserMutation,
   useDeleteUserMutation,
@@ -467,6 +536,8 @@ export const {
   useGetRespondedMeetingsQuery,
   useLinkGoogleCalendarMutation,
   useUnlinkGoogleCalendarMutation,
+  useLinkMicrosoftCalendarMutation,
+  useUnlinkMicrosoftCalendarMutation,
   useGetGoogleCalendarEventsQuery,
   useCreateMeetingMutation,
   useGetMeetingQuery,

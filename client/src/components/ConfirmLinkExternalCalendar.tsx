@@ -1,6 +1,7 @@
 import { useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import GoogleLogo from 'assets/google-g-logo.svg';
+import MicrosoftLogo from 'assets/microsoft-logo.svg';
 import { useAppSelector } from 'app/hooks';
 import { selectTokenIsPresent } from 'slices/authentication';
 import GenericSpinner from './GenericSpinner';
@@ -9,17 +10,25 @@ import { useToast } from './Toast';
 import { getReqErrorMessage } from 'utils/requests.utils';
 import ButtonWithSpinner from './ButtonWithSpinner';
 import { useGetSelfInfoIfTokenIsPresent } from 'utils/auth.hooks';
-import { useConfirmLinkGoogleAccountMutation } from 'slices/api';
+import { useConfirmLinkGoogleAccountMutation, useConfirmLinkMicrosoftAccountMutation } from 'slices/api';
 
-// TODO: add Microsoft
-type OAuth2Provider = 'google';
+type OAuth2Provider = 'google' | 'microsoft';
+const logos: Record<OAuth2Provider, string> = {
+  'google': GoogleLogo,
+  'microsoft': MicrosoftLogo,
+};
 
 export default function ConfirmLinkExternalCalendar({provider}: {provider: OAuth2Provider}) {
   const capitalizedProvider = provider.charAt(0).toUpperCase() + provider.slice(1);
   const tokenIsPresent = useAppSelector(selectTokenIsPresent);
   const {data: userInfo} = useGetSelfInfoIfTokenIsPresent();
   const navigate = useNavigate();
-  const [confirmLinkAccount, {isSuccess, isLoading, error}] = useConfirmLinkGoogleAccountMutation();
+  const confirmLinkGoogleAccountVals = useConfirmLinkGoogleAccountMutation();
+  const confirmLinkMicrosoftAccountVals = useConfirmLinkMicrosoftAccountMutation();
+  const [confirmLinkAccount, {isSuccess, isLoading, error}] = ({
+    'google': confirmLinkGoogleAccountVals,
+    'microsoft': confirmLinkMicrosoftAccountVals,
+  } as const)[provider];
   const {showToast} = useToast();
   const [searchParams] = useSearchParams();
   // The token will be removed from the URL and stored in the Redux store from
@@ -67,8 +76,8 @@ export default function ConfirmLinkExternalCalendar({provider}: {provider: OAuth
           Link your {capitalizedProvider} account
         </h3>
         <img
-          src={GoogleLogo}
-          alt="Google Logo"
+          src={logos[provider]}
+          alt={`${capitalizedProvider} Logo`}
           style={{maxHeight: '1.5em'}}
         />
       </div>

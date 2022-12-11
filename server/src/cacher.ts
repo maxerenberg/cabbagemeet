@@ -1,27 +1,32 @@
-// TODO: create table in DB for expirable data, have cron job which deletes
-// rows periodically
+// TODO: replace with Redis
 
-export default class Cacher {
-  private readonly set = new Set<string>();
+export default class Cacher<T = true> {
+  private readonly map = new Map<string, T>();
 
   has(key: string): boolean {
-    return this.set.has(key);
+    return this.map.has(key);
+  }
+
+  get(key: string): T | undefined {
+    return this.map.get(key);
   }
 
   pop(key: string): boolean {
-    if (!this.set.has(key)) {
-      return false;
-    }
     // The timer will still expire later and try to remote a key which
     // no longer exists. That is fine.
-    this.set.delete(key);
-    return true;
+    return this.map.delete(key);
   }
 
-  add(key: string, ttlSeconds: number) {
-    this.set.add(key);
+  getAndPop(key: string): T | undefined {
+    const value = this.map.get(key);
+    this.map.delete(key);
+    return value;
+  }
+
+  add(key: string, value: T, ttlSeconds: number) {
+    this.map.set(key, value);
     setTimeout(() => {
-      this.set.delete(key);
+      this.map.delete(key);
     }, ttlSeconds * 1000);
   }
 }

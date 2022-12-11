@@ -5,10 +5,23 @@ import { normalizeDBError, UniqueConstraintFailed } from '../database.utils';
 import OAuth2Service from '../oauth2/oauth2.service';
 import { Repository } from 'typeorm';
 import User from './user.entity';
+import { oauth2ProviderNamesMap, oauth2TableNames } from 'src/oauth2/oauth2-common';
 
 export class UserAlreadyExistsError extends Error {}
 
-export const columnsForGetUser = ['User', 'GoogleOAuth2.LinkedCalendar'];
+const columnsForGetUser = [
+  'User',
+  ...Object.values(oauth2ProviderNamesMap).map(name => `${name}OAuth2.LinkedCalendar`)
+];
+
+export function selectUserLeftJoinOAuth2Tables(repository: Repository<User>) {
+  let query = repository.createQueryBuilder('User').select(columnsForGetUser);
+  for (const tableName of oauth2TableNames) {
+    // e.g. leftJoin('User.GoogleOAuth2', 'GoogleOAuth2')
+    query = query.leftJoin(`User.${tableName}`, tableName);
+  }
+  return query;
+}
 
 @Injectable()
 export default class UsersService {
@@ -41,10 +54,7 @@ export default class UsersService {
   }
 
   async findOneByID(userID: number): Promise<User | null> {
-    return this.userRepository
-      .createQueryBuilder()
-      .leftJoin('User.GoogleOAuth2', 'GoogleOAuth2')
-      .select(columnsForGetUser)
+    return selectUserLeftJoinOAuth2Tables(this.userRepository)
       .where('User.ID = :userID', {userID})
       .getOne();
   }
@@ -67,7 +77,7 @@ export default class UsersService {
 
   async deleteUser(userID: number): Promise<void> {
     // Revoke and delete any OAuth2 credentials which we've stored for this user
-    await this.oauth2Service.google_unlinkAccount(userID);
+    await this.oauth2Service.unlinkAllOAuth2Accounts(userID);
     await this.userRepository.delete(userID);
   }
 

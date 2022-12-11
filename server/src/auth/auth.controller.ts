@@ -43,11 +43,8 @@ import UsersService, { UserAlreadyExistsError } from '../users/users.service';
 import AuthService from './auth.service';
 import LocalLoginDto from './local-login.dto';
 import LocalSignupDto from './local-signup.dto';
-import OAuth2Service, {
-  OAuth2Provider,
-  OAuth2Reason,
-  OAuth2NotConfiguredError,
-} from '../oauth2/oauth2.service';
+import OAuth2Service, { OAuth2Reason, OAuth2NotConfiguredError } from '../oauth2/oauth2.service';
+import { OAuth2ProviderType, oauth2ProviderNamesMap } from '../oauth2/oauth2-common';
 import OAuth2ConsentPostRedirectDto from '../oauth2/oauth2-consent-post-redirect.dto';
 import RateLimiter, { SECONDS_PER_MINUTE } from '../rate-limiter';
 import ResetPasswordDto from './reset-password.dto';
@@ -258,12 +255,20 @@ export class AuthController {
     await this.authService.confirmResetPassword(user, body.password);
   }
 
-  private redirectToGoogle(reason: OAuth2Reason, postRedirect: string, promptConsent: boolean, nonce?: string): string {
+  private async redirectToOAuth2Provider(
+    {providerType, reason, postRedirect, promptConsent, nonce}:
+    {providerType: OAuth2ProviderType, reason: OAuth2Reason, postRedirect: string, promptConsent: boolean, nonce?: string}
+  ): Promise<string> {
     try {
-      return this.oauth2Service.getRequestURL(OAuth2Provider.GOOGLE, {reason, postRedirect, nonce}, promptConsent);
+      return await this.oauth2Service.getRequestURL(
+        providerType,
+        {reason, postRedirect, clientNonce: nonce},
+        promptConsent
+      );
     } catch (err: any) {
       if (err instanceof OAuth2NotConfiguredError) {
-        throw new NotFoundException('Google OAuth2 is not configured on this server');
+        const providerName = oauth2ProviderNamesMap[providerType];
+        throw new NotFoundException(`${providerName} OAuth2 is not configured on this server`);
       }
       throw err;
     }
@@ -277,9 +282,35 @@ export class AuthController {
   @ApiNotFoundResponse({type: NotFoundResponse})
   @Post('login-with-google')
   @HttpCode(HttpStatus.OK)
-  loginWithGoogle(@Body() body: OAuth2ConsentPostRedirectDto): CustomRedirectResponse {
+  async loginWithGoogle(@Body() body: OAuth2ConsentPostRedirectDto): Promise<CustomRedirectResponse> {
     return {
-      redirect: this.redirectToGoogle('login', body.post_redirect, false, body.nonce)
+      redirect: await this.redirectToOAuth2Provider({
+        providerType: OAuth2ProviderType.GOOGLE,
+        reason: 'login',
+        postRedirect: body.post_redirect,
+        promptConsent: false,
+        nonce: body.nonce,
+      })
+    };
+  }
+
+  @ApiOperation({
+    summary: 'Login with Microsoft',
+    description: 'Returns a URL to an OAuth2 consent page where the client can sign in with their Microsoft account',
+    operationId: 'loginWithMicrosoft',
+  })
+  @ApiNotFoundResponse({type: NotFoundResponse})
+  @Post('login-with-microsoft')
+  @HttpCode(HttpStatus.OK)
+  async loginWithMicrosoft(@Body() body: OAuth2ConsentPostRedirectDto): Promise<CustomRedirectResponse> {
+    return {
+      redirect: await this.redirectToOAuth2Provider({
+        providerType: OAuth2ProviderType.MICROSOFT,
+        reason: 'login',
+        postRedirect: body.post_redirect,
+        promptConsent: false,
+        nonce: body.nonce,
+      })
     };
   }
 
@@ -290,9 +321,34 @@ export class AuthController {
   })
   @Post('signup-with-google')
   @HttpCode(HttpStatus.OK)
-  signupWithGoogle(@Body() body: OAuth2ConsentPostRedirectDto): CustomRedirectResponse {
+  async signupWithGoogle(@Body() body: OAuth2ConsentPostRedirectDto): Promise<CustomRedirectResponse> {
     return {
-      redirect: this.redirectToGoogle('signup', body.post_redirect, true, body.nonce)
+      redirect: await this.redirectToOAuth2Provider({
+        providerType: OAuth2ProviderType.GOOGLE,
+        reason: 'signup',
+        postRedirect: body.post_redirect,
+        promptConsent: true,
+        nonce: body.nonce,
+      })
+    };
+  }
+
+  @ApiOperation({
+    summary: 'Sign up with Microsoft',
+    description: 'Returns a URL to an OAuth2 consent page where the client can sign up with their Microsoft account',
+    operationId: 'signupWithMicrosoft',
+  })
+  @Post('signup-with-microsoft')
+  @HttpCode(HttpStatus.OK)
+  async signupWithMicrosoft(@Body() body: OAuth2ConsentPostRedirectDto): Promise<CustomRedirectResponse> {
+    return {
+      redirect: await this.redirectToOAuth2Provider({
+        providerType: OAuth2ProviderType.MICROSOFT,
+        reason: 'signup',
+        postRedirect: body.post_redirect,
+        promptConsent: true,
+        nonce: body.nonce,
+      })
     };
   }
 }

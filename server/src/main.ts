@@ -5,6 +5,7 @@ import { NestExpressApplication } from '@nestjs/platform-express';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { AppModule } from './app.module';
 import { EnvironmentVariables } from './env.validation';
+import { oauth2ProviderNames } from './oauth2/oauth2-common';
 
 function setupSwagger(app: INestApplication) {
   const config = new DocumentBuilder()
@@ -22,7 +23,7 @@ async function bootstrap() {
   const app = await NestFactory.create<NestExpressApplication>(AppModule);
   app.enableShutdownHooks();
   app.setGlobalPrefix('api', {
-    exclude: ['redirect/google']
+    exclude: oauth2ProviderNames.map(name => `redirect/${name.toLowerCase()}`),
   });
   app.useGlobalPipes(
     new ValidationPipe({

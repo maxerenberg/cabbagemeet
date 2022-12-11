@@ -1,4 +1,4 @@
-import type { AnyAction, ThunkDispatch } from '@reduxjs/toolkit';
+import type { AnyAction, SerializedError, ThunkDispatch } from '@reduxjs/toolkit';
 import type { MutationLifecycleApi, QueryLifecycleApi } from '@reduxjs/toolkit/dist/query/endpointDefinitions';
 import { removeToken, setToken } from './authentication';
 import { transformMeetingResponse, transformMeetingsShortResponse } from 'utils/response-transforms';
@@ -198,7 +198,9 @@ async function getSelfInfo_onQueryStarted(
     await queryFulfilled;
   } catch (err: any) {
     console.warn(err);
-    dispatch(removeToken());
+    if (err?.error?.status === 401) {
+      dispatch(removeToken());
+    }
   }
 }
 

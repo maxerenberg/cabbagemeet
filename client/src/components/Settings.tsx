@@ -15,9 +15,11 @@ import { getReqErrorMessage, useMutationWithPersistentError } from "utils/reques
 import {
   useEditUserMutation,
   useGetSelfInfoQuery,
-  useLinkGoogleCalendarMutation,
   useLogoutMutation,
+  useLinkGoogleCalendarMutation,
   useUnlinkGoogleCalendarMutation,
+  useLinkMicrosoftCalendarMutation,
+  useUnlinkMicrosoftCalendarMutation,
 } from "slices/api";
 import ButtonWithSpinner from "./ButtonWithSpinner";
 import { useGetSelfInfoIfTokenIsPresent } from "utils/auth.hooks";
@@ -144,7 +146,39 @@ function GeneralSettings() {
 function LinkedAccounts() {
   const {data: userInfo} = useGetSelfInfoIfTokenIsPresent();
   assert(userInfo !== undefined);
-  const hasLinkedGoogleAccount = userInfo.hasLinkedGoogleAccount;
+  return (
+    <div>
+      <h4>Linked Accounts</h4>
+      <LinkedAccount
+        provider="Google"
+        hasLinkedAccount={userInfo.hasLinkedGoogleAccount}
+        useLinkCalendarMutation={useLinkGoogleCalendarMutation}
+        useUnlinkCalendarMutation={useUnlinkGoogleCalendarMutation}
+      />
+      <LinkedAccount
+        provider="Microsoft"
+        calendarProductName="Outlook"
+        hasLinkedAccount={userInfo.hasLinkedMicrosoftAccount}
+        useLinkCalendarMutation={useLinkMicrosoftCalendarMutation}
+        useUnlinkCalendarMutation={useUnlinkMicrosoftCalendarMutation}
+      />
+    </div>
+  );
+}
+
+function LinkedAccount({
+  provider,
+  calendarProductName,
+  hasLinkedAccount,
+  useLinkCalendarMutation,
+  useUnlinkCalendarMutation,
+}: {
+  provider: string,
+  calendarProductName?: string,
+  hasLinkedAccount: boolean,
+  useLinkCalendarMutation: typeof useLinkGoogleCalendarMutation,
+  useUnlinkCalendarMutation: typeof useUnlinkGoogleCalendarMutation,
+}) {
   const [
     unlinkCalendar,
     {
@@ -152,7 +186,7 @@ function LinkedAccounts() {
       isLoading: unlink_isLoading,
       error: unlink_error
     }
-  ] = useMutationWithPersistentError(useUnlinkGoogleCalendarMutation);
+  ] = useMutationWithPersistentError(useUnlinkCalendarMutation);
   const [
     linkCalendar,
     {
@@ -161,12 +195,12 @@ function LinkedAccounts() {
       isLoading: link_isLoading,
       error: link_error
     }
-  ] = useMutationWithPersistentError(useLinkGoogleCalendarMutation);
+  ] = useMutationWithPersistentError(useLinkCalendarMutation);
   const {showToast} = useToast();
   useEffect(() => {
     if (unlink_isSuccess) {
       showToast({
-        msg: 'Successfully unlinked Google account',
+        msg: `Successfully unlinked ${provider} account`,
         msgType: 'success',
         autoClose: true,
       });
@@ -177,9 +211,10 @@ function LinkedAccounts() {
       window.location.href = link_data!.redirect;
     }
   }, [link_data, link_isSuccess]);
-  const buttonVariant = hasLinkedGoogleAccount ? 'secondary' : 'primary';
+  calendarProductName = calendarProductName ?? provider;
+  const buttonVariant = hasLinkedAccount ? 'secondary' : 'primary';
   let onClick: React.MouseEventHandler<HTMLButtonElement> | undefined;
-  if (hasLinkedGoogleAccount) {
+  if (hasLinkedAccount) {
     onClick = () => unlinkCalendar();
   } else {
     onClick = () => linkCalendar({
@@ -189,33 +224,30 @@ function LinkedAccounts() {
   const error = link_error || unlink_error;
   const btnDisabled = link_isLoading || link_isSuccess || unlink_isLoading;
   return (
-    <div>
-      <h4>Linked Accounts</h4>
-      <div className="mt-4">
-        <div className="d-flex flex-wrap align-items-center justify-content-between">
-          <h5 className="text-primary">Google</h5>
-          <ButtonWithSpinner
-            as="NonFocusButton"
-            style={{minWidth: 'max-content'}}
-            className={`btn btn-outline-${buttonVariant} w-100-md-down mt-3 mt-md-0`}
-            onClick={onClick}
-            isLoading={btnDisabled}
-          >
-            {hasLinkedGoogleAccount ? 'Unlink' : 'Link'} Google Calendar
-          </ButtonWithSpinner>
-        </div>
-        {error && (
-          <p className="text-danger text-center mb-0 mt-3">An error occurred: {getReqErrorMessage(error)}</p>
-        )}
-        <p className="mt-4">
-          Link your Google account to view your Google calendar events
-          when adding your availabilities.
-        </p>
-        <small>
-          Your Google profile information will only be used to create, read and update
-          your Google calendar events.
-        </small>
+    <div className="mt-4">
+      <div className="d-flex flex-wrap align-items-center justify-content-between">
+        <h5 className="text-primary">{provider}</h5>
+        <ButtonWithSpinner
+          as="NonFocusButton"
+          style={{minWidth: 'max-content'}}
+          className={`btn btn-outline-${buttonVariant} w-100-md-down mt-3 mt-md-0`}
+          onClick={onClick}
+          isLoading={btnDisabled}
+        >
+          {hasLinkedAccount ? 'Unlink' : 'Link'} {calendarProductName} Calendar
+        </ButtonWithSpinner>
       </div>
+      {error && (
+        <p className="text-danger text-center mb-0 mt-3">An error occurred: {getReqErrorMessage(error)}</p>
+      )}
+      <p className="mt-4">
+        Link your {provider} account to view your {calendarProductName} calendar events
+        when adding your availabilities.
+      </p>
+      <small>
+        Your {provider} profile information will only be used to create, read and update
+        your {calendarProductName} calendar events.
+      </small>
     </div>
   );
 }

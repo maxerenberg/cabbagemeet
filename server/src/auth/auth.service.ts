@@ -83,7 +83,7 @@ export default class AuthService {
     if (!sent) {
       return false;
     }
-    this.verificationCodes.add(`${email}:${codeStr}`, SECONDS_PER_MINUTE * expiresMinutes);
+    this.verificationCodes.add(`${email}:${codeStr}`, true, SECONDS_PER_MINUTE * expiresMinutes);
     if (process.env.NODE_ENV === 'development') {
       this.logger.debug(`verification code=${codeStr}`);
     }

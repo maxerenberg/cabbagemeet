@@ -118,6 +118,31 @@ export class EnvironmentVariables {
   @IsString()
   OAUTH2_GOOGLE_REDIRECT_URI?: string;
 
+  @IsOptional()
+  @IsString()
+  OAUTH2_MICROSOFT_CLIENT_ID?: string;
+
+  // Path to a certificate used for PKCE (must be PEM-encoded)
+  @IsOptional()
+  @IsString()
+  OAUTH2_MICROSOFT_CERTIFICATE_PATH?: string;
+
+  // Path to a private key used for PKCE (must be PEM-encoded)
+  @IsOptional()
+  @IsString()
+  OAUTH2_MICROSOFT_PRIVATE_KEY_PATH?: string;
+
+  // See https://learn.microsoft.com/en-us/azure/active-directory/develop/v2-protocols-oidc#find-your-apps-openid-configuration-document-uri
+  // Use 'common' if both work/school and personal Microsoft accounts can be used and
+  // 'consumers' if only personal Microsoft accounts can be used
+  @IsOptional()
+  @IsString()
+  OAUTH2_MICROSOFT_TENANT_ID?: string = 'consumers';
+
+  @IsOptional()
+  @IsString()
+  OAUTH2_MICROSOFT_REDIRECT_URI?: string;
+
   // Should be set to true if this app is behind a reverse proxy AND the proxy
   // has been configured to set the X-Forwarded-For header
   @IsOptional()

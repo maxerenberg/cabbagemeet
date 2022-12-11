@@ -8,6 +8,7 @@ import { getReqErrorMessage, useMutationWithPersistentError } from "utils/reques
 import ButtonWithSpinner from './ButtonWithSpinner';
 import { useLoginMutation } from 'slices/api';
 import { HistoryContext } from './HistoryProvider';
+import ContinueWithMicrosoftButton from './ContinueWithMicrosoftButton';
 
 // TODO: reduce code duplication with Signup.tsx
 
@@ -18,6 +19,16 @@ export default function Login() {
     </div>
   );
 };
+
+function ORBar() {
+  return (
+    <div className="d-flex align-items-center my-4">
+      <div className="border-top flex-grow-1"></div>
+      <span className="fw-bold mx-2">OR</span>
+      <div className="border-top flex-grow-1"></div>
+    </div>
+  );
+}
 
 function LoginForm() {
   const [validated, setValidated] = useState(false);
@@ -57,11 +68,8 @@ function LoginForm() {
     <Form noValidate className={styles.loginForm} {...{validated, onSubmit}}>
       <h4 className="mb-5">Login</h4>
       <ContinueWithGoogleButton reason='login' />
-      <div className="d-flex align-items-center my-4">
-        <div className="border-top flex-grow-1"></div>
-        <span className="fw-bold mx-2">OR</span>
-        <div className="border-top flex-grow-1"></div>
-      </div>
+      <ContinueWithMicrosoftButton reason='login' className="mt-4" />
+      <ORBar />
       <Form.Group controlId="login-form-email">
         <Form.Label>Email address</Form.Label>
         <Form.Control
