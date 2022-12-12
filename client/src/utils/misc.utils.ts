@@ -15,3 +15,8 @@ export function scrollUpIntoViewIfNeeded(elem: HTMLElement, scrollMarginTop: num
     window.scrollBy(0, -offset);
   }
 }
+
+export function capitalize(s: string): string {
+  s = s.toLowerCase();
+  return s.charAt(0).toUpperCase() + s.slice(1);
+}

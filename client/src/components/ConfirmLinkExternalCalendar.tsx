@@ -1,7 +1,5 @@
 import { useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import GoogleLogo from 'assets/google-g-logo.svg';
-import MicrosoftLogo from 'assets/microsoft-logo.svg';
 import { useAppSelector } from 'app/hooks';
 import { selectTokenIsPresent } from 'slices/authentication';
 import GenericSpinner from './GenericSpinner';
@@ -10,25 +8,17 @@ import { useToast } from './Toast';
 import { getReqErrorMessage } from 'utils/requests.utils';
 import ButtonWithSpinner from './ButtonWithSpinner';
 import { useGetSelfInfoIfTokenIsPresent } from 'utils/auth.hooks';
-import { useConfirmLinkGoogleAccountMutation, useConfirmLinkMicrosoftAccountMutation } from 'slices/api';
+import { calendarBrandNames, confirmLinkAccountHooks, OAuth2Provider } from 'utils/oauth2-common';
+import { logos } from 'utils/oauth2-common';
+import { capitalize } from 'utils/misc.utils';
 
-type OAuth2Provider = 'google' | 'microsoft';
-const logos: Record<OAuth2Provider, string> = {
-  'google': GoogleLogo,
-  'microsoft': MicrosoftLogo,
-};
 
 export default function ConfirmLinkExternalCalendar({provider}: {provider: OAuth2Provider}) {
-  const capitalizedProvider = provider.charAt(0).toUpperCase() + provider.slice(1);
+  const capitalizedProvider = capitalize(provider);
   const tokenIsPresent = useAppSelector(selectTokenIsPresent);
   const {data: userInfo} = useGetSelfInfoIfTokenIsPresent();
   const navigate = useNavigate();
-  const confirmLinkGoogleAccountVals = useConfirmLinkGoogleAccountMutation();
-  const confirmLinkMicrosoftAccountVals = useConfirmLinkMicrosoftAccountMutation();
-  const [confirmLinkAccount, {isSuccess, isLoading, error}] = ({
-    'google': confirmLinkGoogleAccountVals,
-    'microsoft': confirmLinkMicrosoftAccountVals,
-  } as const)[provider];
+  const [confirmLinkAccount, {isSuccess, isLoading, error}] = confirmLinkAccountHooks[provider]();
   const {showToast} = useToast();
   const [searchParams] = useSearchParams();
   // The token will be removed from the URL and stored in the Redux store from
@@ -62,6 +52,7 @@ export default function ConfirmLinkExternalCalendar({provider}: {provider: OAuth
   if (!userInfo) {
     return <GenericSpinner />;
   }
+  const calendarBrandName = calendarBrandNames[provider] ?? capitalizedProvider;
   const onClick = () => confirmLinkAccount({
     encrypted_entity: encryptedEntity,
     iv,
@@ -90,8 +81,8 @@ export default function ConfirmLinkExternalCalendar({provider}: {provider: OAuth
       </p>
       <ul>
         <li>Single sign-on with {capitalizedProvider}</li>
-        <li>See your {capitalizedProvider} calendar events when adding your availabilities</li>
-        <li>Synchronize your scheduled meetings with {capitalizedProvider} calendar</li>
+        <li>See your {calendarBrandName} calendar events when adding your availabilities</li>
+        <li>Synchronize your scheduled meetings with {calendarBrandName} calendar</li>
       </ul>
       {error && (
         <p className="text-danger text-center mb-0 mt-4">An error occurred: {getReqErrorMessage(error)}</p>

@@ -9,6 +9,7 @@ import OAuth2Service from './oauth2.service';
 import GoogleCalendarEvents from './google-calendar-events.entity';
 import GoogleCalendarCreatedEvent from './google-calendar-created-event.entity';
 import MicrosoftOAuth2 from './microsoft-oauth2.entity';
+import MicrosoftCalendarEvents from './microsoft-calendar-events.entity';
 
 @Module({
   imports: [
@@ -17,7 +18,7 @@ import MicrosoftOAuth2 from './microsoft-oauth2.entity';
     CustomJwtModule,
     TypeOrmModule.forFeature([
       GoogleOAuth2, GoogleCalendarEvents, GoogleCalendarCreatedEvent,
-      MicrosoftOAuth2,
+      MicrosoftOAuth2, MicrosoftCalendarEvents,
     ]),
   ],
   providers: [OAuth2Service],

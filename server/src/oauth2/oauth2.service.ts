@@ -11,16 +11,27 @@ import User from '../users/user.entity';
 import { assert, encodeQueryParams } from '../misc.utils';
 import { selectUserLeftJoinOAuth2Tables } from '../users/users.service';
 import type { OIDCResponse, DecodedIDToken, RefreshTokenResponse, GoogleListEventsResponse, GoogleListEventsResponseItem, GoogleInsertEventResponse } from './oauth2-response-types';
-import { toISOStringUTC, getSecondsSinceUnixEpoch, toISOStringWithTz } from '../dates.utils';
+import { toISOStringUTC, getSecondsSinceUnixEpoch } from '../dates.utils';
 import MeetingsService from '../meetings/meetings.service';
-import GoogleCalendarEvents, { GoogleCalendarEvent } from './google-calendar-events.entity';
+import GoogleCalendarEvents from './google-calendar-events.entity';
+import type { OAuth2CalendarEvent } from './oauth2-common';
 import GoogleCalendarCreatedEvent from './google-calendar-created-event.entity';
 import Meeting from '../meetings/meeting.entity';
-import { oidcScopes, oauth2Reasons, OAuth2ProviderType, oauth2ProviderTypes } from './oauth2-common';
+import {
+  oauth2Reasons,
+  OAuth2ProviderType,
+  oauth2ProviderTypes,
+  OAuth2ErrorResponseError,
+  OAuth2NotConfiguredError,
+  OAuth2NoRefreshTokenError,
+  OAuth2NotAllScopesGrantedError,
+  OAuth2AccountAlreadyLinkedError,
+} from './oauth2-common';
 import GoogleOAuth2Provider from './google-oauth2-provider';
 import MicrosoftOAuth2Provider from './microsoft-oauth2-provider';
 import AbstractOAuth2 from './abstract-oauth2.entity';
 import MicrosoftOAuth2 from './microsoft-oauth2.entity';
+import MicrosoftCalendarEvents from './microsoft-calendar-events.entity';
 
 // TODO: use truncated exponential backoff
 // See https://developers.google.com/calendar/api/guides/quota
@@ -28,6 +39,10 @@ import MicrosoftOAuth2 from './microsoft-oauth2.entity';
 const oauth2EntityClasses: Record<OAuth2ProviderType, typeof GoogleOAuth2 | typeof MicrosoftOAuth2> = {
   [OAuth2ProviderType.GOOGLE]: GoogleOAuth2,
   [OAuth2ProviderType.MICROSOFT]: MicrosoftOAuth2,
+};
+const calendarEventsEntityClasses: Record<OAuth2ProviderType, typeof GoogleCalendarEvents | typeof MicrosoftCalendarEvents> = {
+  [OAuth2ProviderType.GOOGLE]: GoogleCalendarEvents,
+  [OAuth2ProviderType.MICROSOFT]: MicrosoftCalendarEvents,
 };
 
 export enum OIDCLoginResultType {
@@ -68,22 +83,6 @@ export type OAuth2State = {
   // This is a nonce passed from the app server to the OIDC server.
   serverNonce?: string;
 };
-export class OAuth2NotConfiguredError extends Error {}
-export class OAuth2ErrorResponseError extends Error {
-  constructor(
-    public statusCode: number,
-    public errorCode?: string,
-  ) {
-    super();
-  }
-}
-// TODO: replace these with a single class and an enum argument
-export class OAuth2InvalidStateError extends Error {}
-export class OAuth2InvalidOrExpiredNonceError extends Error {}
-export class OAuth2NoRefreshTokenError extends Error {}
-export class OAuth2NotAllScopesGrantedError extends Error {}
-export class OAuth2AccountAlreadyLinkedError extends Error {}
-export class OAuth2AccountNotLinkedError extends Error {}
 
 export interface OAuth2Config {
   authzEndpoint: string;
@@ -125,11 +124,12 @@ export interface IOAuth2Provider {
   getPartialTokenFormParams(serverNonce?: string): Promise<PartialTokenFormParams>;
   getPartialRefreshParams(): Promise<PartialRefreshParams>;
   setLinkedCalendarToTrue(user: User): void;
+  getEventsForMeeting(userID: number, meeting: Meeting): Promise<OAuth2CalendarEvent[]>;
 }
 
+// TODO: delete this
 const GOOGLE_API_BASE_URL = 'https://www.googleapis.com';
 const GOOGLE_API_CALENDAR_EVENTS_BASE_URL = `${GOOGLE_API_BASE_URL}/calendar/v3/calendars/primary/events`;
-const MAX_EVENT_RESULTS = 100;
 
 function errorIsGoogleCalendarEventNoLongerExists(err: any): boolean {
   return err instanceof OAuth2ErrorResponseError
@@ -150,17 +150,17 @@ export default class OAuth2Service {
     configService: ConfigService<EnvironmentVariables, true>,
     private meetingsService: MeetingsService,
     private dataSource: DataSource,
-    // TODO: make these non members
+    @InjectRepository(User) private usersRepository: Repository<User>,
     @InjectRepository(GoogleOAuth2) private googleOAuth2Repository: Repository<GoogleOAuth2>,
-    @InjectRepository(GoogleCalendarEvents) private googleCalendarEventsRepository: Repository<GoogleCalendarEvents>,
+    @InjectRepository(GoogleCalendarEvents) googleCalendarEventsRepository: Repository<GoogleCalendarEvents>,
     @InjectRepository(GoogleCalendarCreatedEvent) private googleCalendarCreatedEventsRepository: Repository<GoogleCalendarCreatedEvent>,
     @InjectRepository(MicrosoftOAuth2) microsoftOAuth2Repository: Repository<MicrosoftOAuth2>,
-    @InjectRepository(User) private usersRepository: Repository<User>,
+    @InjectRepository(MicrosoftCalendarEvents) microsoftCalendarEventsRepository: Repository<MicrosoftCalendarEvents>,
   ) {
     this.publicURL = configService.get('PUBLIC_URL', {infer: true});
     this.oauth2Providers = {
-      [OAuth2ProviderType.GOOGLE]: new GoogleOAuth2Provider(configService),
-      [OAuth2ProviderType.MICROSOFT]: new MicrosoftOAuth2Provider(configService),
+      [OAuth2ProviderType.GOOGLE]: new GoogleOAuth2Provider(configService, this, googleCalendarEventsRepository, googleCalendarCreatedEventsRepository),
+      [OAuth2ProviderType.MICROSOFT]: new MicrosoftOAuth2Provider(configService, this, microsoftCalendarEventsRepository),
     };
     this.oauth2Repositories = {
       [OAuth2ProviderType.GOOGLE]: googleOAuth2Repository,
@@ -263,8 +263,7 @@ export default class OAuth2Service {
     return {data, decodedIDToken};
   }
 
-  private async google_refreshAccessToken(creds: GoogleOAuth2): Promise<GoogleOAuth2> {
-    const provider = this.oauth2Providers[OAuth2ProviderType.GOOGLE];
+  private async refreshAccessToken(provider: IOAuth2Provider, creds: AbstractOAuth2): Promise<AbstractOAuth2> {
     const partialParams = await provider.getPartialRefreshParams();
     const {tokenEndpoint} = provider.getStaticOAuth2Config();
     // See https://developers.google.com/identity/protocols/oauth2/web-server#offline
@@ -282,17 +281,18 @@ export default class OAuth2Service {
         headers: {'content-type': 'application/x-www-form-urlencoded'},
       });
     } catch (err: any) {
-      await this.google_deleteCredsIfErrorIsInvalidToken(err, creds);
+      await this.deleteCredsIfErrorIsInvalidToken(provider, err, creds);
       throw err;
     }
-    const partialCreds: Partial<GoogleOAuth2> = {
+    const partialCreds: Partial<AbstractOAuth2> = {
       AccessToken: data.access_token,
       AccessTokenExpiresAt: this.calculateTokenExpirationTime(data.expires_in),
     };
     if (data.refresh_token) {
       partialCreds.RefreshToken = data.refresh_token;
     }
-    await this.googleOAuth2Repository.update({UserID: creds.UserID}, partialCreds);
+    const oauth2Repository = this.oauth2Repositories[provider.type];
+    await oauth2Repository.update({UserID: creds.UserID}, partialCreds);
     return {...creds, ...partialCreds};
   }
 
@@ -470,22 +470,23 @@ export default class OAuth2Service {
     }
   }
 
-  private async google_refreshCredsIfNecessary(creds: GoogleOAuth2): Promise<GoogleOAuth2> {
+  private async refreshCredsIfNecessary(provider: IOAuth2Provider, creds: AbstractOAuth2): Promise<AbstractOAuth2> {
     if (creds.AccessTokenExpiresAt > getSecondsSinceUnixEpoch()) {
       return creds;
     }
-    return this.google_refreshAccessToken(creds);
+    return this.refreshAccessToken(provider, creds);
   }
 
-  private async google_getOrRefreshCreds(userID: number): Promise<GoogleOAuth2 | null> {
-    const creds = await this.googleOAuth2Repository.findOneBy({UserID: userID});
+  async getOrRefreshCreds(provider: IOAuth2Provider, userID: number): Promise<AbstractOAuth2 | null> {
+    const oauth2Repository = this.oauth2Repositories[provider.type];
+    const creds = await oauth2Repository.findOneBy({UserID: userID});
     if (!creds) {
       return null;
     }
-    return this.google_refreshCredsIfNecessary(creds);
+    return this.refreshCredsIfNecessary(provider, creds);
   }
 
-  private async google_deleteCredsIfErrorIsInvalidToken(err: any, creds: GoogleOAuth2) {
+  private async deleteCredsIfErrorIsInvalidToken(provider: IOAuth2Provider, err: any, creds: AbstractOAuth2) {
     if (
       err instanceof OAuth2ErrorResponseError
       && (
@@ -495,11 +496,12 @@ export default class OAuth2Service {
     ) {
       // Invalid authentication credentials. Assume that the user revoked access
       this.logger.warn(`Invalid credentials for userID=${creds.UserID}. Deleting all OAuth2 data.`);
-      await this.googleOAuth2Repository.delete(creds.UserID);
+      const oauth2Repository = this.oauth2Repositories[provider.type];
+      await oauth2Repository.delete(creds.UserID);
     }
   }
 
-  private async google_apiRequest<T>(creds: GoogleOAuth2, ...args: Parameters<typeof request>): Promise<T | null> {
+  async apiRequest<T>(provider: IOAuth2Provider, creds: AbstractOAuth2, ...args: Parameters<typeof request>): Promise<T | null> {
     const accessToken = creds.AccessToken;
     if (args.length < 2) {
       args.push({});
@@ -522,7 +524,7 @@ export default class OAuth2Service {
         return null;
       }
     } catch (err: any) {
-      await this.google_deleteCredsIfErrorIsInvalidToken(err, creds);
+      await this.deleteCredsIfErrorIsInvalidToken(provider, err, creds);
       throw err;
     }
   }
@@ -539,11 +541,10 @@ export default class OAuth2Service {
       // If they originally signed up via an OAuth2 provider, then we'll delete
       // the calendar data, but keep the OAuth2 token so that they can still sign in.
       const oauth2EntityClass = oauth2EntityClasses[providerType];
-      // FIXME: MicrosoftCalendarEvents
-      const oauth2CalendarEventsClass = GoogleCalendarEvents;
+      const calendarEventsEntityClass = calendarEventsEntityClasses[providerType];
       await this.dataSource.transaction(async manager => {
         await manager.update(oauth2EntityClass, {UserID: userID}, {LinkedCalendar: false});
-        await manager.delete(oauth2CalendarEventsClass, {UserID: userID});
+        await manager.delete(calendarEventsEntityClass, {UserID: userID});
       });
       return;
     }
@@ -557,8 +558,8 @@ export default class OAuth2Service {
         body: this.encodeFormQueryParams({token: creds.RefreshToken}),
         headers: {'content-type': 'application/x-www-form-urlencoded'},
       });
-      await oauth2Repository.delete(userID);
     }
+    await oauth2Repository.delete(userID);
   }
 
   async unlinkAllOAuth2Accounts(userID: number) {
@@ -572,151 +573,13 @@ export default class OAuth2Service {
     }
   }
 
-  private GoogleListEventsResponseItem_to_GoogleCalendarEvent(item: GoogleListEventsResponseItem): GoogleCalendarEvent {
-    return {
-      ID: item.id,
-      summary: item.summary,
-      start: toISOStringUTC(new Date(item.start.dateTime)),
-      end: toISOStringUTC(new Date(item.end.dateTime)),
-    };
-  }
-
-  private google_mergeResultsFromIncrementalSync(
-    events: GoogleCalendarEvent[],
-    newItems: GoogleListEventsResponseItem[]
-  ): GoogleCalendarEvent[] {
-    const eventsMap: Record<string, GoogleCalendarEvent> = {};
-    for (const event of events) {
-      eventsMap[event.ID] = event;
-    }
-    for (const item of newItems) {
-      // See https://developers.google.com/calendar/api/v3/reference/events#resource
-      if (item.status === 'cancelled') {
-        delete eventsMap[item.id];
-      } else {
-        // update or insert
-        eventsMap[item.id] = this.GoogleListEventsResponseItem_to_GoogleCalendarEvent(item);
-      }
-    }
-    return Object.values(eventsMap);
-  }
-
-  private async google_getEventsForMeetingUsingIncrementalSync(
-    creds: GoogleOAuth2,
+  async getEventsForMeeting(
+    providerType: OAuth2ProviderType,
     userID: number,
     meetingID: number,
-    google_apiTimeMin: string,
-    google_apiTimeMax: string,
-  ): Promise<{
-    events: GoogleCalendarEvent[],
-    nextSyncToken: string | null,
-    needToSaveEvents: boolean;
-  } | null> {
-    const existingEventsData = await this.googleCalendarEventsRepository.findOneBy({
-      UserID: userID, MeetingID: meetingID
-    });
-    if (
-      !existingEventsData
-      || !existingEventsData.SyncToken
-      || existingEventsData.PrevTimeMin !== google_apiTimeMin
-      || existingEventsData.PrevTimeMax !== google_apiTimeMax
-    ) {
-      return null;
-    }
-    const params = {syncToken: existingEventsData.SyncToken};
-    const url = GOOGLE_API_CALENDAR_EVENTS_BASE_URL + '?' + encodeQueryParams(params);
-    let response: GoogleListEventsResponse | undefined;
-    try {
-      response = await this.google_apiRequest<GoogleListEventsResponse>(creds, url);
-      this.logger.debug(response);
-    } catch (err: any) {
-      // See https://developers.google.com/calendar/api/guides/sync#full_sync_required_by_server
-      if (!(
-        err instanceof OAuth2ErrorResponseError
-        && (err as OAuth2ErrorResponseError).statusCode === 410
-      )) {
-        throw err;
-      }
-    }
-    // We don't want to perform pagination (for now)
-    if (!response || response.nextPageToken) {
-      return null;
-    }
-    const thereAreNewEvents = response.items.length > 0;
-    const existingEvents = existingEventsData.Events;
-    const events =
-      thereAreNewEvents
-      ? this.google_mergeResultsFromIncrementalSync(existingEvents, response.items)
-      : existingEvents;
-    return {
-      events,
-      nextSyncToken: response.nextSyncToken || null,
-      needToSaveEvents: thereAreNewEvents,
-    };
-  }
-
-  private async google_getEventsForMeetingUsingFullSync(
-    creds: GoogleOAuth2,
-    google_apiTimeMin: string,
-    google_apiTimeMax: string,
-  ): Promise<{
-    events: GoogleCalendarEvent[],
-    nextSyncToken: string | null,
-  } | null> {
-    // Make sure to NOT use orderBy, otherwise a syncToken won't be returned
-    const params: Record<string, string> = {
-      maxAttendees: '1',
-      maxResults: String(MAX_EVENT_RESULTS),
-      singleEvents: 'true',
-      timeMin: google_apiTimeMin,
-      timeMax: google_apiTimeMax,
-    };
-    const url = GOOGLE_API_CALENDAR_EVENTS_BASE_URL + '?' + encodeQueryParams(params);
-    const response = await this.google_apiRequest<GoogleListEventsResponse>(creds, url);
-    this.logger.debug(response);
-    const events = response.items.map(
-      item => this.GoogleListEventsResponseItem_to_GoogleCalendarEvent(item)
-    );
-    return {events, nextSyncToken: response.nextSyncToken || null};
-  }
-
-  async google_getEventsForMeeting(userID: number, meetingID: number): Promise<GoogleCalendarEvent[]> {
-    const creds = await this.google_getOrRefreshCreds(userID);
-    if (!creds || !creds.LinkedCalendar) {
-      return [];
-    }
+  ): Promise<OAuth2CalendarEvent[]> {
     const meeting = await this.meetingsService.getMeetingOrThrow(meetingID);
-    const tentativeDates = meeting.TentativeDates;
-    const minDate = tentativeDates.reduce((a, b) => a < b ? a : b);
-    const maxDate = tentativeDates.reduce((a, b) => a > b ? a : b);
-    const google_apiTimeMin = toISOStringWithTz(minDate, meeting.MinStartHour, meeting.Timezone);
-    const google_apiTimeMax = toISOStringWithTz(maxDate, meeting.MaxEndHour, meeting.Timezone);
-    let existingEventsData = await this.google_getEventsForMeetingUsingIncrementalSync(creds, userID, meetingID, google_apiTimeMin, google_apiTimeMax);
-    let events: GoogleCalendarEvent[];
-    let nextSyncToken: string | null = null;
-    let needToSaveEvents = true;
-    if (existingEventsData) {
-      ({events, nextSyncToken, needToSaveEvents} = existingEventsData);
-    } else {
-      const newEventsData = await this.google_getEventsForMeetingUsingFullSync(creds, google_apiTimeMin, google_apiTimeMax);
-      ({events, nextSyncToken} = newEventsData);
-    }
-    if (needToSaveEvents) {
-      await this.googleCalendarEventsRepository.save({
-        MeetingID: meetingID,
-        UserID: userID,
-        Events: events,
-        PrevTimeMin: google_apiTimeMin,
-        PrevTimeMax: google_apiTimeMax,
-        SyncToken: nextSyncToken,
-      });
-    }
-    // Filter out the event which we created for this meeting
-    const createdEvent = await this.googleCalendarCreatedEventsRepository.findOneBy({MeetingID: meetingID, UserID: userID});
-    if (createdEvent) {
-      events = events.filter(event => event.ID !== createdEvent.CreatedGoogleMeetingID);
-    }
-    return events;
+    return this.oauth2Providers[providerType].getEventsForMeeting(userID, meeting);
   }
 
   private getRespondentsLinkedWithGoogle(meetingID: number) {
@@ -764,7 +627,8 @@ export default class OAuth2Service {
     if (meeting.ScheduledStartDateTime === null || meeting.ScheduledEndDateTime === null) {
       return;
     }
-    creds = await this.google_refreshCredsIfNecessary(creds);
+    const provider = this.oauth2Providers[OAuth2ProviderType.GOOGLE];
+    creds = await this.refreshCredsIfNecessary(provider, creds) as GoogleOAuth2;
     const userID = creds.UserID;
     let apiURL = GOOGLE_API_CALENDAR_EVENTS_BASE_URL;
     let apiMethod: Dispatcher.HttpMethod = 'POST';
@@ -790,15 +654,15 @@ export default class OAuth2Service {
     const body = JSON.stringify(params);
     const headers = {'content-type': 'application/json'};
     try {
-      response = await this.google_apiRequest<GoogleInsertEventResponse>(
-        creds, apiURL, {method: apiMethod, body, headers}
+      response = await this.apiRequest<GoogleInsertEventResponse>(
+        provider, creds, apiURL, {method: apiMethod, body, headers}
       );
     } catch (err: any) {
       if (existingEvent && errorIsGoogleCalendarEventNoLongerExists(err)) {
         // It's possible that the user deleted the event themselves. Try to create
         // a new one instead.
-        response = await this.google_apiRequest<GoogleInsertEventResponse>(
-          creds, GOOGLE_API_CALENDAR_EVENTS_BASE_URL, {method: 'POST', body, headers}
+        response = await this.apiRequest<GoogleInsertEventResponse>(
+          provider, creds, GOOGLE_API_CALENDAR_EVENTS_BASE_URL, {method: 'POST', body, headers}
         );
       } else {
         throw err;
@@ -860,10 +724,11 @@ export default class OAuth2Service {
     if (!event) {
       return;
     }
-    creds = await this.google_refreshCredsIfNecessary(creds);
+    const provider = this.oauth2Providers[OAuth2ProviderType.GOOGLE];
+    creds = await this.refreshCredsIfNecessary(provider, creds) as GoogleOAuth2;
     const apiURL = `${GOOGLE_API_CALENDAR_EVENTS_BASE_URL}/${event.CreatedGoogleMeetingID}`;
     try {
-      await this.google_apiRequest(creds, apiURL, {method: 'DELETE'});
+      await this.apiRequest(provider, creds, apiURL, {method: 'DELETE'});
     } catch (err: any) {
       if (!errorIsGoogleCalendarEventNoLongerExists(err)) {
         throw err;

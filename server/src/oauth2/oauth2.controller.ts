@@ -23,11 +23,15 @@ import User from 'src/users/user.entity';
 import { UserToUserResponse } from 'src/users/users.controller';
 import UsersService from 'src/users/users.service';
 import ConfirmLinkAccountDto from './confirm-link-account.dto';
-import OAuth2Service, {
-  OIDCLoginResultType, OAuth2State, OAuth2NotConfiguredError,
-  OAuth2AccountAlreadyLinkedError, OAuth2NotAllScopesGrantedError,
-} from './oauth2.service';
-import { oauth2ProviderNamesMap, OAuth2ProviderType, oauth2Reasons } from './oauth2-common';
+import OAuth2Service, { OIDCLoginResultType, OAuth2State } from './oauth2.service';
+import {
+  oauth2ProviderNamesMap,
+  OAuth2ProviderType,
+  oauth2Reasons,
+  OAuth2NotConfiguredError,
+  OAuth2AccountAlreadyLinkedError,
+  OAuth2NotAllScopesGrantedError,
+} from './oauth2-common';
 import AbstractOAuth2 from './abstract-oauth2.entity';
 
 @ApiTags('externalCalendars')

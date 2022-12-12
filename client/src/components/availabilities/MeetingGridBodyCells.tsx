@@ -3,7 +3,7 @@ import { useAppSelector, useAppDispatch } from 'app/hooks';
 import type { PeopleDateTimes, Style } from 'common/types';
 import {
   useGetCurrentMeetingWithSelector,
-  useGetGoogleCalendarEventsIfTokenIsPresent,
+  useGetExternalCalendarEventsIfTokenIsPresent,
 } from 'utils/meetings.hooks';
 import {
   selectSelMode,
@@ -175,8 +175,9 @@ function MeetingGridBodyCells({
   const scheduleSet = useMemo(() => scheduledDateTimes || {}, [scheduledDateTimes]);
   const meetingID = useAppSelector(selectCurrentMeetingID);
   assert(meetingID !== undefined);
-  const {data: externalEvents} = useGetGoogleCalendarEventsIfTokenIsPresent(meetingID);
+  const externalEvents = useGetExternalCalendarEventsIfTokenIsPresent(meetingID);
   // Take the first event of each dateTime, and take the first dateTime of each event
+  // FIXME: show overlapping events side-by-side
   const dateTimesToExternalEventInfo = useMemo(() => {
     const result: {
       [dateTime: string]: {
@@ -187,7 +188,7 @@ function MeetingGridBodyCells({
     if (externalEvents === undefined) {
       return result;
     }
-    for (const {summary, startDateTime, endDateTime} of externalEvents.events) {
+    for (const {summary, startDateTime, endDateTime} of externalEvents) {
       const dateTimes = startAndEndDateTimeToDateTimesFlat(startDateTime, endDateTime);
       for (const dateTime of dateTimes) {
         result[dateTime] = {

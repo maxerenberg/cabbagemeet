@@ -2,6 +2,7 @@ import { Entity, ManyToOne, OneToMany } from 'typeorm';
 import { CustomJoinColumn } from '../custom-columns/custom-join-column';
 import User from '../users/user.entity';
 import AbstractOAuth2 from './abstract-oauth2.entity';
+import MicrosoftCalendarEvents from './microsoft-calendar-events.entity';
 
 // See https://learn.microsoft.com/en-us/azure/active-directory/develop/v2-protocols-oidc
 @Entity('MicrosoftOAuth2')
@@ -15,8 +16,8 @@ export default class MicrosoftOAuth2 extends AbstractOAuth2 {
   @CustomJoinColumn({name: 'UserID'})
   User: User;
 
-  // @OneToMany(() => GoogleCalendarEvents, event => event.GoogleOAuth2)
-  // Events: GoogleCalendarEvents[];
+  @OneToMany(() => MicrosoftCalendarEvents, event => event.MicrosoftOAuth2)
+  Events: MicrosoftCalendarEvents[];
 
   // @OneToMany(() => GoogleCalendarCreatedEvent, event => event.GoogleOAuth2)
   // CreatedEvents: GoogleCalendarCreatedEvent[];

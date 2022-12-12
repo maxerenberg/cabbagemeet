@@ -178,6 +178,15 @@ const injectedRtkApi = api.injectEndpoints({
         params: { meetingID: queryArg },
       }),
     }),
+    getMicrosoftCalendarEvents: build.query<
+      GetMicrosoftCalendarEventsApiResponse,
+      GetMicrosoftCalendarEventsApiArg
+    >({
+      query: (queryArg) => ({
+        url: `/api/me/microsoft-calendar-events`,
+        params: { meetingID: queryArg },
+      }),
+    }),
     createMeeting: build.mutation<
       CreateMeetingApiResponse,
       CreateMeetingApiArg
@@ -326,8 +335,11 @@ export type UnlinkMicrosoftCalendarApiResponse =
   /** status 200  */ UserResponse;
 export type UnlinkMicrosoftCalendarApiArg = void;
 export type GetGoogleCalendarEventsApiResponse =
-  /** status 200  */ GoogleCalendarEventsResponse;
+  /** status 200  */ OAuth2CalendarEventsResponse;
 export type GetGoogleCalendarEventsApiArg = number;
+export type GetMicrosoftCalendarEventsApiResponse =
+  /** status 200  */ OAuth2CalendarEventsResponse;
+export type GetMicrosoftCalendarEventsApiArg = number;
 export type CreateMeetingApiResponse = /** status 201  */ MeetingResponse;
 export type CreateMeetingApiArg = CreateMeetingDto;
 export type GetMeetingApiResponse = /** status 200  */ MeetingResponse;
@@ -458,13 +470,13 @@ export type MeetingsShortResponse = {
 export type LinkExternalCalendarDto = {
   post_redirect: string;
 };
-export type GoogleCalendarEventsResponseItem = {
+export type OAuth2CalendarEventsResponseItem = {
   summary: string;
   startDateTime: string;
   endDateTime: string;
 };
-export type GoogleCalendarEventsResponse = {
-  events: GoogleCalendarEventsResponseItem[];
+export type OAuth2CalendarEventsResponse = {
+  events: OAuth2CalendarEventsResponseItem[];
 };
 export type MeetingRespondent = {
   respondentID: number;
@@ -539,6 +551,7 @@ export const {
   useLinkMicrosoftCalendarMutation,
   useUnlinkMicrosoftCalendarMutation,
   useGetGoogleCalendarEventsQuery,
+  useGetMicrosoftCalendarEventsQuery,
   useCreateMeetingMutation,
   useGetMeetingQuery,
   useEditMeetingMutation,

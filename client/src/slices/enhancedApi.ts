@@ -1,4 +1,4 @@
-import type { AnyAction, SerializedError, ThunkDispatch } from '@reduxjs/toolkit';
+import type { AnyAction, ThunkDispatch } from '@reduxjs/toolkit';
 import type { MutationLifecycleApi, QueryLifecycleApi } from '@reduxjs/toolkit/dist/query/endpointDefinitions';
 import { removeToken, setToken } from './authentication';
 import { transformMeetingResponse, transformMeetingsShortResponse } from 'utils/response-transforms';
@@ -55,7 +55,13 @@ export const {
   useConfirmPasswordResetMutation,
 } = replacedApi;
 
-const allTags = ['createdMeetings', 'respondedMeetings', 'meeting', 'googleCalendarEvents'] as const;
+const allTags = [
+  'createdMeetings',
+  'respondedMeetings',
+  'meeting',
+  'googleCalendarEvents',
+  'microsoftCalendarEvents',
+] as const;
 
 export const enhancedApi = replacedApi.enhanceEndpoints({
   addTagTypes: allTags,
@@ -92,6 +98,12 @@ export const enhancedApi = replacedApi.enhanceEndpoints({
     unlinkGoogleCalendar: {
       onQueryStarted: (arg, api) => editUser_onQueryStarted(arg, api),
     },
+    confirmLinkMicrosoftAccount: {
+      onQueryStarted: (arg, api) => editUser_onQueryStarted(arg, api),
+    },
+    unlinkMicrosoftCalendar: {
+      onQueryStarted: (arg, api) => editUser_onQueryStarted(arg, api),
+    },
     getMeeting: {
       providesTags: (result, error, arg) => [{type: 'meeting', id: arg}],
     },
@@ -113,7 +125,11 @@ export const enhancedApi = replacedApi.enhanceEndpoints({
     },
     editMeeting: {
       invalidatesTags: (result, error, arg) =>
-        ['createdMeetings', 'respondedMeetings', {type: 'googleCalendarEvents', id: arg.id}],
+        [
+          'createdMeetings', 'respondedMeetings',
+          {type: 'googleCalendarEvents', id: arg.id},
+          {type: 'microsoftCalendarEvents', id: arg.id},
+        ],
       onQueryStarted: (arg, api) => upsertMeeting_onQueryStarted(arg, api),
     },
     deleteMeeting: {
@@ -136,6 +152,9 @@ export const enhancedApi = replacedApi.enhanceEndpoints({
     },
     getGoogleCalendarEvents: {
       providesTags: (result, error, arg) => [{type: 'googleCalendarEvents', id: arg}],
+    },
+    getMicrosoftCalendarEvents: {
+      providesTags: (result, error, arg) => [{type: 'microsoftCalendarEvents', id: arg}],
     },
   },
 });

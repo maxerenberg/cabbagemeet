@@ -1,9 +1,5 @@
 import { useSearchParams } from "react-router-dom";
-
-function capitalize(s: string): string {
-  s = s.toLowerCase();
-  return s.charAt(0).toUpperCase() + s.slice(1);
-}
+import { capitalize } from 'utils/misc.utils';
 
 function getOAuth2ErrorMessage(e: string, provider: string | null): string {
   provider = provider ?? 'Unknown';

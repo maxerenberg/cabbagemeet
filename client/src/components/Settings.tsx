@@ -7,7 +7,7 @@ import DeleteAccountModal from "./DeleteAccountModal";
 import {
   selectTokenIsPresent,
 } from "slices/authentication";
-import { assert } from "utils/misc.utils";
+import { assert, capitalize } from "utils/misc.utils";
 import { useToast } from "./Toast";
 import styles from './Settings.module.css';
 import GenericSpinner from "./GenericSpinner";
@@ -23,6 +23,7 @@ import {
 } from "slices/api";
 import ButtonWithSpinner from "./ButtonWithSpinner";
 import { useGetSelfInfoIfTokenIsPresent } from "utils/auth.hooks";
+import { calendarBrandNames, OAuth2Provider } from "utils/oauth2-common";
 
 export default function Settings() {
   const tokenIsPresent = useAppSelector(selectTokenIsPresent);
@@ -150,14 +151,13 @@ function LinkedAccounts() {
     <div>
       <h4>Linked Accounts</h4>
       <LinkedAccount
-        provider="Google"
+        provider="google"
         hasLinkedAccount={userInfo.hasLinkedGoogleAccount}
         useLinkCalendarMutation={useLinkGoogleCalendarMutation}
         useUnlinkCalendarMutation={useUnlinkGoogleCalendarMutation}
       />
       <LinkedAccount
-        provider="Microsoft"
-        calendarProductName="Outlook"
+        provider="microsoft"
         hasLinkedAccount={userInfo.hasLinkedMicrosoftAccount}
         useLinkCalendarMutation={useLinkMicrosoftCalendarMutation}
         useUnlinkCalendarMutation={useUnlinkMicrosoftCalendarMutation}
@@ -168,13 +168,11 @@ function LinkedAccounts() {
 
 function LinkedAccount({
   provider,
-  calendarProductName,
   hasLinkedAccount,
   useLinkCalendarMutation,
   useUnlinkCalendarMutation,
 }: {
-  provider: string,
-  calendarProductName?: string,
+  provider: OAuth2Provider,
   hasLinkedAccount: boolean,
   useLinkCalendarMutation: typeof useLinkGoogleCalendarMutation,
   useUnlinkCalendarMutation: typeof useUnlinkGoogleCalendarMutation,
@@ -197,21 +195,22 @@ function LinkedAccount({
     }
   ] = useMutationWithPersistentError(useLinkCalendarMutation);
   const {showToast} = useToast();
+  const capitalizedProvider = capitalize(provider);
   useEffect(() => {
     if (unlink_isSuccess) {
       showToast({
-        msg: `Successfully unlinked ${provider} account`,
+        msg: `Successfully unlinked ${capitalizedProvider} account`,
         msgType: 'success',
         autoClose: true,
       });
     }
-  }, [unlink_isSuccess, showToast]);
+  }, [unlink_isSuccess, showToast, capitalizedProvider]);
   useEffect(() => {
     if (link_isSuccess) {
       window.location.href = link_data!.redirect;
     }
   }, [link_data, link_isSuccess]);
-  calendarProductName = calendarProductName ?? provider;
+  const calendarProductName = calendarBrandNames[provider] ?? capitalizedProvider;
   const buttonVariant = hasLinkedAccount ? 'secondary' : 'primary';
   let onClick: React.MouseEventHandler<HTMLButtonElement> | undefined;
   if (hasLinkedAccount) {
@@ -241,11 +240,11 @@ function LinkedAccount({
         <p className="text-danger text-center mb-0 mt-3">An error occurred: {getReqErrorMessage(error)}</p>
       )}
       <p className="mt-4">
-        Link your {provider} account to view your {calendarProductName} calendar events
+        Link your {capitalizedProvider} account to view your {calendarProductName} calendar events
         when adding your availabilities.
       </p>
       <small>
-        Your {provider} profile information will only be used to create, read and update
+        Your {capitalizedProvider} profile information will only be used to create, read and update
         your {calendarProductName} calendar events.
       </small>
     </div>

@@ -1,7 +1,7 @@
-import { BadRequestException, Body, Controller, Delete, Get, HttpCode, HttpException, HttpStatus, NotFoundException, ParseIntPipe, Patch, Post, Query, Redirect, UseGuards } from '@nestjs/common';
+import { BadRequestException, Body, Controller, Delete, Get, HttpCode, HttpStatus, NotFoundException, ParseIntPipe, Patch, Post, Query, Redirect, UseGuards } from '@nestjs/common';
 import { ModuleRef } from '@nestjs/core';
 import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags, ApiUnauthorizedResponse } from '@nestjs/swagger';
-import { GoogleCalendarEvent } from '../oauth2/google-calendar-events.entity';
+import type { OAuth2CalendarEvent } from '../oauth2/oauth2-common';
 import { AuthUser } from '../auth/auth-user.decorator';
 import JwtAuthGuard from '../auth/jwt-auth.guard';
 import {
@@ -11,10 +11,10 @@ import {
 } from '../common-responses';
 import { meetingToMeetingShortResponse } from '../meetings/meetings.controller';
 import MeetingsService, { NoSuchMeetingError } from '../meetings/meetings.service';
-import OAuth2Service, { OAuth2NotConfiguredError } from '../oauth2/oauth2.service';
-import { OAuth2ProviderType } from '../oauth2/oauth2-common';
+import OAuth2Service from '../oauth2/oauth2.service';
+import { OAuth2ProviderType, OAuth2NotConfiguredError } from '../oauth2/oauth2-common';
 import EditUserDto from './edit-user.dto';
-import GoogleCalendarEventsResponse from './google-calendar-events.response';
+import OAuth2CalendarEventsResponse from './oauth2-calendar-events.response';
 import LinkExternalCalendarDto from './link-external-calendar.dto';
 import { MeetingsShortResponse } from '../meetings/meeting-short-response';
 import UserResponse from './user-response';
@@ -215,22 +215,14 @@ export class UsersController {
     return this.unlinkCalendar(OAuth2ProviderType.MICROSOFT, user);
   }
 
-  @ApiOperation({
-    summary: 'Get Google calendar events',
-    description: (
-      'Get a list of Google calendar events whose dates overlap with'
-      + ' the tentative dates of a meeting'
-    ),
-    operationId: 'getGoogleCalendarEvents',
-  })
-  @Get('google-calendar-events')
-  async getGoogleCalendarEvents(
-    @AuthUser() user: User,
-    @Query('meetingID', ParseIntPipe) meetingID: number,
-  ): Promise<GoogleCalendarEventsResponse> {
-    let events: GoogleCalendarEvent[];
+  private async getOAuth2CalendarEvents(
+    providerType: OAuth2ProviderType,
+    user: User,
+    meetingID: number,
+  ): Promise<OAuth2CalendarEventsResponse> {
+    let events: OAuth2CalendarEvent[];
     try {
-      events = await this.oauth2Service.google_getEventsForMeeting(user.ID, meetingID);
+      events = await this.oauth2Service.getEventsForMeeting(providerType, user.ID, meetingID);
     } catch (err: any) {
       if (err instanceof NoSuchMeetingError) {
         throw new NotFoundException();
@@ -244,5 +236,37 @@ export class UsersController {
         endDateTime: event.end,
       }))
     };
+  }
+
+  @ApiOperation({
+    summary: 'Get Google calendar events',
+    description: (
+      'Get a list of Google calendar events whose dates overlap with'
+      + ' the tentative dates of a meeting'
+    ),
+    operationId: 'getGoogleCalendarEvents',
+  })
+  @Get('google-calendar-events')
+  getGoogleCalendarEvents(
+    @AuthUser() user: User,
+    @Query('meetingID', ParseIntPipe) meetingID: number,
+  ): Promise<OAuth2CalendarEventsResponse> {
+    return this.getOAuth2CalendarEvents(OAuth2ProviderType.GOOGLE, user, meetingID);
+  }
+
+  @ApiOperation({
+    summary: 'Get Microsoft calendar events',
+    description: (
+      'Get a list of Outlook calendar events whose dates overlap with'
+      + ' the tentative dates of a meeting'
+    ),
+    operationId: 'getMicrosoftCalendarEvents',
+  })
+  @Get('microsoft-calendar-events')
+  getMicrosoftCalendarEvents(
+    @AuthUser() user: User,
+    @Query('meetingID', ParseIntPipe) meetingID: number,
+  ): Promise<OAuth2CalendarEventsResponse> {
+    return this.getOAuth2CalendarEvents(OAuth2ProviderType.MICROSOFT, user, meetingID);
   }
 }

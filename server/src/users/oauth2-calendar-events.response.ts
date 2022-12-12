@@ -1,6 +1,6 @@
 import { ApiProperty } from "@nestjs/swagger";
 
-class GoogleCalendarEventsResponseItem {
+class OAuth2CalendarEventsResponseItem {
   @ApiProperty({example: 'Meeting with Joe'})
   summary: string;
 
@@ -11,7 +11,7 @@ class GoogleCalendarEventsResponseItem {
   endDateTime: string;
 }
 
-export default class GoogleCalendarEventsResponse {
-  @ApiProperty({type: () => GoogleCalendarEventsResponseItem, isArray: true})
-  events: GoogleCalendarEventsResponseItem[];
+export default class OAuth2CalendarEventsResponse {
+  @ApiProperty({type: () => OAuth2CalendarEventsResponseItem, isArray: true})
+  events: OAuth2CalendarEventsResponseItem[];
 }

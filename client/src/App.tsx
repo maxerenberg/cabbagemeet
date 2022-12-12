@@ -49,6 +49,7 @@ export default function App() {
             <Route path="signup" element={<Signup />} />
             <Route path="login" element={<Login />} />
             <Route path="confirm-link-google-account" element={<ConfirmLinkExternalCalendar provider="google" />} />
+            <Route path="confirm-link-microsoft-account" element={<ConfirmLinkExternalCalendar provider="microsoft" />} />
             <Route path="forgot-password" element={<ForgotPassword />} />
             <Route path="confirm-password-reset" element={<ConfirmPasswordReset />} />
             <Route path="error" element={<ErrorPage />} />

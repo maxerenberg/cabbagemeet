@@ -63,3 +63,29 @@ export interface GoogleListEventsResponse {
 }
 
 export type GoogleInsertEventResponse = GoogleListEventsResponseItem;
+
+// See https://learn.microsoft.com/en-us/graph/api/event-delta?view=graph-rest-1.0&tabs=http
+export interface MicrosoftEventDeltaResponse {
+  '@odata.nextLink'?: string;
+  '@odata.deltaLink'?: string;
+  value: {
+    // Properties in which we are not interested have been omitted
+    id: string;
+    // See https://learn.microsoft.com/en-us/graph/delta-query-overview?tabs=http#resource-representation-in-the-delta-query-response
+    '@removed'?: {reason: 'changed' | 'deleted'};
+    // The following properties are optional because update instances will only
+    // have at least the properties which have changed
+    // See https://learn.microsoft.com/en-us/graph/delta-query-overview?tabs=http#resource-representation-in-the-delta-query-response
+    subject?: string;
+    isCancelled?: boolean;
+    // See https://learn.microsoft.com/en-us/graph/api/resources/datetimetimezone?view=graph-rest-1.0
+    start?: {
+      dateTime: string;  // e.g. "2023-04-01T18:00:00.0000000"
+      timeZone: string;  // e.g. "UTC"
+    };
+    end?: {
+      dateTime: string;  // e.g. "2023-04-01T18:00:00.0000000"
+      timeZone: string;  // e.g. "UTC"
+    };
+  }[];
+}

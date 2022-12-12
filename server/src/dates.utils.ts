@@ -43,6 +43,22 @@ export function toISOStringUTC(date: Date): string {
   return `${YYYY}-${MM}-${DD}T${HH}:${mm}:${ss}Z`;
 }
 
+export function toISOStringUTCFromDateTimeStrAndTz(dateTimeStr: string, tz: string): string {
+  const date = DateTime.fromISO(dateTimeStr, { zone: tz }).toJSDate();
+  return toISOStringUTC(date);
+}
+
+export function toISOStringUTCFromDateStrAndHourAndTz(dateStr: string, hourDecimal: number, ianaTz: string): string {
+  const [year, month, day] = getYearMonthDayFromDateString(dateStr);
+  const hour = Math.floor(hourDecimal);
+  const minute = Math.floor((hourDecimal - hour) * 60);
+  const date = DateTime.fromObject(
+    {year, month, day, hour, minute},
+    {zone: ianaTz}
+  ).toJSDate();
+  return toISOStringUTC(date);
+}
+
 /**
  * Returns the year, month and day in a date string
  * @param date a date string in YYYY-MM-DD format
@@ -50,22 +66,4 @@ export function toISOStringUTC(date: Date): string {
  */
  export function getYearMonthDayFromDateString(date: string): [number, number, number] {
   return date.split('-').map(s => parseInt(s)) as [number, number, number];
-}
-
-export function toISOStringWithTz(dateStr: string, hourDecimal: number, ianaTz: string): string {
-  const [year, month, day] = getYearMonthDayFromDateString(dateStr);
-  const hour = Math.floor(hourDecimal);
-  const minute = Math.floor((hourDecimal - hour) * 60);
-  return DateTime.fromObject(
-    {
-      year,
-      month,
-      day,
-      hour,
-      minute,
-    },
-    {
-      zone: ianaTz
-    }
-  ).toISO();
 }
