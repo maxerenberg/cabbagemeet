@@ -23,6 +23,7 @@ import { flatGridCoords } from 'utils/arrays.utils';
 import { addDaysToDateString, customToISOString, startAndEndDateTimeToDateTimesFlat } from 'utils/dates.utils';
 import { assert, assertIsNever } from 'utils/misc.utils';
 import { selectCurrentMeetingID } from 'slices/currentMeeting';
+import type { OAuth2CalendarEventsResponseItem } from 'slices/api';
 
 // TODO: deal with decimal start/end times
 
@@ -128,6 +129,80 @@ function useMouseupListener(dateTimes: string[][]) {
   }, [mouseState, selMode.type, dispatch, dateTimes]);
 }
 
+type ExternalEventInfoWithColStart = OAuth2CalendarEventsResponseItem & {
+  colStart: number;  // starts from 1 (like grid-column-start)
+};
+function calculateExternalEventInfoColumns(externalEvents: OAuth2CalendarEventsResponseItem[]): {
+  [dateTime: string]: ExternalEventInfoWithColStart[]
+} {
+// A single cell (i.e. 30-minute interval) can have multiple external events
+    // inside it. We want to show them side-by-side.
+    const result: {
+      [dateTime: string]: ExternalEventInfoWithColStart[]
+    } = {};
+    if (externalEvents === undefined) {
+      return result;
+    }
+    // Since we want overlapping events to be shown side-by-side, each cell must
+    // be subdivided into columns. Note that a cell might have e.g. the first column
+    // empty but the second column full, if we have two events like this:
+    // +--+
+    // |  | +--+
+    // |  | |  |
+    // +--+ |  |
+    //      +--+
+    // Note that the row at the bottom needs to have the second event in the second
+    // column, even though it doesn't overlap with the first event.
+    const maxColStartPerCell: {
+      [dateTime: string]: number;
+    } =  {};
+    for (const externalEvent of externalEvents) {
+      // Note that startDateTime might not be aligned on a multiple of 30 minutes
+      const {startDateTime, endDateTime} = externalEvent;
+      const dateTimes = startAndEndDateTimeToDateTimesFlat(startDateTime, endDateTime);
+      // dateTimes[0] is aligned on a multiple of 30 minutes
+      let maxColStart = 0;
+      for (const dateTime of dateTimes) {
+        if (maxColStartPerCell[dateTime] !== undefined) {
+          maxColStart = Math.max(maxColStart, maxColStartPerCell[dateTime]);
+        }
+      }
+      if (result[dateTimes[0]] === undefined) {
+        result[dateTimes[0]] = [];
+      }
+      const colStart = maxColStart + 1;
+      result[dateTimes[0]].push({...externalEvent, colStart});
+      for (const dateTime of dateTimes) {
+        maxColStartPerCell[dateTime] = colStart;
+      }
+    }
+    return result;
+}
+
+function calculateDateTimeGrid(numRows: number, numCols: number, dateStrings: string[], startHour: number): string[][] {
+  const rows: string[][] = [];
+  for (let rowIdx = 0; rowIdx < numRows; rowIdx++) {
+    const row: string[] = [];
+    const hour = (startHour + Math.floor(rowIdx / 2)) % 24;
+    for (let colIdx = 0; colIdx < numCols; colIdx++) {
+      let date = dateStrings[colIdx];
+      if (hour < startHour) {
+        // This can happen if [startTime, endTime) spans midnight, e.g.
+        // 10 P.M. to 2 A.M.
+        date = addDaysToDateString(date, 1);
+      }
+      const dateTime = customToISOString(
+        date,
+        hour,
+        rowIdx % 2 === 0 ? 0 : 30
+      );
+      row.push(dateTime);
+    }
+    rows.push(row);
+  }
+  return rows;
+}
+
 function MeetingGridBodyCells({
   numRows, numCols, startHour, dateStrings,
 }: {
@@ -149,56 +224,21 @@ function MeetingGridBodyCells({
     return createDateTimePeople(availabilities);
   }, [respondents]);
   const gridCoords = useMemo(() => flatGridCoords(numRows, numCols), [numRows, numCols]);
-  const dateTimes = useMemo((): string[][] => {
-    const rows: string[][] = [];
-    for (let rowIdx = 0; rowIdx < numRows; rowIdx++) {
-      const row: string[] = [];
-      const hour = (startHour + Math.floor(rowIdx / 2)) % 24;
-      for (let colIdx = 0; colIdx < numCols; colIdx++) {
-        let date = dateStrings[colIdx];
-        if (hour < startHour) {
-          // This can happen if [startTime, endTime) spans midnight, e.g.
-          // 10 P.M. to 2 A.M.
-          date = addDaysToDateString(date, 1);
-        }
-        const dateTime = customToISOString(
-          date,
-          hour,
-          rowIdx % 2 === 0 ? 0 : 30
-        );
-        row.push(dateTime);
-      }
-      rows.push(row);
-    }
-    return rows;
-  }, [numRows, numCols, dateStrings, startHour]);
+  const dateTimes = useMemo(
+    () => calculateDateTimeGrid(numRows, numCols, dateStrings, startHour),
+    [numRows, numCols, dateStrings, startHour]
+  );
   const scheduleSet = useMemo(() => scheduledDateTimes || {}, [scheduledDateTimes]);
   const meetingID = useAppSelector(selectCurrentMeetingID);
   assert(meetingID !== undefined);
   const externalEvents = useGetExternalCalendarEventsIfTokenIsPresent(meetingID);
-  // Take the first event of each dateTime, and take the first dateTime of each event
   // FIXME: show overlapping events side-by-side
-  const dateTimesToExternalEventInfo = useMemo(() => {
-    const result: {
-      [dateTime: string]: {
-        eventName: string;
-        isStartOfEvent: boolean;
-      }
-    } = {};
-    if (externalEvents === undefined) {
-      return result;
-    }
-    for (const {summary, startDateTime, endDateTime} of externalEvents) {
-      const dateTimes = startAndEndDateTimeToDateTimesFlat(startDateTime, endDateTime);
-      for (const dateTime of dateTimes) {
-        result[dateTime] = {
-          eventName: summary,
-          isStartOfEvent: dateTime === startDateTime
-        };
-      }
-    }
-    return result;
-  }, [externalEvents]);
+  const dateTimesToExternalEventInfo = useMemo(
+    () => calculateExternalEventInfoColumns(externalEvents),
+    [externalEvents]
+  );
+  // Use singleton to avoid re-renders
+  const emptyArrayOfExternalEventInfo: ExternalEventInfoWithColStart[] = useMemo(() => [], []);
   const earliestScheduledDateTime = useMemo(() => {
     const dateTimes = Object.keys(scheduleSet);
     return dateTimes.length > 0 ? dateTimes.sort()[0] : null;
@@ -214,8 +254,7 @@ function MeetingGridBodyCells({
           const dateTime = dateTimes[rowIdx][colIdx];
           const isScheduled = scheduleSet[dateTime];
           const isEarliestScheduled = dateTime === earliestScheduledDateTime;
-          const externalEventName = dateTimesToExternalEventInfo[dateTime]?.eventName;
-          const isFirstDateTimeOfExternalEvent = dateTimesToExternalEventInfo[dateTime]?.isStartOfEvent ?? false;
+          const externalEvents = dateTimesToExternalEventInfo[dateTime] || emptyArrayOfExternalEventInfo;
           const hoverUserIsAvailableAtThisTime = somebodyIsHovered && respondents[hoverUser].availabilities[dateTime];
           const selectedUserIsAvailableAtThisTime =
             selMode.type === 'selectedUser'
@@ -229,8 +268,7 @@ function MeetingGridBodyCells({
               dateTime,
               isScheduled,
               isEarliestScheduled,
-              externalEventName,
-              isFirstDateTimeOfExternalEvent,
+              externalEvents,
               somebodyIsHovered,
               hoverUserIsAvailableAtThisTime,
               selectedUserIsAvailableAtThisTime,
@@ -245,6 +283,28 @@ function MeetingGridBodyCells({
 }
 export default React.memo(MeetingGridBodyCells);
 
+// The number of seconds which a single cell represents
+const SECONDS_IN_THIRTY_MINUTES = 30 * 60;
+// Calculates the top offset and height of an external event box in a cell,
+// in fractions of the height of a single cell
+function calculateTopOffsetAndHeightOfExternalEventBox(
+  cellStartTime: string, eventStartTime: string, eventEndTime: string,
+): {
+  topOffset: number;
+  height: number;
+} {
+  const cellStartTimeEpochSeconds = new Date(cellStartTime).getTime() / 1000;
+  const eventStartTimeEpochSeconds = new Date(eventStartTime).getTime() / 1000;
+  const eventEndTimeEpochSeconds = new Date(eventEndTime).getTime() / 1000;
+  assert(Number.isInteger(cellStartTimeEpochSeconds));
+  assert(Number.isInteger(eventStartTimeEpochSeconds));
+  assert(Number.isInteger(eventEndTimeEpochSeconds));
+  assert(eventStartTimeEpochSeconds >= cellStartTimeEpochSeconds);
+  const topOffset = (eventStartTimeEpochSeconds - cellStartTimeEpochSeconds) / SECONDS_IN_THIRTY_MINUTES;
+  const height = (eventEndTimeEpochSeconds - eventStartTimeEpochSeconds) / SECONDS_IN_THIRTY_MINUTES;
+  return {topOffset, height};
+}
+
 const Cell = React.memo(function Cell({
   rowIdx,
   colIdx,
@@ -252,8 +312,7 @@ const Cell = React.memo(function Cell({
   dateTime,
   isScheduled,
   isEarliestScheduled,
-  externalEventName,
-  isFirstDateTimeOfExternalEvent,
+  externalEvents,
   somebodyIsHovered,
   hoverUserIsAvailableAtThisTime,
   selectedUserIsAvailableAtThisTime,
@@ -266,8 +325,7 @@ const Cell = React.memo(function Cell({
   dateTime: string,
   isScheduled: boolean,
   isEarliestScheduled: boolean,
-  externalEventName: string | undefined,
-  isFirstDateTimeOfExternalEvent: boolean,
+  externalEvents: ExternalEventInfoWithColStart[],
   somebodyIsHovered: boolean,
   hoverUserIsAvailableAtThisTime: boolean,
   selectedUserIsAvailableAtThisTime: boolean,
@@ -303,56 +361,72 @@ const Cell = React.memo(function Cell({
   if (rowIdx === 0) classNames.push('weeklyview__bodycell_firstrow');
   if (colIdx === 0) classNames.push('weeklyview__bodycell_firstcol');
   if (rowIdx % 2 === 1) classNames.push('weeklyview__bodycell_oddrow');
-  const className = classNames.join(' ');
 
   const style: Style = {gridArea: `c${cellIdx}`};
-  let rgb: string | undefined;
-  let alpha = '100%';
+  let showRespondentsProportion = false;
   if (selMode.type === 'addingRespondent' || selMode.type === 'editingRespondent') {
     if (
       (isInMouseSelectionArea && mouseSelectionAreaIsAddingDateTimes)
       || (!isInMouseSelectionArea && isSelected)
     ) {
-      rgb = 'var(--custom-primary-rgb)';
+      classNames.push('selected');
     }
   } else if (selMode.type === 'editingSchedule') {
     if (isInMouseSelectionColumn || isSelected) {
-      rgb = 'var(--custom-scheduled-cell-rgb)';
+      classNames.push('selected');
     } else if (numPeopleAvailableAtThisTime > 0) {
-      rgb = 'var(--custom-primary-rgb)';
-      alpha = Math.round(100 * (0.2 + 0.8 * (numPeopleAvailableAtThisTime / totalPeople))) + '%';
+      showRespondentsProportion = true;
     }
   } else if (selMode.type === 'selectedUser') {
     if (selectedUserIsAvailableAtThisTime) {
-      rgb = 'var(--custom-primary-rgb)';
+      classNames.push('selected');
     }
   } else if (selMode.type === 'none') {
     if (somebodyIsHovered) {
       if (hoverUserIsAvailableAtThisTime) {
-        rgb = 'var(--custom-primary-rgb)';
+        classNames.push('selected');
       }
     } else if (numPeopleAvailableAtThisTime > 0) {
-      rgb = 'var(--custom-primary-rgb)';
-      alpha = Math.round(100 * (0.2 + 0.8 * (numPeopleAvailableAtThisTime / totalPeople))) + '%';
+      showRespondentsProportion = true;
     }
   } else {
     assertIsNever(selMode);
   }
+  if (showRespondentsProportion) {
+    const rgb = 'var(--custom-primary-rgb)';
+    const alpha = Math.round(100 * (0.2 + 0.8 * (numPeopleAvailableAtThisTime / totalPeople))) + '%';
+    style.backgroundColor = `rgba(${rgb}, ${alpha})`;
+  }
 
-  let externalEventBox: ReactElement<HTMLDivElement> | undefined;
+  let externalEventBoxes: ReactElement<HTMLDivElement>[] | undefined;
   if (
-    (
-      selMode.type === 'addingRespondent'
-      || selMode.type === 'editingRespondent'
-    )
-    && externalEventName !== undefined
+    // FIXME: don't show external events if editing someone else
+    (selMode.type === 'addingRespondent' || selMode.type === 'editingRespondent')
+    && externalEvents.length > 0
     //&& !meetingIsScheduled
   ) {
-    externalEventBox = (
-      <div className="weeklyview__bodycell_external_event">
-        {isFirstDateTimeOfExternalEvent && externalEventName}
-      </div>
-    );
+    classNames.push('position-relative', 'd-grid');
+    const numExternalEventCols = Math.max(...externalEvents.map(e => e.colStart));
+    style.gridTemplateColumns = `repeat(${numExternalEventCols}, 1fr)`;
+    externalEventBoxes = externalEvents.map((externalEvent, i) => {
+      const {topOffset, height} = calculateTopOffsetAndHeightOfExternalEventBox(dateTime, externalEvent.startDateTime, externalEvent.endDateTime);
+      const topPercent = Math.floor(topOffset * 100) + '%';
+      const heightPercent = Math.floor(height * 100) + '%';
+      return (
+        <div
+          key={i}
+          className="position-absolute weeklyview__bodycell_external_event"
+          style={{
+            top: topPercent,
+            height: heightPercent,
+            gridColumnStart: externalEvent.colStart,
+            gridColumnEnd: externalEvent.colStart + 1,
+          }}
+        >
+          <span className="weeklyview__bodycell_external_event_text">{externalEvent.summary}</span>
+        </div>
+      );
+    });
   }
 
   let scheduledTimeBox: ReactElement<HTMLDivElement> | undefined;
@@ -362,14 +436,13 @@ const Cell = React.memo(function Cell({
   ) {
     scheduledTimeBox = (
       <div className="weeklyview__bodycell_scheduled_inner">
-        {isEarliestScheduled && 'SCHEDULED'}
+        {isEarliestScheduled && (
+          <span className="weeklyview__bodycell_scheduled_inner_text">SCHEDULED</span>
+        )}
       </div>
     );
   }
 
-  if (rgb !== undefined) {
-    style.backgroundColor = `rgba(${rgb}, ${alpha})`;
-  }
   let onMouseEnter: React.MouseEventHandler | undefined;
   let onMouseLeave: React.MouseEventHandler | undefined;
   let onMouseDown: React.MouseEventHandler | undefined;
@@ -402,7 +475,7 @@ const Cell = React.memo(function Cell({
   }
   return (
     <div
-      className={className}
+      className={classNames.join(' ')}
       style={style}
       onMouseEnter={onMouseEnter}
       onMouseLeave={onMouseLeave}
@@ -410,7 +483,7 @@ const Cell = React.memo(function Cell({
     >
       {/* at most one of these will be shown */}
       {scheduledTimeBox}
-      {externalEventBox}
+      {externalEventBoxes}
     </div>
   );
 });

@@ -34,9 +34,19 @@
   border-bottom: 1px solid lightgray;
 }
 
+.weeklyview__bodycell.selected {
+  background-color: rgba(var(--custom-primary-rgb), 80%);
+}
+
 .weeklyview__bodycell:hover {
   cursor: pointer;
-  border: 2px dashed black;
+  /*
+    This was causing the external event boxes to change position every
+    time the user hovers over a box. If we really want a border on hover,
+    we'll need to create a separate div on top of the cell to avoid
+    pushing the cell's content down.
+  */
+  /* border: 2px dashed black; */
 }
 
 .weeklyview__bodycell_scheduled_inner {
@@ -49,16 +59,25 @@
 
 .weeklyview__bodycell_external_event {
   width: 100%;
+  border-radius: 6px;
   /* TODO: choose a text color with good contrast */
   background-color: rgba(var(--custom-scheduled-cell-rgb), 70%);
 }
 
 .weeklyview__bodycell_scheduled_inner,
 .weeklyview__bodycell_external_event {
-  height: 100%;
   overflow: hidden;
   padding-left: 0.7em;
+  pointer-events: none;
+}
+
+.weeklyview__bodycell_scheduled_inner_text,
+.weeklyview__bodycell_external_event_text {
   font-size: 0.7em;
+}
+
+.weeklyview__bodycell_scheduled_inner {
+  height: 100%;
   display: flex;
   align-items: center;
 }

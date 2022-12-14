@@ -129,7 +129,6 @@ export default function WeeklyViewTimePicker() {
       <div className="d-md-flex mt-3 mt-md-5">
         <div
           style={{
-            flexGrow: 1,
             display: 'grid',
             /* Column order: left arrow, hours, schedule grid, right arrow */
             gridTemplateColumns: `auto auto repeat(${numDaysDisplayed}, minmax(3em, 1fr)) auto`,
@@ -137,7 +136,7 @@ export default function WeeklyViewTimePicker() {
             gridTemplateRows: `auto auto repeat(${numRows}, 1.75em)`,
             gridTemplateAreas,
           }}
-          className="weeklyview-grid"
+          className="flex-md-grow-1 weeklyview-grid"
         >
           <MeetingGridMonthTextCell dateStrings={datesDisplayed} />
           <MeetingGridDayOfWeekCells dateStrings={datesDisplayed} />

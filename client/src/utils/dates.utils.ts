@@ -193,6 +193,8 @@ export function convertOtherTzToLocal(
  * Returns a sorted array of the starting times of the 30-minute intervals between
  * [startDateTime, endDateTime).
  *
+ * WARNING: startDateTime will be rounded down to the start of the closest 30-minute interval
+ *
  * e.g. startAndEndDateTimeToDateTimesFlat('2022-10-10T14:00:00Z', '2022-10-10T15:30:00Z')
  *      => ['2022-10-10T14:00:00Z', '2022-10-10T14:30:00Z', '2022-10-10T15:00:00Z']
  * @param startDateTime YYYY-MM-DDTHH:mm:ssZ
@@ -200,8 +202,18 @@ export function convertOtherTzToLocal(
  */
  export function startAndEndDateTimeToDateTimesFlat(startDateTime: string, endDateTime: string): string[] {
   assert(startDateTime <= endDateTime);
+  const date = new Date(startDateTime);
+  if (date.getUTCMinutes() > 30) {
+    date.setUTCMinutes(30);
+  } else if (0 < date.getUTCMinutes() && date.getUTCMinutes() < 30) {
+    date.setUTCMinutes(0);
+  }
   const result: string[] = [];
-  for (let dateTime = startDateTime; dateTime < endDateTime; dateTime = addMinutesToDateTimeString(dateTime, 30)) {
+  for (
+    let dateTime = customToISOString(date);
+    dateTime < endDateTime;
+    date.setUTCMinutes(date.getUTCMinutes() + 30), dateTime = customToISOString(date)
+  ) {
     result.push(dateTime);
   }
   return result;
@@ -212,9 +224,9 @@ export function convertOtherTzToLocal(
  * @param month the month index. Must be in [0, 12)
  * @param uppercase whether the returned value should be upper case (default: true)
  */
-export function getMonthAbbr(monthIdx: number, uppercase?: boolean): string {
+export function getMonthAbbr(monthIdx: number, uppercase: boolean = true): string {
   const abbr = months[monthIdx].substring(0, 3);
-  return uppercase === false ? abbr : abbr.toUpperCase();
+  return uppercase ? abbr : abbr.toUpperCase();
 }
 
 /**
