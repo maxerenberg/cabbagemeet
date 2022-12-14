@@ -64,7 +64,7 @@ export default function Meeting() {
     return <EditMeeting setIsEditing={setIsEditingMeeting} />;
   }
   return (
-    <div className="meeting-container">
+    <div className="flex-grow-1">
       <MeetingTitleRow setIsEditingMeeting={setIsEditingMeeting} />
       <MeetingAboutRow />
       <hr className="my-4 my-md-5" />

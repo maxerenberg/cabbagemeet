@@ -1,7 +1,3 @@
-.meeting-container {
-  flex-grow: 1;
-}
-
 /* media-breakpoint-up(md) */
 @media (min-width: 768px) {
   .meeting-avl-button {
@@ -18,10 +14,39 @@
 
 .weeklyview__bodycell {
   user-select: none;
-  border-right: 1px solid lightgray;
   text-align: left;
+  position: relative;
 }
 
+/*
+  We don't want the grid lines to strike through the selected
+  areas (which are coloured), since we want those to appear
+  contiguous. Since we can't apply a z-index to borders, we
+  create a pseudo-element with a lower z-index, so that the
+  background-color of the real element appears on top of its
+  border.
+  Solution adapted from https://stackoverflow.com/a/28897204.
+*/
+.weeklyview__bodycell::after,
+.weeklyview__bodycell_oddrow::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  z-index: -1;
+  border-right: 1px solid lightgray;
+}
+
+.weeklyview__bodycell_oddrow::after {
+  border-bottom: 1px solid lightgray;
+}
+
+/*
+  It's OK for the first/last borders to be on top, since they
+  can't strike through a cell.
+*/
 .weeklyview__bodycell_firstrow {
   border-top: 1px solid lightgray;
 }
@@ -30,23 +55,23 @@
   border-left: 1px solid lightgray;
 }
 
-.weeklyview__bodycell_oddrow {
-  border-bottom: 1px solid lightgray;
-}
-
 .weeklyview__bodycell.selected {
-  background-color: rgba(var(--custom-primary-rgb), 80%);
+  background-color: rgba(var(--custom-primary-rgb), 70%);
 }
 
 .weeklyview__bodycell:hover {
   cursor: pointer;
+}
+
+.weeklyview__bodycell:hover::after {
   /*
-    This was causing the external event boxes to change position every
-    time the user hovers over a box. If we really want a border on hover,
-    we'll need to create a separate div on top of the cell to avoid
-    pushing the cell's content down.
+    This needs to be in a pseudo-element because if we add a border to
+    the cell itself, then its inner width/height will change (due to
+    box-sizing: border-box), which will cause the external event boxes
+    to change size because they use percentages for width and height.
   */
-  /* border: 2px dashed black; */
+  border: 2px dashed black;
+  z-index: unset;
 }
 
 .weeklyview__bodycell_scheduled_inner {
