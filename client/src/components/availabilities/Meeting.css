@@ -92,13 +92,15 @@
 .weeklyview__bodycell_scheduled_inner,
 .weeklyview__bodycell_external_event {
   overflow: hidden;
+  padding-top: 0.3em;
   padding-left: 0.7em;
   pointer-events: none;
 }
 
 .weeklyview__bodycell_scheduled_inner_text,
 .weeklyview__bodycell_external_event_text {
-  font-size: 0.7em;
+  font-size: 0.8em;
+  line-height: 1.25;
 }
 
 .weeklyview__bodycell_scheduled_inner {

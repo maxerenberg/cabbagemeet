@@ -20,10 +20,10 @@ import {
 import type { MouseState } from 'slices/availabilitiesSelection';
 import { useToast } from 'components/Toast';
 import { flatGridCoords } from 'utils/arrays.utils';
-import { addDaysToDateString, customToISOString, startAndEndDateTimeToDateTimesFlat } from 'utils/dates.utils';
+import { addDaysToDateString, customToISOString } from 'utils/dates.utils';
 import { assert, assertIsNever } from 'utils/misc.utils';
 import { selectCurrentMeetingID } from 'slices/currentMeeting';
-import type { OAuth2CalendarEventsResponseItem } from 'slices/api';
+import { ExternalEventInfoWithNumCols, calculateExternalEventInfoColumns } from './MeetingGridBodyCells.helpers';
 
 // TODO: deal with decimal start/end times
 
@@ -129,56 +129,6 @@ function useMouseupListener(dateTimes: string[][]) {
   }, [mouseState, selMode.type, dispatch, dateTimes]);
 }
 
-type ExternalEventInfoWithColStart = OAuth2CalendarEventsResponseItem & {
-  colStart: number;  // starts from 1 (like grid-column-start)
-};
-function calculateExternalEventInfoColumns(externalEvents: OAuth2CalendarEventsResponseItem[]): {
-  [dateTime: string]: ExternalEventInfoWithColStart[]
-} {
-// A single cell (i.e. 30-minute interval) can have multiple external events
-    // inside it. We want to show them side-by-side.
-    const result: {
-      [dateTime: string]: ExternalEventInfoWithColStart[]
-    } = {};
-    if (externalEvents === undefined) {
-      return result;
-    }
-    // Since we want overlapping events to be shown side-by-side, each cell must
-    // be subdivided into columns. Note that a cell might have e.g. the first column
-    // empty but the second column full, if we have two events like this:
-    // +--+
-    // |  | +--+
-    // |  | |  |
-    // +--+ |  |
-    //      +--+
-    // Note that the row at the bottom needs to have the second event in the second
-    // column, even though it doesn't overlap with the first event.
-    const maxColStartPerCell: {
-      [dateTime: string]: number;
-    } =  {};
-    for (const externalEvent of externalEvents) {
-      // Note that startDateTime might not be aligned on a multiple of 30 minutes
-      const {startDateTime, endDateTime} = externalEvent;
-      const dateTimes = startAndEndDateTimeToDateTimesFlat(startDateTime, endDateTime);
-      // dateTimes[0] is aligned on a multiple of 30 minutes
-      let maxColStart = 0;
-      for (const dateTime of dateTimes) {
-        if (maxColStartPerCell[dateTime] !== undefined) {
-          maxColStart = Math.max(maxColStart, maxColStartPerCell[dateTime]);
-        }
-      }
-      if (result[dateTimes[0]] === undefined) {
-        result[dateTimes[0]] = [];
-      }
-      const colStart = maxColStart + 1;
-      result[dateTimes[0]].push({...externalEvent, colStart});
-      for (const dateTime of dateTimes) {
-        maxColStartPerCell[dateTime] = colStart;
-      }
-    }
-    return result;
-}
-
 function calculateDateTimeGrid(numRows: number, numCols: number, dateStrings: string[], startHour: number): string[][] {
   const rows: string[][] = [];
   for (let rowIdx = 0; rowIdx < numRows; rowIdx++) {
@@ -238,7 +188,7 @@ function MeetingGridBodyCells({
     [externalEvents]
   );
   // Use singleton to avoid re-renders
-  const emptyArrayOfExternalEventInfo: ExternalEventInfoWithColStart[] = useMemo(() => [], []);
+  const emptyArrayOfExternalEventInfo = useMemo(() => ({events: [], numCols: 0}), []);
   const earliestScheduledDateTime = useMemo(() => {
     const dateTimes = Object.keys(scheduleSet);
     return dateTimes.length > 0 ? dateTimes.sort()[0] : null;
@@ -325,7 +275,7 @@ const Cell = React.memo(function Cell({
   dateTime: string,
   isScheduled: boolean,
   isEarliestScheduled: boolean,
-  externalEvents: ExternalEventInfoWithColStart[],
+  externalEvents: ExternalEventInfoWithNumCols,
   somebodyIsHovered: boolean,
   hoverUserIsAvailableAtThisTime: boolean,
   selectedUserIsAvailableAtThisTime: boolean,
@@ -402,13 +352,12 @@ const Cell = React.memo(function Cell({
   if (
     // FIXME: don't show external events if editing someone else
     (selMode.type === 'addingRespondent' || selMode.type === 'editingRespondent')
-    && externalEvents.length > 0
+    && externalEvents.events.length > 0
     //&& !meetingIsScheduled
   ) {
     classNames.push('position-relative', 'd-grid');
-    const numExternalEventCols = Math.max(...externalEvents.map(e => e.colStart));
-    style.gridTemplateColumns = `repeat(${numExternalEventCols}, 1fr)`;
-    externalEventBoxes = externalEvents.map((externalEvent, i) => {
+    style.gridTemplateColumns = `repeat(${externalEvents.numCols}, 1fr)`;
+    externalEventBoxes = externalEvents.events.map((externalEvent, i) => {
       const {topOffset, height} = calculateTopOffsetAndHeightOfExternalEventBox(dateTime, externalEvent.startDateTime, externalEvent.endDateTime);
       const topPercent = Math.floor(topOffset * 100) + '%';
       const heightPercent = Math.floor(height * 100) + '%';
@@ -423,7 +372,8 @@ const Cell = React.memo(function Cell({
             gridColumnEnd: externalEvent.colStart + 1,
           }}
         >
-          <span className="weeklyview__bodycell_external_event_text">{externalEvent.summary}</span>
+          {/* Need a nested div because changing font-size on the cell which change its height (specified in em) */}
+          <div className="weeklyview__bodycell_external_event_text">{externalEvent.summary}</div>
         </div>
       );
     });

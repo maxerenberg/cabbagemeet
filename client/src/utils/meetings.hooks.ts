@@ -1,3 +1,4 @@
+import { useMemo } from "react";
 import { useAppSelector } from "app/hooks";
 import {
   OAuth2CalendarEventsResponseItem,
@@ -34,8 +35,11 @@ export function useGetExternalCalendarEventsIfTokenIsPresent(meetingID: number) 
   const hasLinkedMicrosoftAccount = userInfo?.hasLinkedMicrosoftAccount || false;
   const {data: googleResponse} = useGetGoogleCalendarEventsQuery(meetingID, {skip: !tokenIsPresent || !hasLinkedGoogleAccount});
   const {data: microsoftResponse} = useGetMicrosoftCalendarEventsQuery(meetingID, {skip: !tokenIsPresent || !hasLinkedMicrosoftAccount});
-  const mergedEvents: OAuth2CalendarEventsResponseItem[] = [];
-  if (googleResponse) mergedEvents.push(...googleResponse.events);
-  if (microsoftResponse) mergedEvents.push(...microsoftResponse.events);
+  const mergedEvents = useMemo(() => {
+    const result: OAuth2CalendarEventsResponseItem[] = [];
+    if (googleResponse) result.push(...googleResponse.events);
+    if (microsoftResponse) result.push(...microsoftResponse.events);
+    return result;
+  }, [googleResponse, microsoftResponse]);
   return mergedEvents;
 }

@@ -579,7 +579,10 @@ export default class OAuth2Service {
     meetingID: number,
   ): Promise<OAuth2CalendarEvent[]> {
     const meeting = await this.meetingsService.getMeetingOrThrow(meetingID);
-    return this.oauth2Providers[providerType].getEventsForMeeting(userID, meeting);
+    const events = await this.oauth2Providers[providerType].getEventsForMeeting(userID, meeting);
+    // sort by start date
+    events.sort((event1, event2) => event1.start.localeCompare(event2.start));
+    return events;
   }
 
   private getRespondentsLinkedWithGoogle(meetingID: number) {
