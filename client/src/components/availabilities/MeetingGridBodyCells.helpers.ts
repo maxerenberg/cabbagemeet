@@ -1,5 +1,5 @@
 import type { OAuth2CalendarEventsResponseItem } from "slices/api";
-import { startAndEndDateTimeToDateTimesFlat } from "utils/dates.utils";
+import { customToISOString, getFractionalHourFromDateInLocalTime, startAndEndDateTimeToDateTimesFlat } from "utils/dates.utils";
 import { assert } from "utils/misc.utils";
 
 type ExternalEventInfoWithColStart = OAuth2CalendarEventsResponseItem & {
@@ -12,17 +12,64 @@ export type ExternalEventInfoWithNumCols = {
 export type ExternalEventInfosWithNumCols = {
   [dateTime: string]: ExternalEventInfoWithNumCols;
 };
+
+// !!!!!!!!!!!!!!!!!
+// FIXME: properly show events which span multiple days
+//        (as of this writing, LettuceMeet has the same bug)
+// !!!!!!!!!!!!!!!!!
+function adjustExternalEventTimesToFitInGrid(
+  externalEvents: OAuth2CalendarEventsResponseItem[],
+  minStartHour: number,  // can be a decimal
+  maxEndHour: number,    // can be a decimal
+) {
+  const minStartHour_int = Math.floor(minStartHour);
+  const minStartHour_minutes = (minStartHour - minStartHour_int) * 60;
+  const maxEndHour_int = Math.floor(maxEndHour);
+  const maxEndHour_minutes = (maxEndHour - maxEndHour_int) * 60;
+  for (let i = 0; i < externalEvents.length; i++) {
+    const externalEvent = externalEvents[i];
+    const startDate = new Date(externalEvent.startDateTime);
+    if (getFractionalHourFromDateInLocalTime(startDate) < minStartHour) {
+      startDate.setHours(minStartHour_int);
+      startDate.setMinutes(minStartHour_minutes);
+      // externalEvent is immutable (probably done by RTK Query), so we need to
+      // create a new object
+      externalEvents[i] = {...externalEvent, startDateTime: customToISOString(startDate)};
+    }
+    const endDate = new Date(externalEvent.endDateTime);
+    if (getFractionalHourFromDateInLocalTime(endDate) > maxEndHour) {
+      endDate.setHours(maxEndHour_int);
+      endDate.setMinutes(maxEndHour_minutes);
+      // Make sure to use externalEvents[i] inside the spread statement
+      // in case we modified the array entry previously
+      externalEvents[i] = {...externalEvents[i], endDateTime: customToISOString(endDate)};
+    }
+  }
+}
+
 // This isn't a very efficient layout algorithm, but at least it won't cause
 // the external event boxes to overlap with each other.
-export function calculateExternalEventInfoColumns(externalEvents: OAuth2CalendarEventsResponseItem[]): ExternalEventInfosWithNumCols {
+export function calculateExternalEventInfoColumns(
+  externalEvents: OAuth2CalendarEventsResponseItem[],
+  minStartHour: number,  // can be a decimal
+  maxEndHour: number,    // can be a decimal
+): ExternalEventInfosWithNumCols {
   if (externalEvents === undefined) {
     return {};
   }
-  // sanity check - make sure events are sorted by start date
+  // sanity check - make sure events are sorted by start date (should be done by server)
   assert(externalEvents.every(
     (_, i) => i === externalEvents.length - 1
               || externalEvents[i].startDateTime <= externalEvents[i+1].startDateTime
   ));
+  // Just in case there are out-of-bounds events, filter them out
+  externalEvents = externalEvents.filter(
+    ({startDateTime, endDateTime}) =>
+      getFractionalHourFromDateInLocalTime(new Date(endDateTime)) > minStartHour
+      && getFractionalHourFromDateInLocalTime(new Date(startDateTime)) < maxEndHour
+  );
+  // Adjust start/end times if necessary so that they are inside the grid boundaries
+  adjustExternalEventTimesToFitInGrid(externalEvents, minStartHour, maxEndHour);
   // A single cell (i.e. 30-minute interval) can have multiple external events
   // inside it. We want to show them side-by-side.
   const colsUsedPerCell: {

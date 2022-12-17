@@ -229,6 +229,10 @@ export function roundDownDateTimeStr(dateTime: string): string {
   return result;
 };
 
+export function getFractionalHourFromDateInLocalTime(date: Date): number {
+  return date.getHours() + date.getMinutes() / 60;
+}
+
 /**
  * Returns the three-letter abbreviation of the given month
  * @param month the month index. Must be in [0, 12)

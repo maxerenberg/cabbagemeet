@@ -162,9 +162,11 @@ function MeetingGridBodyCells({
 }: {
   numRows: number, numCols: number, startHour: number, dateStrings: string[],
 }) {
-  const {respondents, scheduledStartDateTime, scheduledEndDateTime} = useGetCurrentMeetingWithSelector(
+  const {respondents, minStartHour, maxEndHour, scheduledStartDateTime, scheduledEndDateTime} = useGetCurrentMeetingWithSelector(
     ({data: meeting}) => ({
       respondents: meeting?.respondents,
+      minStartHour: meeting?.minStartHour,
+      maxEndHour: meeting?.maxEndHour,
       scheduledStartDateTime: meeting?.scheduledStartDateTime,
       scheduledEndDateTime: meeting?.scheduledEndDateTime,
     })
@@ -188,8 +190,13 @@ function MeetingGridBodyCells({
   const externalEvents = useGetExternalCalendarEventsIfTokenIsPresent(meetingID);
   // FIXME: show overlapping events side-by-side
   const dateTimesToExternalEventInfo = useMemo(
-    () => calculateExternalEventInfoColumns(externalEvents),
-    [externalEvents]
+    () => {
+      if (minStartHour === undefined || maxEndHour === undefined) {
+        return {};
+      }
+      return calculateExternalEventInfoColumns(externalEvents, minStartHour, maxEndHour);
+    },
+    [externalEvents, minStartHour, maxEndHour]
   );
   // Use singleton to avoid re-renders
   const emptyArrayOfExternalEventInfo = useMemo(() => ({events: [], numCols: 0}), []);
