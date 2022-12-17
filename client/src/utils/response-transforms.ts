@@ -1,5 +1,5 @@
 import type { DateTimeSet } from 'common/types';
-import { convertOtherTzToLocal, startAndEndDateTimeToDateTimesFlat } from "utils/dates.utils";
+import { convertOtherTzToLocal } from "utils/dates.utils";
 import { MeetingRespondent, MeetingsShortResponse } from "slices/api";
 import type { MeetingShortResponse, MeetingResponse } from 'slices/api';
 import { arrayToObject } from "./arrays.utils";
@@ -13,10 +13,9 @@ export type TransformedRespondents = {
 };
 export type TransformedMeetingResponse = Omit<
   MeetingResponse,
-  'respondents' | 'timezone' | 'scheduledStartDateTime' | 'scheduledEndDateTime'
+  'respondents' | 'timezone'
 > & {
   respondents: TransformedRespondents;
-  scheduledDateTimes?: DateTimeSet;
 };
 export type TransformedMeetingShortResponse = Omit<MeetingShortResponse, 'timezone'>;
 export type TransformedMeetingsShortResponse = { meetings: TransformedMeetingShortResponse[]; };
@@ -36,12 +35,11 @@ function transformMeetingShortResponse(response: MeetingShortResponse): Transfor
 }
 
 export function transformMeetingResponse(response: MeetingResponse): TransformedMeetingResponse {
-  const {timezone, respondents, scheduledStartDateTime, scheduledEndDateTime, ...rest} = response;
+  const {timezone, respondents, ...rest} = response;
   return {
     ...rest,
     ...convertMeetingTimesAndDatesToLocal(response),
     respondents: transformRespondents(respondents),
-    scheduledDateTimes: expandScheduledDateTimes(scheduledStartDateTime, scheduledEndDateTime),
   };
 }
 
@@ -73,14 +71,3 @@ function transformRespondents(respondents: MeetingRespondent[]): TransformedResp
   }
   return result;
 }
-
-function expandScheduledDateTimes(scheduledStartDateTime?: string, scheduledEndDateTime?: string): DateTimeSet | undefined {
-  if (!scheduledStartDateTime || !scheduledEndDateTime) {
-    return undefined;
-  }
-  return startAndEndDateTimeToDateTimeSet(scheduledStartDateTime, scheduledEndDateTime);
-}
-
-export function startAndEndDateTimeToDateTimeSet(startDateTime: string, endDateTime: string): DateTimeSet {
-  return arrayToObject(startAndEndDateTimeToDateTimesFlat(startDateTime, endDateTime));
-};

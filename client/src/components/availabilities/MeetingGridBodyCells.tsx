@@ -20,10 +20,14 @@ import {
 import type { MouseState } from 'slices/availabilitiesSelection';
 import { useToast } from 'components/Toast';
 import { flatGridCoords } from 'utils/arrays.utils';
-import { addDaysToDateString, customToISOString } from 'utils/dates.utils';
+import { addDaysToDateString, customToISOString, roundDownDateTimeStr } from 'utils/dates.utils';
 import { assert, assertIsNever } from 'utils/misc.utils';
 import { selectCurrentMeetingID } from 'slices/currentMeeting';
-import { ExternalEventInfoWithNumCols, calculateExternalEventInfoColumns } from './MeetingGridBodyCells.helpers';
+import {
+  ExternalEventInfoWithNumCols,
+  calculateExternalEventInfoColumns,
+  calculateTopOffsetAndHeightOfExternalEventBox,
+} from './MeetingGridBodyCells.helpers';
 
 // TODO: deal with decimal start/end times
 
@@ -158,10 +162,11 @@ function MeetingGridBodyCells({
 }: {
   numRows: number, numCols: number, startHour: number, dateStrings: string[],
 }) {
-  const {respondents, scheduledDateTimes} = useGetCurrentMeetingWithSelector(
+  const {respondents, scheduledStartDateTime, scheduledEndDateTime} = useGetCurrentMeetingWithSelector(
     ({data: meeting}) => ({
       respondents: meeting?.respondents,
-      scheduledDateTimes: meeting?.scheduledDateTimes,
+      scheduledStartDateTime: meeting?.scheduledStartDateTime,
+      scheduledEndDateTime: meeting?.scheduledEndDateTime,
     })
   );
   assert(respondents !== undefined);
@@ -178,7 +183,6 @@ function MeetingGridBodyCells({
     () => calculateDateTimeGrid(numRows, numCols, dateStrings, startHour),
     [numRows, numCols, dateStrings, startHour]
   );
-  const scheduleSet = useMemo(() => scheduledDateTimes || {}, [scheduledDateTimes]);
   const meetingID = useAppSelector(selectCurrentMeetingID);
   assert(meetingID !== undefined);
   const externalEvents = useGetExternalCalendarEventsIfTokenIsPresent(meetingID);
@@ -189,10 +193,9 @@ function MeetingGridBodyCells({
   );
   // Use singleton to avoid re-renders
   const emptyArrayOfExternalEventInfo = useMemo(() => ({events: [], numCols: 0}), []);
-  const earliestScheduledDateTime = useMemo(() => {
-    const dateTimes = Object.keys(scheduleSet);
-    return dateTimes.length > 0 ? dateTimes.sort()[0] : null;
-  }, [scheduleSet]);
+  const roundedDownScheduledStartDateTime = useMemo(() => {
+    return scheduledStartDateTime && roundDownDateTimeStr(scheduledStartDateTime);
+  }, [scheduledStartDateTime]);
   const selMode = useAppSelector(selectSelMode);
   const hoverUser = useAppSelector(selectHoverUser);
   const somebodyIsHovered = hoverUser !== null;
@@ -202,8 +205,10 @@ function MeetingGridBodyCells({
       {
         gridCoords.map(([colIdx, rowIdx], i) => {
           const dateTime = dateTimes[rowIdx][colIdx];
-          const isScheduled = scheduleSet[dateTime];
-          const isEarliestScheduled = dateTime === earliestScheduledDateTime;
+          const scheduledStartDateTimeProp =
+            roundedDownScheduledStartDateTime === dateTime
+            ? scheduledStartDateTime
+            : undefined;
           const externalEvents = dateTimesToExternalEventInfo[dateTime] || emptyArrayOfExternalEventInfo;
           const hoverUserIsAvailableAtThisTime = somebodyIsHovered && respondents[hoverUser].availabilities[dateTime];
           const selectedUserIsAvailableAtThisTime =
@@ -216,8 +221,8 @@ function MeetingGridBodyCells({
               rowIdx,
               colIdx,
               dateTime,
-              isScheduled,
-              isEarliestScheduled,
+              scheduledStartDateTime: scheduledStartDateTimeProp,
+              scheduledEndDateTime,
               externalEvents,
               somebodyIsHovered,
               hoverUserIsAvailableAtThisTime,
@@ -233,35 +238,13 @@ function MeetingGridBodyCells({
 }
 export default React.memo(MeetingGridBodyCells);
 
-// The number of seconds which a single cell represents
-const SECONDS_IN_THIRTY_MINUTES = 30 * 60;
-// Calculates the top offset and height of an external event box in a cell,
-// in fractions of the height of a single cell
-function calculateTopOffsetAndHeightOfExternalEventBox(
-  cellStartTime: string, eventStartTime: string, eventEndTime: string,
-): {
-  topOffset: number;
-  height: number;
-} {
-  const cellStartTimeEpochSeconds = new Date(cellStartTime).getTime() / 1000;
-  const eventStartTimeEpochSeconds = new Date(eventStartTime).getTime() / 1000;
-  const eventEndTimeEpochSeconds = new Date(eventEndTime).getTime() / 1000;
-  assert(Number.isInteger(cellStartTimeEpochSeconds));
-  assert(Number.isInteger(eventStartTimeEpochSeconds));
-  assert(Number.isInteger(eventEndTimeEpochSeconds));
-  assert(eventStartTimeEpochSeconds >= cellStartTimeEpochSeconds);
-  const topOffset = (eventStartTimeEpochSeconds - cellStartTimeEpochSeconds) / SECONDS_IN_THIRTY_MINUTES;
-  const height = (eventEndTimeEpochSeconds - eventStartTimeEpochSeconds) / SECONDS_IN_THIRTY_MINUTES;
-  return {topOffset, height};
-}
-
 const Cell = React.memo(function Cell({
   rowIdx,
   colIdx,
   cellIdx,
   dateTime,
-  isScheduled,
-  isEarliestScheduled,
+  scheduledStartDateTime,
+  scheduledEndDateTime,
   externalEvents,
   somebodyIsHovered,
   hoverUserIsAvailableAtThisTime,
@@ -273,8 +256,8 @@ const Cell = React.memo(function Cell({
   colIdx: number,
   cellIdx: number,
   dateTime: string,
-  isScheduled: boolean,
-  isEarliestScheduled: boolean,
+  scheduledStartDateTime: string | undefined,
+  scheduledEndDateTime: string | undefined,
   externalEvents: ExternalEventInfoWithNumCols,
   somebodyIsHovered: boolean,
   hoverUserIsAvailableAtThisTime: boolean,
@@ -313,7 +296,7 @@ const Cell = React.memo(function Cell({
   if (rowIdx % 2 === 1) classNames.push('weeklyview__bodycell_oddrow');
 
   const style: Style = {gridArea: `c${cellIdx}`};
-  let showRespondentsProportion = false;
+  let showRespondentsColour = false;
   if (selMode.type === 'addingRespondent' || selMode.type === 'editingRespondent') {
     if (
       (isInMouseSelectionArea && mouseSelectionAreaIsAddingDateTimes)
@@ -323,9 +306,9 @@ const Cell = React.memo(function Cell({
     }
   } else if (selMode.type === 'editingSchedule') {
     if (isInMouseSelectionColumn || isSelected) {
-      classNames.push('selected');
+      classNames.push('scheduling');
     } else if (numPeopleAvailableAtThisTime > 0) {
-      showRespondentsProportion = true;
+      showRespondentsColour = true;
     }
   } else if (selMode.type === 'selectedUser') {
     if (selectedUserIsAvailableAtThisTime) {
@@ -337,12 +320,12 @@ const Cell = React.memo(function Cell({
         classNames.push('selected');
       }
     } else if (numPeopleAvailableAtThisTime > 0) {
-      showRespondentsProportion = true;
+      showRespondentsColour = true;
     }
   } else {
     assertIsNever(selMode);
   }
-  if (showRespondentsProportion) {
+  if (showRespondentsColour) {
     const rgb = 'var(--custom-primary-rgb)';
     const alpha = Math.round(100 * (0.2 + 0.8 * (numPeopleAvailableAtThisTime / totalPeople))) + '%';
     style.backgroundColor = `rgba(${rgb}, ${alpha})`;
@@ -359,15 +342,13 @@ const Cell = React.memo(function Cell({
     style.gridTemplateColumns = `repeat(${externalEvents.numCols}, 1fr)`;
     externalEventBoxes = externalEvents.events.map((externalEvent, i) => {
       const {topOffset, height} = calculateTopOffsetAndHeightOfExternalEventBox(dateTime, externalEvent.startDateTime, externalEvent.endDateTime);
-      const topPercent = Math.floor(topOffset * 100) + '%';
-      const heightPercent = Math.floor(height * 100) + '%';
       return (
         <div
           key={i}
-          className="position-absolute weeklyview__bodycell_external_event"
+          className="weeklyview__bodycell_external_event"
           style={{
-            top: topPercent,
-            height: heightPercent,
+            top: Math.floor(topOffset * 100) + '%',
+            height: Math.floor(height * 100) + '%',
             gridColumnStart: externalEvent.colStart,
             gridColumnEnd: externalEvent.colStart + 1,
           }}
@@ -382,13 +363,20 @@ const Cell = React.memo(function Cell({
   let scheduledTimeBox: ReactElement<HTMLDivElement> | undefined;
   if (
     selMode.type === 'none'
-    && isScheduled
+    && scheduledStartDateTime !== undefined
+    && scheduledEndDateTime !== undefined
   ) {
+    // re-use the same function we used for external events
+    const {topOffset, height} = calculateTopOffsetAndHeightOfExternalEventBox(dateTime, scheduledStartDateTime, scheduledEndDateTime);
     scheduledTimeBox = (
-      <div className="weeklyview__bodycell_scheduled_inner">
-        {isEarliestScheduled && (
-          <span className="weeklyview__bodycell_scheduled_inner_text">SCHEDULED</span>
-        )}
+      <div
+        className="d-flex align-items-center weeklyview__bodycell_scheduled_inner"
+        style={{
+          top: Math.floor(topOffset * 100) + '%',
+          height: Math.floor(height * 100) + '%',
+        }}
+      >
+        <div className="flex-grow-1 text-center">SCHEDULED</div>
       </div>
     );
   }

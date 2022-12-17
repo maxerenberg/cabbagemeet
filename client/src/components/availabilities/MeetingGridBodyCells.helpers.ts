@@ -76,7 +76,12 @@ export function calculateExternalEventInfoColumns(externalEvents: OAuth2Calendar
       let occupied = false;
       for (const dateTime of dateTimes) {
         if (!colsUsedPerCell[dateTime]) continue;
-        occupied = colsUsedPerCell[dateTime].some(({colStart}) => colNum === colStart);
+        for (const {colStart} of colsUsedPerCell[dateTime]) {
+          if (colStart === colNum) {
+            occupied = true;
+            break;
+          }
+        }
         if (occupied) break;
       }
       if (!occupied) break;
@@ -101,4 +106,26 @@ export function calculateExternalEventInfoColumns(externalEvents: OAuth2Calendar
     result[dateTimes[0]].events.push({colStart, ...externalEvent});
   }
   return result;
+}
+
+// The number of seconds which a single cell represents
+const SECONDS_IN_THIRTY_MINUTES = 30 * 60;
+// Calculates the top offset and height of an external event box in a cell,
+// in fractions of the height of a single cell
+export function calculateTopOffsetAndHeightOfExternalEventBox(
+  cellStartTime: string, eventStartTime: string, eventEndTime: string,
+): {
+  topOffset: number;
+  height: number;
+} {
+  const cellStartTimeEpochSeconds = new Date(cellStartTime).getTime() / 1000;
+  const eventStartTimeEpochSeconds = new Date(eventStartTime).getTime() / 1000;
+  const eventEndTimeEpochSeconds = new Date(eventEndTime).getTime() / 1000;
+  assert(Number.isInteger(cellStartTimeEpochSeconds));
+  assert(Number.isInteger(eventStartTimeEpochSeconds));
+  assert(Number.isInteger(eventEndTimeEpochSeconds));
+  assert(eventStartTimeEpochSeconds >= cellStartTimeEpochSeconds);
+  const topOffset = (eventStartTimeEpochSeconds - cellStartTimeEpochSeconds) / SECONDS_IN_THIRTY_MINUTES;
+  const height = (eventEndTimeEpochSeconds - eventStartTimeEpochSeconds) / SECONDS_IN_THIRTY_MINUTES;
+  return {topOffset, height};
 }

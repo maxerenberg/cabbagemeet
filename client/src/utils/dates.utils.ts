@@ -189,6 +189,20 @@ export function convertOtherTzToLocal(
   return { startHour, endHour, dates };
 }
 
+function roundDownDate(date: Date) {
+  if (date.getUTCMinutes() > 30) {
+    date.setUTCMinutes(30);
+  } else if (0 < date.getUTCMinutes() && date.getUTCMinutes() < 30) {
+    date.setUTCMinutes(0);
+  }
+}
+
+export function roundDownDateTimeStr(dateTime: string): string {
+  const date = new Date(dateTime);
+  roundDownDate(date);
+  return customToISOString(date);
+}
+
 /**
  * Returns a sorted array of the starting times of the 30-minute intervals between
  * [startDateTime, endDateTime).
@@ -203,11 +217,7 @@ export function convertOtherTzToLocal(
  export function startAndEndDateTimeToDateTimesFlat(startDateTime: string, endDateTime: string): string[] {
   assert(startDateTime <= endDateTime);
   const date = new Date(startDateTime);
-  if (date.getUTCMinutes() > 30) {
-    date.setUTCMinutes(30);
-  } else if (0 < date.getUTCMinutes() && date.getUTCMinutes() < 30) {
-    date.setUTCMinutes(0);
-  }
+  roundDownDate(date);
   const result: string[] = [];
   for (
     let dateTime = customToISOString(date);

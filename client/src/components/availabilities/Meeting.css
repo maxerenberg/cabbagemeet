@@ -59,6 +59,10 @@
   background-color: rgba(var(--custom-primary-rgb), 70%);
 }
 
+.weeklyview__bodycell.scheduling {
+  background-color: rgba(var(--custom-scheduled-cell-rgb), 70%);
+}
+
 .weeklyview__bodycell:hover {
   cursor: pointer;
 }
@@ -76,44 +80,33 @@
 
 .weeklyview__bodycell_scheduled_inner {
   width: 80%;
-  height: 100%;
-  margin: 0 auto;
+  left: 10%;
+  right: 10%;
+  font-size: 0.8em;
   color: white;
   background-color: var(--custom-scheduled-cell-color);
+  /* should be shown on top of other people's availabilities */
+  z-index: 1;
 }
 
 .weeklyview__bodycell_external_event {
   width: 100%;
   border-radius: 6px;
-  /* TODO: choose a text color with good contrast */
   background-color: rgba(var(--custom-scheduled-cell-rgb), 70%);
+  padding-top: 0.3em;
+  padding-left: 0.7em;
 }
 
 .weeklyview__bodycell_scheduled_inner,
 .weeklyview__bodycell_external_event {
+  position: absolute;
   overflow: hidden;
-  padding-top: 0.3em;
-  padding-left: 0.7em;
   pointer-events: none;
 }
 
-.weeklyview__bodycell_scheduled_inner_text,
 .weeklyview__bodycell_external_event_text {
   font-size: 0.8em;
   line-height: 1.25;
-}
-
-.weeklyview__bodycell_scheduled_inner {
-  height: 100%;
-  display: flex;
-  align-items: center;
-}
-
-/* media-breakpoint-up(lg) */
-@media (min-width: 992px) {
-  .weeklyview__bodycell_scheduled_inner {
-    font-size: 0.8em;
-  }
 }
 
 .weeklyview-grid {

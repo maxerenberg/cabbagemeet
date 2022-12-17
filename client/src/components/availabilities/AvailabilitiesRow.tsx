@@ -31,28 +31,25 @@ function AvailabilitiesRow({
   const selMode = useAppSelector(selectSelMode);
   const selectedTimes = useAppSelector(selectSelectedTimes);
   const meetingID = useAppSelector(selectCurrentMeetingID);
-  const {respondents, selfRespondentID, scheduledDateTimes} = useGetCurrentMeetingWithSelector(
+  const {respondents, selfRespondentID, scheduledStartDateTime, scheduledEndDateTime} = useGetCurrentMeetingWithSelector(
     ({data: meeting}) => ({
       respondents: meeting?.respondents,
       selfRespondentID: meeting?.selfRespondentID,
-      scheduledDateTimes: meeting?.scheduledDateTimes,
+      scheduledStartDateTime: meeting?.scheduledStartDateTime,
+      scheduledEndDateTime: meeting?.scheduledEndDateTime,
     })
   );
   assert(meetingID !== undefined && respondents !== undefined);
   // The ref is necessary to avoid showing the toast twice when submitting availabilities
   // for the user who is currently logged in for the first time
   const selfRespondentIDRef = useRef(selfRespondentID);
-  const isScheduled = scheduledDateTimes !== undefined;
+  const isScheduled = scheduledStartDateTime !== undefined && scheduledEndDateTime !== undefined;
   const scheduledDateTimeTitle = useMemo(() => {
-    if (scheduledDateTimes === undefined) return null;
-    const scheduledDateTimesFlat = Object.keys(scheduledDateTimes).sort();
-    const startDateTime = scheduledDateTimesFlat[0];
-    let endDateTime = scheduledDateTimesFlat[scheduledDateTimesFlat.length - 1];
-    // Each key of scheduledDateTimes represents the start of a 30-minute interval,
-    // so if we want a fully spanning interval, we need to add 30 min. to endDateTime
-    endDateTime = addMinutesToDateTimeString(endDateTime, 30);
-    return createTitleWithSchedule(startDateTime, endDateTime);
-  }, [scheduledDateTimes]);
+    if (scheduledStartDateTime === undefined || scheduledEndDateTime === undefined) {
+      return null;
+    }
+    return createTitleWithSchedule(scheduledStartDateTime, scheduledEndDateTime);
+  }, [scheduledStartDateTime, scheduledEndDateTime]);
   // optimistic - assume that if token is present, user info will be successfully fetched
   const isLoggedIn = useAppSelector(selectTokenIsPresent);
   const editSelf = useEditSelf(isLoggedIn);
