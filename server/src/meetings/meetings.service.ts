@@ -92,7 +92,7 @@ export default class MeetingsService {
     ) {
       // Update respondents' external calendars
       // Do not await the Promise so that we don't block the caller
-      this.oauth2Service.google_tryCreateOrUpdateEventsForMeeting(meeting);
+      this.oauth2Service.tryCreateOrUpdateEventsForMeetingForAllRespondents(meeting);
     }
   }
 
@@ -137,7 +137,7 @@ export default class MeetingsService {
     }
     // Update respondents' external calendars
     // Do not await the Promise so that we don't block the caller
-    this.oauth2Service.google_tryCreateOrUpdateEventsForMeeting(meeting);
+    this.oauth2Service.tryCreateOrUpdateEventsForMeetingForAllRespondents(meeting);
   }
 
   async unscheduleMeeting(meeting: Meeting) {
@@ -148,7 +148,7 @@ export default class MeetingsService {
     await this.updateMeetingDB(meeting, updatedInfo);
     // Update respondents' external calendars
     // Do not await the Promise so that we don't block the caller
-    this.oauth2Service.google_tryDeleteEventsForMeeting(meeting.ID);
+    this.oauth2Service.tryDeleteEventsForMeetingForAllRespondents(meeting.ID);
   }
 
   async deleteMeeting(meetingID: number): Promise<void> {
@@ -161,7 +161,7 @@ export default class MeetingsService {
     // Promise.allSettled() in the OAuth2Service should hopefully speed things up.
     //
     // Alternative solution: use a tombstoned row
-    await this.oauth2Service.google_tryDeleteEventsForMeeting(meetingID);
+    await this.oauth2Service.tryDeleteEventsForMeetingForAllRespondents(meetingID);
     await this.meetingsRepository.delete(meetingID);
   }
 
@@ -210,7 +210,7 @@ export default class MeetingsService {
     const updatedMeeting = await this.getMeetingWithRespondents(meetingID);
     // Update respondent's external calendars
     // Do not await the Promise so that we don't block the caller
-    this.oauth2Service.google_tryCreateOrUpdateEventForMeeting(userID, updatedMeeting);
+    this.oauth2Service.tryCreateOrUpdateEventsForMeetingForSingleRespondent(userID, updatedMeeting);
     return updatedMeeting;
   }
 
@@ -219,7 +219,7 @@ export default class MeetingsService {
       // We need to wait until this runs to completion or else the row in
       // the GoogleCalendarCreatedEvents table might be deleted prematurely
       // (due to cascading deletions).
-      await this.oauth2Service.google_tryDeleteEventForMeeting(respondent.UserID, respondent.MeetingID);
+      await this.oauth2Service.tryDeleteEventsForMeetingForSingleRespondent(respondent.UserID, respondent.MeetingID);
     }
     await this.respondentsRepository.delete(respondent.RespondentID);
     // TODO: wrap in transaction

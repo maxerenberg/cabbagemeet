@@ -4,7 +4,8 @@ import { CustomJoinColumn } from '../custom-columns/custom-join-column';
 import MeetingRespondent from './meeting-respondent.entity';
 import GoogleCalendarEvents from '../oauth2/google-calendar-events.entity';
 import GoogleCalendarCreatedEvent from '../oauth2/google-calendar-created-event.entity';
-import MicrosoftCalendarEvents from 'src/oauth2/microsoft-calendar-events.entity';
+import MicrosoftCalendarEvents from '../oauth2/microsoft-calendar-events.entity';
+import MicrosoftCalendarCreatedEvent from '../oauth2/microsoft-calendar-created-event.entity';
 
 /*
 It is necessary to store the timezone of the person who created
@@ -88,4 +89,7 @@ export default class Meeting {
 
   @OneToMany(() => MicrosoftCalendarEvents, msftEvent => msftEvent.Meeting)
   MicrosoftCalendarEvents: MicrosoftCalendarEvents[];
+
+  @OneToMany(() => MicrosoftCalendarCreatedEvent, msftEvent => msftEvent.Meeting)
+  MicrosoftCalendarCreatedEvents: MicrosoftCalendarCreatedEvent[];
 };

@@ -1,5 +1,6 @@
 import { ConfigService } from "@nestjs/config";
 import { Repository } from "typeorm";
+import type { Dispatcher } from 'undici';
 import { toISOStringUTCFromDateStrAndHourAndTz, toISOStringUTC } from '../dates.utils';
 import type { EnvironmentVariables } from "../env.validation";
 import type Meeting from "../meetings/meeting.entity";
@@ -15,6 +16,7 @@ import type {
 } from "./oauth2.service";
 import type { GoogleListEventsResponse, GoogleListEventsResponseItem, GoogleInsertEventResponse } from './oauth2-response-types';
 import {
+  AbstractOAuth2CalendarCreatedEvent,
   OAuth2CalendarEvent,
   OAuth2ErrorResponseError,
   OAuth2ProviderType,
@@ -25,6 +27,7 @@ import type OAuth2Service from "./oauth2.service";
 import GoogleCalendarEvents from "./google-calendar-events.entity";
 import { Logger } from "@nestjs/common";
 import GoogleCalendarCreatedEvent from "./google-calendar-created-event.entity";
+import AbstractOAuth2 from "./abstract-oauth2.entity";
 
 const googleOidcScopes = [
   'openid',
@@ -56,10 +59,19 @@ type GoogleOAuth2EnvConfig = {
   redirect_uri: string;
 };
 
+function errorIsGoogleCalendarEventNoLongerExists(err: any): boolean {
+  return err instanceof OAuth2ErrorResponseError
+    && (
+      (err as OAuth2ErrorResponseError).statusCode === 404
+      || (err as OAuth2ErrorResponseError).statusCode === 410
+    );
+}
+
 export default class GoogleOAuth2Provider implements IOAuth2Provider {
   public readonly type = OAuth2ProviderType.GOOGLE;
   private readonly envConfig: GoogleOAuth2EnvConfig | undefined;
   private readonly logger = new Logger(GoogleOAuth2Provider.name);
+  private readonly publicURL: string;
 
   constructor(
     configService: ConfigService<EnvironmentVariables, true>,
@@ -73,6 +85,7 @@ export default class GoogleOAuth2Provider implements IOAuth2Provider {
     if (client_id && secret && redirect_uri) {
       this.envConfig = {client_id, secret, redirect_uri};
     }
+    this.publicURL = configService.get('PUBLIC_URL', {infer: true});
   }
 
   isConfigured(): boolean {
@@ -263,5 +276,74 @@ export default class GoogleOAuth2Provider implements IOAuth2Provider {
       events = events.filter(event => event.ID !== createdEvent.CreatedGoogleMeetingID);
     }
     return events;
+  }
+
+  async createOrUpdateEventForMeeting(
+    creds: AbstractOAuth2,
+    abstractExistingEvent: AbstractOAuth2CalendarCreatedEvent | null,
+    meeting: Meeting,
+  ): Promise<void> {
+    const existingEvent = abstractExistingEvent as GoogleCalendarCreatedEvent | null;
+    const userID = creds.UserID;
+    let apiURL = GOOGLE_API_CALENDAR_EVENTS_BASE_URL;
+    let apiMethod: Dispatcher.HttpMethod = 'POST';
+    if (existingEvent) {
+      // See https://developers.google.com/calendar/api/v3/reference/events/update
+      apiURL += '/' + existingEvent.CreatedGoogleMeetingID;
+      apiMethod = 'PUT';
+    }
+    const params: Record<string, any> = {
+      start: {
+        dateTime: meeting.ScheduledStartDateTime,
+      },
+      end: {
+        dateTime: meeting.ScheduledEndDateTime,
+      },
+      summary: meeting.Name,
+      source: {
+        url: `${this.publicURL}/m/${meeting.ID}`,
+      },
+    };
+    if (meeting.About) {
+      params.description = meeting.About;
+    }
+    let response: GoogleInsertEventResponse | undefined;
+    const body = JSON.stringify(params);
+    const headers = {'content-type': 'application/json'};
+    try {
+      response = await this.oauth2Service.apiRequest<GoogleInsertEventResponse>(
+        this, creds, apiURL, {method: apiMethod, body, headers}
+      );
+    } catch (err: any) {
+      if (existingEvent && errorIsGoogleCalendarEventNoLongerExists(err)) {
+        // It's possible that the user deleted the event themselves. Try to create
+        // a new one instead.
+        response = await this.oauth2Service.apiRequest<GoogleInsertEventResponse>(
+          this, creds, GOOGLE_API_CALENDAR_EVENTS_BASE_URL, {method: 'POST', body, headers}
+        );
+      } else {
+        throw err;
+      }
+    }
+    await this.calendarCreatedEventsRepository.save({
+      MeetingID: meeting.ID,
+      UserID: userID,
+      CreatedGoogleMeetingID: response.id,
+    });
+  }
+
+  async deleteEventForMeeting(creds: AbstractOAuth2, abstractEvent: AbstractOAuth2CalendarCreatedEvent): Promise<void> {
+    const event = abstractEvent as GoogleCalendarCreatedEvent;
+    const apiURL = `${GOOGLE_API_CALENDAR_EVENTS_BASE_URL}/${event.CreatedGoogleMeetingID}`;
+    try {
+      await this.oauth2Service.apiRequest(this, creds, apiURL, {method: 'DELETE'});
+    } catch (err: any) {
+      if (!errorIsGoogleCalendarEventNoLongerExists(err)) {
+        throw err;
+      }
+    }
+    await this.calendarCreatedEventsRepository.delete({
+      MeetingID: event.MeetingID, UserID: creds.UserID
+    });
   }
 }

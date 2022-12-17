@@ -10,6 +10,7 @@ import { Logger } from '@nestjs/common';
 import { ConfigService } from "@nestjs/config";
 import { sign as jwtSignCb } from 'jsonwebtoken';
 import { Repository } from 'typeorm';
+import type { Dispatcher } from 'undici';
 import Cacher from '../cacher';
 import {
   getSecondsSinceUnixEpoch,
@@ -38,9 +39,11 @@ import {
   OAuth2InvalidOrExpiredNonceError,
   OAuth2ErrorResponseError,
   OAuth2CalendarEvent,
-  MAX_EVENT_RESULTS,
+  AbstractOAuth2CalendarCreatedEvent,
 } from './oauth2-common';
-import { MicrosoftEventDeltaResponse } from './oauth2-response-types';
+import type { MicrosoftCreateEventResponse, MicrosoftEventDeltaResponse } from './oauth2-response-types';
+import AbstractOAuth2 from './abstract-oauth2.entity';
+import MicrosoftCalendarCreatedEvent from './microsoft-calendar-created-event.entity';
 
 const randomBytes: (size: number) => Promise<Buffer> = promisify(randomBytesCb);
 const randomInt: (max: number) => Promise<number> = promisify(randomIntCb);
@@ -78,9 +81,11 @@ function createOAuth2Config(tenantID: string): OAuth2Config {
 // See https://learn.microsoft.com/en-us/azure/active-directory/develop/v2-oauth2-auth-code-flow#request-an-access-token-with-a-certificate-credential
 const CLIENT_ASSERTION_TYPE = 'urn:ietf:params:oauth:client-assertion-type:jwt-bearer';
 
+const MICROSOFT_API_BASE_URL = 'https://graph.microsoft.com/v1.0';
 // See https://learn.microsoft.com/en-us/graph/api/event-delta?view=graph-rest-1.0
 //     https://learn.microsoft.com/en-us/graph/delta-query-events
-const MICROSOFT_API_CALENDAR_EVENTS_DELTA_URL = 'https://graph.microsoft.com/v1.0/me/calendarView/delta';
+const MICROSOFT_API_CALENDAR_EVENTS_DELTA_URL = `${MICROSOFT_API_BASE_URL}/me/calendarView/delta`;
+const MICROSOFT_API_CALENDAR_EVENTS_URL = `${MICROSOFT_API_BASE_URL}/me/events`;
 
 // See https://www.oauth.com/oauth2-servers/pkce/authorization-request/
 const pkceCodeVerifierValidChars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-._~';
@@ -111,11 +116,17 @@ type MicrosoftOAuth2EnvConfig = {
   private_key: Buffer;
 };
 
+function errorIsMicrosoftCalendarEventNoLongerExists(err: any): boolean {
+  return err instanceof OAuth2ErrorResponseError
+    && (err as OAuth2ErrorResponseError).statusCode === 404;
+}
+
 export default class MicrosoftOAuth2Provider implements IOAuth2Provider {
   public readonly type = OAuth2ProviderType.MICROSOFT;
   private readonly oauth2Config: OAuth2Config;
   private readonly envConfig: MicrosoftOAuth2EnvConfig | undefined;
   private readonly logger = new Logger(MicrosoftOAuth2Provider.name);
+  private readonly publicURL: string;
   private readonly x5t: string | undefined;
   // Map each nonce to a code verifier. The nonce is stored in the 'state'
   // parameter passed to the authorization endpoint.
@@ -125,6 +136,7 @@ export default class MicrosoftOAuth2Provider implements IOAuth2Provider {
     configService: ConfigService<EnvironmentVariables, true>,
     private readonly oauth2Service: OAuth2Service,
     private readonly calendarEventsRepository: Repository<MicrosoftCalendarEvents>,
+    private readonly calendarCreatedEventsRepository: Repository<MicrosoftCalendarCreatedEvent>,
   ) {
     const tenantID = configService.get('OAUTH2_MICROSOFT_TENANT_ID', {infer: true});
     this.oauth2Config = createOAuth2Config(tenantID);
@@ -138,6 +150,7 @@ export default class MicrosoftOAuth2Provider implements IOAuth2Provider {
       const private_key = fs.readFileSync(private_key_path);
       this.envConfig = {client_id, redirect_uri, private_key};
     }
+    this.publicURL = configService.get('PUBLIC_URL', {infer: true});
   }
 
   isConfigured(): boolean {
@@ -403,8 +416,85 @@ private generateClientAssertion(privateKey: Buffer, clientID: string): Promise<s
         DeltaLink: deltaLink,
       });
     }
-    // TODO: Filter out the event which we created for this meeting
+    // Filter out the event which we created for this meeting
+    const createdEvent = await this.calendarCreatedEventsRepository.findOneBy({MeetingID: meeting.ID, UserID: userID});
+    if (createdEvent) {
+      events = events.filter(event => event.ID !== createdEvent.CreatedMicrosoftMeetingID);
+    }
 
     return events;
+  }
+
+  // TODO: reduce code duplication with GoogleOAuth2Provider
+  async createOrUpdateEventForMeeting(creds: AbstractOAuth2, abstractExistingEvent: AbstractOAuth2CalendarCreatedEvent, meeting: Meeting): Promise<void> {
+    const existingEvent = abstractExistingEvent as MicrosoftCalendarCreatedEvent | null;
+    const userID = creds.UserID;
+    let apiMethod: Dispatcher.HttpMethod = 'POST';
+    let apiURL = MICROSOFT_API_CALENDAR_EVENTS_URL;
+    if (existingEvent) {
+      // See https://learn.microsoft.com/en-us/graph/api/event-update?view=graph-rest-1.0
+      apiURL += '/' + existingEvent.CreatedMicrosoftMeetingID;
+      apiMethod = 'PATCH';
+    }
+    const meetingURL = `${this.publicURL}/m/${meeting.ID}`;
+    // See https://learn.microsoft.com/en-us/graph/api/resources/event?view=graph-rest-1.0
+    const params: Record<string, any> = {
+      subject: meeting.Name,
+      body: {
+        content: meetingURL,
+        contentType: 'text',
+      },
+      bodyPreview: meetingURL,
+      start: {
+        dateTime: meeting.ScheduledStartDateTime,
+        timeZone: 'UTC',
+      },
+      end: {
+        dateTime: meeting.ScheduledEndDateTime,
+        timeZone: 'UTC',
+      },
+    };
+    if (meeting.About) {
+      params.body.content = meeting.About + '\n' + meetingURL;
+      params.bodyPreview = meeting.About;
+    }
+    let response: MicrosoftCreateEventResponse | undefined;
+    const body = JSON.stringify(params);
+    const headers = {'content-type': 'application/json'};
+    try {
+      response = await this.oauth2Service.apiRequest<MicrosoftCreateEventResponse>(
+        this, creds, apiURL, {method: apiMethod, body, headers}
+      );
+    } catch (err) {
+      if (existingEvent && errorIsMicrosoftCalendarEventNoLongerExists(err)) {
+        // It's possible that the user deleted the event themselves. Try to create
+        // a new one instead.
+        response = await this.oauth2Service.apiRequest<MicrosoftCreateEventResponse>(
+          this, creds, MICROSOFT_API_CALENDAR_EVENTS_URL, {method: 'POST', body, headers}
+        );
+      } else {
+        throw err;
+      }
+    }
+    await this.calendarCreatedEventsRepository.save({
+      MeetingID: meeting.ID,
+      UserID: userID,
+      CreatedMicrosoftMeetingID: response.id,
+    });
+  }
+
+  async deleteEventForMeeting(creds: AbstractOAuth2, abstractEvent: AbstractOAuth2CalendarCreatedEvent): Promise<void> {
+    const event = abstractEvent as MicrosoftCalendarCreatedEvent;
+    const apiURL = `${MICROSOFT_API_CALENDAR_EVENTS_URL}/${event.CreatedMicrosoftMeetingID}`;
+    try {
+      await this.oauth2Service.apiRequest(this, creds, apiURL, {method: 'DELETE'});
+    } catch (err: any) {
+      if (!errorIsMicrosoftCalendarEventNoLongerExists(err)) {
+        throw err;
+      }
+    }
+    await this.calendarCreatedEventsRepository.delete({
+      MeetingID: event.MeetingID, UserID: creds.UserID
+    });
   }
 }

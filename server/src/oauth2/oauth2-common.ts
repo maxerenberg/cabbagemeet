@@ -1,3 +1,6 @@
+import type GoogleCalendarCreatedEvent from "./google-calendar-created-event.entity";
+import type MicrosoftCalendarCreatedEvent from "./microsoft-calendar-created-event.entity";
+
 // These need to be in a separate file to avoid a circular import
 export const oidcScopes = ['openid', 'profile', 'email'] as const;
 export enum OAuth2ProviderType {
@@ -15,6 +18,15 @@ export const oauth2ProviderNamesMap: Record<OAuth2ProviderType, string> = {
 };
 export const oauth2ProviderNames = Object.values(oauth2ProviderNamesMap);
 export const oauth2TableNames = oauth2ProviderNames.map(name => `${name}OAuth2`);
+export const oauth2TableNamesMap = Object.entries(oauth2ProviderNamesMap)
+  .reduce((o, [key, val]) => ({...o, [key]: `${val}OAuth2`}),
+          {} as Record<OAuth2ProviderType, string>);
+export const oauth2CreatedEventTableNamesMap = Object.entries(oauth2ProviderNamesMap)
+  .reduce((o, [key, val]) => ({...o, [key]: `${val}CalendarCreatedEvent`}),
+          {} as Record<OAuth2ProviderType, string>);
+export type AbstractOAuth2CalendarCreatedEvent =
+  GoogleCalendarCreatedEvent
+  | MicrosoftCalendarCreatedEvent;
 export const oauth2Reasons = ['link', 'signup', 'login'] as const;
 export const MAX_EVENT_RESULTS = 100;
 

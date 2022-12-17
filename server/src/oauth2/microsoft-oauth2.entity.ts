@@ -3,6 +3,7 @@ import { CustomJoinColumn } from '../custom-columns/custom-join-column';
 import User from '../users/user.entity';
 import AbstractOAuth2 from './abstract-oauth2.entity';
 import MicrosoftCalendarEvents from './microsoft-calendar-events.entity';
+import MicrosoftCalendarCreatedEvent from './microsoft-calendar-created-event.entity';
 
 // See https://learn.microsoft.com/en-us/azure/active-directory/develop/v2-protocols-oidc
 @Entity('MicrosoftOAuth2')
@@ -19,6 +20,6 @@ export default class MicrosoftOAuth2 extends AbstractOAuth2 {
   @OneToMany(() => MicrosoftCalendarEvents, event => event.MicrosoftOAuth2)
   Events: MicrosoftCalendarEvents[];
 
-  // @OneToMany(() => GoogleCalendarCreatedEvent, event => event.GoogleOAuth2)
-  // CreatedEvents: GoogleCalendarCreatedEvent[];
+  @OneToMany(() => MicrosoftCalendarCreatedEvent, event => event.MicrosoftOAuth2)
+  CreatedEvents: MicrosoftCalendarCreatedEvent[];
 }

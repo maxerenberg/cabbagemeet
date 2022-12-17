@@ -1,7 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import * as jwt from 'jsonwebtoken';
-import { Dispatcher, request } from 'undici';
+import { request } from 'undici';
 import { EnvironmentVariables } from '../env.validation';
 import { InjectRepository } from '@nestjs/typeorm';
 import GoogleOAuth2 from './google-oauth2.entity';
@@ -10,11 +10,11 @@ import { normalizeDBError, UniqueConstraintFailed } from '../database.utils';
 import User from '../users/user.entity';
 import { assert, encodeQueryParams } from '../misc.utils';
 import { selectUserLeftJoinOAuth2Tables } from '../users/users.service';
-import type { OIDCResponse, DecodedIDToken, RefreshTokenResponse, GoogleListEventsResponse, GoogleListEventsResponseItem, GoogleInsertEventResponse } from './oauth2-response-types';
-import { toISOStringUTC, getSecondsSinceUnixEpoch } from '../dates.utils';
+import type { OIDCResponse, DecodedIDToken, RefreshTokenResponse } from './oauth2-response-types';
+import { getSecondsSinceUnixEpoch } from '../dates.utils';
 import MeetingsService from '../meetings/meetings.service';
 import GoogleCalendarEvents from './google-calendar-events.entity';
-import type { OAuth2CalendarEvent } from './oauth2-common';
+import { AbstractOAuth2CalendarCreatedEvent, OAuth2CalendarEvent, oauth2CreatedEventTableNamesMap, oauth2TableNamesMap } from './oauth2-common';
 import GoogleCalendarCreatedEvent from './google-calendar-created-event.entity';
 import Meeting from '../meetings/meeting.entity';
 import {
@@ -32,6 +32,7 @@ import MicrosoftOAuth2Provider from './microsoft-oauth2-provider';
 import AbstractOAuth2 from './abstract-oauth2.entity';
 import MicrosoftOAuth2 from './microsoft-oauth2.entity';
 import MicrosoftCalendarEvents from './microsoft-calendar-events.entity';
+import MicrosoftCalendarCreatedEvent from './microsoft-calendar-created-event.entity';
 
 // TODO: use truncated exponential backoff
 // See https://developers.google.com/calendar/api/guides/quota
@@ -125,24 +126,20 @@ export interface IOAuth2Provider {
   getPartialRefreshParams(): Promise<PartialRefreshParams>;
   setLinkedCalendarToTrue(user: User): void;
   getEventsForMeeting(userID: number, meeting: Meeting): Promise<OAuth2CalendarEvent[]>;
-}
-
-// TODO: delete this
-const GOOGLE_API_BASE_URL = 'https://www.googleapis.com';
-const GOOGLE_API_CALENDAR_EVENTS_BASE_URL = `${GOOGLE_API_BASE_URL}/calendar/v3/calendars/primary/events`;
-
-function errorIsGoogleCalendarEventNoLongerExists(err: any): boolean {
-  return err instanceof OAuth2ErrorResponseError
-    && (
-      (err as OAuth2ErrorResponseError).statusCode === 404
-      || (err as OAuth2ErrorResponseError).statusCode === 410
-    );
+  createOrUpdateEventForMeeting(
+    creds: AbstractOAuth2,
+    existingEvent: AbstractOAuth2CalendarCreatedEvent | null,
+    meeting: Meeting,
+  ): Promise<void>;
+  deleteEventForMeeting(
+    creds: AbstractOAuth2,
+    event: AbstractOAuth2CalendarCreatedEvent,
+  ): Promise<void>
 }
 
 @Injectable()
 export default class OAuth2Service {
   private readonly logger = new Logger(OAuth2Service.name);
-  private readonly publicURL: string;
   private readonly oauth2Providers: Record<OAuth2ProviderType, IOAuth2Provider>;
   private readonly oauth2Repositories: Record<OAuth2ProviderType, Repository<AbstractOAuth2>>;
 
@@ -151,16 +148,16 @@ export default class OAuth2Service {
     private meetingsService: MeetingsService,
     private dataSource: DataSource,
     @InjectRepository(User) private usersRepository: Repository<User>,
-    @InjectRepository(GoogleOAuth2) private googleOAuth2Repository: Repository<GoogleOAuth2>,
+    @InjectRepository(GoogleOAuth2) googleOAuth2Repository: Repository<GoogleOAuth2>,
     @InjectRepository(GoogleCalendarEvents) googleCalendarEventsRepository: Repository<GoogleCalendarEvents>,
-    @InjectRepository(GoogleCalendarCreatedEvent) private googleCalendarCreatedEventsRepository: Repository<GoogleCalendarCreatedEvent>,
+    @InjectRepository(GoogleCalendarCreatedEvent) googleCalendarCreatedEventsRepository: Repository<GoogleCalendarCreatedEvent>,
     @InjectRepository(MicrosoftOAuth2) microsoftOAuth2Repository: Repository<MicrosoftOAuth2>,
     @InjectRepository(MicrosoftCalendarEvents) microsoftCalendarEventsRepository: Repository<MicrosoftCalendarEvents>,
+    @InjectRepository(MicrosoftCalendarCreatedEvent) microsoftCalendarCreatedEventsRepository: Repository<MicrosoftCalendarCreatedEvent>,
   ) {
-    this.publicURL = configService.get('PUBLIC_URL', {infer: true});
     this.oauth2Providers = {
       [OAuth2ProviderType.GOOGLE]: new GoogleOAuth2Provider(configService, this, googleCalendarEventsRepository, googleCalendarCreatedEventsRepository),
-      [OAuth2ProviderType.MICROSOFT]: new MicrosoftOAuth2Provider(configService, this, microsoftCalendarEventsRepository),
+      [OAuth2ProviderType.MICROSOFT]: new MicrosoftOAuth2Provider(configService, this, microsoftCalendarEventsRepository, microsoftCalendarCreatedEventsRepository),
     };
     this.oauth2Repositories = {
       [OAuth2ProviderType.GOOGLE]: googleOAuth2Repository,
@@ -585,31 +582,34 @@ export default class OAuth2Service {
     return events;
   }
 
-  private getRespondentsLinkedWithGoogle(meetingID: number) {
-    return this.googleOAuth2Repository
+  private getOAuth2LinkedRespondents(
+    provider: IOAuth2Provider, meetingID: number
+  ): Promise<AbstractOAuth2[]> {
+    const oauth2TableName = oauth2TableNamesMap[provider.type];
+    const createdEventTableName = oauth2CreatedEventTableNamesMap[provider.type];
+    console.log(oauth2TableName, createdEventTableName);
+    return this.oauth2Repositories[provider.type]
       .createQueryBuilder()
-      .innerJoin('GoogleOAuth2.User', 'User')
+      .innerJoin(`${oauth2TableName}.User`, 'User')
       .innerJoin(
         'User.Respondents', 'MeetingRespondent',
         'MeetingRespondent.MeetingID = :meetingID', {meetingID}
       )
       .leftJoin(
-        'GoogleOAuth2.CreatedEvents', 'GoogleCalendarCreatedEvent',
-        'GoogleCalendarCreatedEvent.MeetingID IS NULL OR' +
-        ' GoogleCalendarCreatedEvent.MeetingID = :meetingID', {meetingID}
+        `${oauth2TableName}.CreatedEvents`, createdEventTableName,
+        `${createdEventTableName}.MeetingID IS NULL OR` +
+        ` ${createdEventTableName}.MeetingID = :meetingID`, {meetingID}
       )
-      .where('GoogleOAuth2.LinkedCalendar = true')
-      .select(['GoogleOAuth2', 'GoogleCalendarCreatedEvent'])
+      .where(`${oauth2TableName}.LinkedCalendar`)
+      .select([oauth2TableName, createdEventTableName])
       .getMany();
   }
 
-  async google_tryCreateOrUpdateEventsForMeeting(meeting: Meeting) {
-    if (meeting.ScheduledStartDateTime === null || meeting.ScheduledEndDateTime === null) {
-      return;
-    }
-    const linkedRespondents = await this.getRespondentsLinkedWithGoogle(meeting.ID);
+  private async tryCreateOrUpdateEventsForMeetingForAllRespondents_provider(provider: IOAuth2Provider, meeting: Meeting) {
+    const linkedRespondents = await this.getOAuth2LinkedRespondents(provider, meeting.ID);
     const results = await Promise.allSettled(linkedRespondents.map(
-      linkedRespondent => this.google_createOrUpdateEventForMeeting(
+      linkedRespondent => this.createOrUpdateEventForMeeting(
+        provider,
         linkedRespondent,
         linkedRespondent.CreatedEvents.length > 0 ? linkedRespondent.CreatedEvents[0] : null,
         meeting,
@@ -622,83 +622,54 @@ export default class OAuth2Service {
     }
   }
 
-  private async google_createOrUpdateEventForMeeting(
-    creds: GoogleOAuth2,
-    existingEvent: GoogleCalendarCreatedEvent | null,
+  async tryCreateOrUpdateEventsForMeetingForAllRespondents(meeting: Meeting): Promise<PromiseSettledResult<void>[]> {
+    if (meeting.ScheduledStartDateTime === null || meeting.ScheduledEndDateTime === null) {
+      return;
+    }
+    const results = await Promise.allSettled(Object.values(this.oauth2Providers).map(
+      provider => this.tryCreateOrUpdateEventsForMeetingForAllRespondents_provider(provider, meeting)
+    ));
+    for (const result of results) {
+      if (result.status === 'rejected') {
+        this.logger.error(result.reason);
+      }
+    }
+  }
+
+  private async createOrUpdateEventForMeeting(
+    provider: IOAuth2Provider,
+    creds: AbstractOAuth2,
+    existingEvent: AbstractOAuth2CalendarCreatedEvent,
     meeting: Meeting,
   ): Promise<void> {
     if (meeting.ScheduledStartDateTime === null || meeting.ScheduledEndDateTime === null) {
       return;
     }
-    const provider = this.oauth2Providers[OAuth2ProviderType.GOOGLE];
-    creds = await this.refreshCredsIfNecessary(provider, creds) as GoogleOAuth2;
-    const userID = creds.UserID;
-    let apiURL = GOOGLE_API_CALENDAR_EVENTS_BASE_URL;
-    let apiMethod: Dispatcher.HttpMethod = 'POST';
-    if (existingEvent) {
-      // See https://developers.google.com/calendar/api/v3/reference/events/update
-      apiURL += '/' + existingEvent.CreatedGoogleMeetingID;
-      apiMethod = 'PUT';
-    }
-    const params: Record<string, any> = {
-      start: {
-        dateTime: meeting.ScheduledStartDateTime,
-      },
-      end: {
-        dateTime: meeting.ScheduledEndDateTime,
-      },
-      description: meeting.About,
-      summary: meeting.Name,
-      source: {
-        url: `${this.publicURL}/m/${meeting.ID}`,
-      },
-    };
-    let response: GoogleInsertEventResponse | undefined;
-    const body = JSON.stringify(params);
-    const headers = {'content-type': 'application/json'};
-    try {
-      response = await this.apiRequest<GoogleInsertEventResponse>(
-        provider, creds, apiURL, {method: apiMethod, body, headers}
-      );
-    } catch (err: any) {
-      if (existingEvent && errorIsGoogleCalendarEventNoLongerExists(err)) {
-        // It's possible that the user deleted the event themselves. Try to create
-        // a new one instead.
-        response = await this.apiRequest<GoogleInsertEventResponse>(
-          provider, creds, GOOGLE_API_CALENDAR_EVENTS_BASE_URL, {method: 'POST', body, headers}
-        );
-      } else {
-        throw err;
-      }
-    }
-    await this.googleCalendarCreatedEventsRepository.save({
-      MeetingID: meeting.ID,
-      UserID: userID,
-      CreatedGoogleMeetingID: response.id,
-    });
+    creds = await this.refreshCredsIfNecessary(provider, creds);
+    return provider.createOrUpdateEventForMeeting(creds, existingEvent, meeting);
   }
 
-  async google_tryCreateOrUpdateEventForMeeting(userID: number, meeting: Meeting) {
-    if (meeting.ScheduledStartDateTime === null || meeting.ScheduledEndDateTime === null) {
-      return;
-    }
-    const creds = await this.googleOAuth2Repository
+  private async tryCreateOrUpdateEventsForMeetingForSingleRespondent_provider(provider: IOAuth2Provider, userID: number, meeting: Meeting) {
+    const oauth2TableName = oauth2TableNamesMap[provider.type];
+    const createdEventTableName = oauth2CreatedEventTableNamesMap[provider.type];
+    const creds = await this.oauth2Repositories[provider.type]
       .createQueryBuilder()
-      .innerJoin('GoogleOAuth2.User', 'User')
+      .innerJoin(`${oauth2TableName}.User`, 'User')
       .leftJoin(
-        'GoogleOAuth2.CreatedEvents', 'GoogleCalendarCreatedEvent',
-        'GoogleCalendarCreatedEvent.MeetingID IS NULL OR' +
-        ' GoogleCalendarCreatedEvent.MeetingID = :meetingID', {meetingID: meeting.ID}
+        `${oauth2TableName}.CreatedEvents`, createdEventTableName,
+        `${createdEventTableName}.MeetingID IS NULL OR` +
+        ` ${createdEventTableName}.MeetingID = :meetingID`, {meetingID: meeting.ID}
       )
-      .where('GoogleOAuth2.UserID = :userID', {userID})
-      .where('GoogleOAuth2.LinkedCalendar = true')
-      .select(['GoogleOAuth2', 'GoogleCalendarCreatedEvent'])
+      .where(`${oauth2TableName}.UserID = :userID`, {userID})
+      .where(`${oauth2TableName}.LinkedCalendar`)
+      .select([oauth2TableName, createdEventTableName])
       .getOne();
     if (!creds) {
       return;
     }
     try {
-      await this.google_createOrUpdateEventForMeeting(
+      await this.createOrUpdateEventForMeeting(
+        provider,
         creds,
         creds.CreatedEvents.length > 0 ? creds.CreatedEvents[0] : null,
         meeting,
@@ -708,13 +679,12 @@ export default class OAuth2Service {
     }
   }
 
-  async google_tryDeleteEventsForMeeting(meetingID: number) {
-    const linkedRespondents = await this.getRespondentsLinkedWithGoogle(meetingID);
-    const results = await Promise.allSettled(linkedRespondents.map(
-      linkedRespondent => this.google_deleteEventForMeeting(
-        linkedRespondent,
-        linkedRespondent.CreatedEvents.length > 0 ? linkedRespondent.CreatedEvents[0] : null,
-      )
+  async tryCreateOrUpdateEventsForMeetingForSingleRespondent(userID: number, meeting: Meeting) {
+    if (meeting.ScheduledStartDateTime === null || meeting.ScheduledEndDateTime === null) {
+      return;
+    }
+    const results = await Promise.allSettled(Object.values(this.oauth2Providers).map(
+      provider => this.tryCreateOrUpdateEventsForMeetingForSingleRespondent_provider(provider, userID, meeting)
     ));
     for (const result of results) {
       if (result.status === 'rejected') {
@@ -723,43 +693,75 @@ export default class OAuth2Service {
     }
   }
 
-  private async google_deleteEventForMeeting(creds: GoogleOAuth2, event: GoogleCalendarCreatedEvent | null): Promise<void> {
-    if (!event) {
-      return;
-    }
-    const provider = this.oauth2Providers[OAuth2ProviderType.GOOGLE];
-    creds = await this.refreshCredsIfNecessary(provider, creds) as GoogleOAuth2;
-    const apiURL = `${GOOGLE_API_CALENDAR_EVENTS_BASE_URL}/${event.CreatedGoogleMeetingID}`;
-    try {
-      await this.apiRequest(provider, creds, apiURL, {method: 'DELETE'});
-    } catch (err: any) {
-      if (!errorIsGoogleCalendarEventNoLongerExists(err)) {
-        throw err;
-      }
-    }
-    await this.googleCalendarCreatedEventsRepository.delete({
-      MeetingID: event.MeetingID, UserID: creds.UserID
-    });
-  }
-
-  async google_tryDeleteEventForMeeting(userID: number, meetingID: number) {
-    const creds = await this.googleOAuth2Repository
+  private async tryDeleteEventsForMeeting_provider(provider: IOAuth2Provider, meetingID: number) {
+    const oauth2TableName = oauth2TableNamesMap[provider.type];
+    const createdEventTableName = oauth2CreatedEventTableNamesMap[provider.type];
+    const linkedRespondents = await this.oauth2Repositories[provider.type]
       .createQueryBuilder()
       .innerJoin(
-        'GoogleOAuth2.CreatedEvents', 'GoogleCalendarCreatedEvent',
-        'GoogleCalendarCreatedEvent.MeetingID = :meetingID', {meetingID}
+        `${oauth2TableName}.CreatedEvents`, createdEventTableName,
+        `${createdEventTableName}.MeetingID = :meetingID`, {meetingID}
       )
-      .where('GoogleOAuth2.UserID = :userID', {userID})
-      .where('GoogleOAuth2.LinkedCalendar = true')
-      .select(['GoogleOAuth2', 'GoogleCalendarCreatedEvent'])
+      .where(`${oauth2TableName}.LinkedCalendar`)
+      .select([oauth2TableName, createdEventTableName])
+      .getMany();
+    const results = await Promise.allSettled(
+      linkedRespondents.map(
+        linkedRespondent => provider.deleteEventForMeeting(
+          linkedRespondent,
+          linkedRespondent.CreatedEvents[0],
+        )
+      )
+    );
+    for (const result of results) {
+      if (result.status === 'rejected') {
+        this.logger.error(result.reason);
+      }
+    }
+  }
+
+  async tryDeleteEventsForMeetingForAllRespondents(meetingID: number) {
+    const results = await Promise.allSettled(Object.values(this.oauth2Providers).map(
+      provider => this.tryDeleteEventsForMeeting_provider(provider, meetingID)
+    ));
+    for (const result of results) {
+      if (result.status === 'rejected') {
+        this.logger.error(result.reason);
+      }
+    }
+  }
+
+  private async tryDeleteEventsForMeetingForSingleRespondent_provider(provider: IOAuth2Provider, userID: number, meetingID: number) {
+    const oauth2TableName = oauth2TableNamesMap[provider.type];
+    const createdEventTableName = oauth2CreatedEventTableNamesMap[provider.type];
+    const creds = await this.oauth2Repositories[provider.type]
+      .createQueryBuilder()
+      .innerJoin(
+        `${oauth2TableName}.CreatedEvents`, createdEventTableName,
+        `${createdEventTableName}.MeetingID = :meetingID`, {meetingID}
+      )
+      .where(`${oauth2TableName}.UserID = :userID`, {userID})
+      .where(`${oauth2TableName}.LinkedCalendar`)
+      .select([oauth2TableName, createdEventTableName])
       .getOne();
     if (!creds) {
       return;
     }
     try {
-      await this.google_deleteEventForMeeting(creds, creds.CreatedEvents[0]);
+      await provider.deleteEventForMeeting(creds, creds.CreatedEvents[0]);
     } catch (err: any) {
       this.logger.error(err);
+    }
+  }
+
+  async tryDeleteEventsForMeetingForSingleRespondent(userID: number, meetingID: number) {
+    const results = await Promise.allSettled(Object.values(this.oauth2Providers).map(
+      provider => this.tryDeleteEventsForMeetingForSingleRespondent_provider(provider, userID, meetingID)
+    ));
+    for (const result of results) {
+      if (result.status === 'rejected') {
+        this.logger.error(result.reason);
+      }
     }
   }
 }

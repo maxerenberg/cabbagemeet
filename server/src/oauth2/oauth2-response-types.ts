@@ -64,7 +64,7 @@ export interface GoogleListEventsResponse {
 
 export type GoogleInsertEventResponse = GoogleListEventsResponseItem;
 
-// See https://learn.microsoft.com/en-us/graph/api/event-delta?view=graph-rest-1.0&tabs=http
+// See https://learn.microsoft.com/en-us/graph/api/event-delta?view=graph-rest-1.0
 export interface MicrosoftEventDeltaResponse {
   '@odata.nextLink'?: string;
   '@odata.deltaLink'?: string;
@@ -88,4 +88,10 @@ export interface MicrosoftEventDeltaResponse {
       timeZone: string;  // e.g. "UTC"
     };
   }[];
+}
+
+// See https://learn.microsoft.com/en-us/graph/api/user-post-events?view=graph-rest-1.0
+export interface MicrosoftCreateEventResponse {
+  // Properties in which we are not interested have been omitted
+  id: string;
 }

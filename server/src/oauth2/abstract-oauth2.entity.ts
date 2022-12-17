@@ -1,4 +1,5 @@
 import { Column, PrimaryColumn, Index } from 'typeorm';
+import type { AbstractOAuth2CalendarCreatedEvent } from './oauth2-common';
 
 export default abstract class AbstractOAuth2 {
   @PrimaryColumn()
@@ -23,4 +24,7 @@ export default abstract class AbstractOAuth2 {
 
   @Column({type: 'text'})
   RefreshToken: string;
+
+  // Exact type depends on implementation
+  CreatedEvents: AbstractOAuth2CalendarCreatedEvent[];
 }
