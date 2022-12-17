@@ -27,8 +27,8 @@ export default class GoogleCalendarEvents {
   PrevTimeMax: string;
 
   // See https://developers.google.com/calendar/api/guides/sync
-  @Column({nullable: true})
-  SyncToken?: string;
+  @Column({type: 'text'})
+  SyncToken: string;
 
   @ManyToOne(() => Meeting, meeting => meeting.GoogleCalendarEvents, {onDelete: 'CASCADE'})
   @CustomJoinColumn({name: 'MeetingID'})

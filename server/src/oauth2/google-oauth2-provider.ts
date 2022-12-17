@@ -21,7 +21,6 @@ import {
   OAuth2ErrorResponseError,
   OAuth2ProviderType,
   oidcScopes,
-  MAX_EVENT_RESULTS,
 } from './oauth2-common';
 import type OAuth2Service from "./oauth2.service";
 import GoogleCalendarEvents from "./google-calendar-events.entity";
@@ -65,6 +64,15 @@ function errorIsGoogleCalendarEventNoLongerExists(err: any): boolean {
       (err as OAuth2ErrorResponseError).statusCode === 404
       || (err as OAuth2ErrorResponseError).statusCode === 410
     );
+}
+
+function GoogleListEventsResponseItem_to_OAuth2CalendarEvent(item: GoogleListEventsResponseItem): OAuth2CalendarEvent {
+  return {
+    ID: item.id,
+    summary: item.summary,
+    start: toISOStringUTC(new Date(item.start.dateTime)),
+    end: toISOStringUTC(new Date(item.end.dateTime)),
+  };
 }
 
 export default class GoogleOAuth2Provider implements IOAuth2Provider {
@@ -130,33 +138,19 @@ export default class GoogleOAuth2Provider implements IOAuth2Provider {
     user.GoogleOAuth2 = {LinkedCalendar: true} as GoogleOAuth2;
   }
 
-  private GoogleListEventsResponseItem_to_OAuth2CalendarEvent(item: GoogleListEventsResponseItem): OAuth2CalendarEvent {
-    return {
-      ID: item.id,
-      summary: item.summary,
-      start: toISOStringUTC(new Date(item.start.dateTime)),
-      end: toISOStringUTC(new Date(item.end.dateTime)),
-    };
-  }
-
   private mergeResultsFromIncrementalSync(
-    events: OAuth2CalendarEvent[],
+    eventsMap: Record<string, OAuth2CalendarEvent>,
     newItems: GoogleListEventsResponseItem[]
-  ): OAuth2CalendarEvent[] {
-    const eventsMap: Record<string, OAuth2CalendarEvent> = {};
-    for (const event of events) {
-      eventsMap[event.ID] = event;
-    }
+  ) {
     for (const item of newItems) {
       // See https://developers.google.com/calendar/api/v3/reference/events#resource
       if (item.status === 'cancelled') {
         delete eventsMap[item.id];
       } else {
         // update or insert
-        eventsMap[item.id] = this.GoogleListEventsResponseItem_to_OAuth2CalendarEvent(item);
+        eventsMap[item.id] = GoogleListEventsResponseItem_to_OAuth2CalendarEvent(item);
       }
     }
-    return Object.values(eventsMap);
   }
 
   private async getEventsForMeetingUsingIncrementalSync(
@@ -167,7 +161,7 @@ export default class GoogleOAuth2Provider implements IOAuth2Provider {
     timeMax: string,
   ): Promise<{
     events: OAuth2CalendarEvent[],
-    nextSyncToken: string | null,
+    nextSyncToken: string,
     needToSaveEvents: boolean,
   } | null> {
     const existingEventsData = await this.calendarEventsRepository.findOneBy({
@@ -175,69 +169,77 @@ export default class GoogleOAuth2Provider implements IOAuth2Provider {
     });
     if (
       !existingEventsData
-      || !existingEventsData.SyncToken
       || existingEventsData.PrevTimeMin !== timeMin
       || existingEventsData.PrevTimeMax !== timeMax
     ) {
       return null;
     }
-    const params = {syncToken: existingEventsData.SyncToken};
-    const url = GOOGLE_API_CALENDAR_EVENTS_BASE_URL + '?' + encodeQueryParams(params);
-    let response: GoogleListEventsResponse | undefined;
-    try {
-      response = await this.oauth2Service.apiRequest<GoogleListEventsResponse>(this, creds, url);
-      this.logger.debug(response);
-    } catch (err: any) {
-      // See https://developers.google.com/calendar/api/guides/sync#full_sync_required_by_server
-      if (
-        err instanceof OAuth2ErrorResponseError
-        && err.statusCode === 410
-      ) {
-        // Full synchronization required
-        return null;
+    const eventsMap: Record<string, OAuth2CalendarEvent> = {};
+    // TODO: maybe it would be better to store the events as a map in the database?
+    for (const event of existingEventsData.Events) {
+      eventsMap[event.ID] = event;
+    }
+    const params: Record<string, string> = {syncToken: existingEventsData.SyncToken};
+    let atLeastOneEventChanged = false;
+    let nextSyncToken: string | undefined;
+    for (;;) {
+      const url = GOOGLE_API_CALENDAR_EVENTS_BASE_URL + '?' + encodeQueryParams(params);
+      let response: GoogleListEventsResponse | undefined;
+      try {
+        response = await this.oauth2Service.apiRequest<GoogleListEventsResponse>(this, creds, url);
+        this.logger.debug(response);
+      } catch (err: any) {
+        // See https://developers.google.com/calendar/api/guides/sync#full_sync_required_by_server
+        if (err instanceof OAuth2ErrorResponseError && err.statusCode === 410) {
+          // Full synchronization required
+          return null;
+        }
+        throw err;
       }
-      throw err;
+      atLeastOneEventChanged = atLeastOneEventChanged || response.items.length > 0;
+      this.mergeResultsFromIncrementalSync(eventsMap, response.items);
+      if (response.nextSyncToken) {
+        nextSyncToken = response.nextSyncToken;
+        break;
+      }
+      params.pageToken = response.nextPageToken!;
     }
-    // We don't want to perform pagination (for now)
-    if (response.nextPageToken) {
-      return null;
-    }
-    const thereAreNewEvents = response.items.length > 0;
-    const existingEvents = existingEventsData.Events;
-    const events =
-      thereAreNewEvents
-      ? this.mergeResultsFromIncrementalSync(existingEvents, response.items)
-      : existingEvents;
     return {
-      events,
-      nextSyncToken: response.nextSyncToken || null,
-      needToSaveEvents: thereAreNewEvents,
+      events: Object.values(eventsMap),
+      nextSyncToken,
+      needToSaveEvents: atLeastOneEventChanged,
     };
   }
 
   private async getEventsForMeetingUsingFullSync(
     creds: GoogleOAuth2,
-    google_apiTimeMin: string,
-    google_apiTimeMax: string,
+    apiTimeMin: string,
+    apiTimeMax: string,
   ): Promise<{
     events: OAuth2CalendarEvent[],
-    nextSyncToken: string | null,
+    nextSyncToken: string,
   } | null> {
     // Make sure to NOT use orderBy, otherwise a syncToken won't be returned
     const params: Record<string, string> = {
       maxAttendees: '1',
-      maxResults: String(MAX_EVENT_RESULTS),
       singleEvents: 'true',
-      timeMin: google_apiTimeMin,
-      timeMax: google_apiTimeMax,
+      timeMin: apiTimeMin,
+      timeMax: apiTimeMax,
     };
-    const url = GOOGLE_API_CALENDAR_EVENTS_BASE_URL + '?' + encodeQueryParams(params);
-    const response = await this.oauth2Service.apiRequest<GoogleListEventsResponse>(this, creds, url);
-    this.logger.debug(response);
-    const events = response.items.map(
-      item => this.GoogleListEventsResponseItem_to_OAuth2CalendarEvent(item)
-    );
-    return {events, nextSyncToken: response.nextSyncToken || null};
+    const events: OAuth2CalendarEvent[] = [];
+    let nextSyncToken: string | undefined;
+    for (;;) {
+      const url = GOOGLE_API_CALENDAR_EVENTS_BASE_URL + '?' + encodeQueryParams(params);
+      const response = await this.oauth2Service.apiRequest<GoogleListEventsResponse>(this, creds, url);
+      this.logger.debug(response);
+      events.push(...response.items.map(GoogleListEventsResponseItem_to_OAuth2CalendarEvent));
+      if (response.nextSyncToken) {
+        nextSyncToken = response.nextSyncToken;
+        break;
+      }
+      params.pageToken = response.nextPageToken!;
+    }
+    return {events, nextSyncToken};
   }
 
   async getEventsForMeeting(userID: number, meeting: Meeting): Promise<OAuth2CalendarEvent[]> {

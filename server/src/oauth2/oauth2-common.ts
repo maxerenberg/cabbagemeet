@@ -28,7 +28,6 @@ export type AbstractOAuth2CalendarCreatedEvent =
   GoogleCalendarCreatedEvent
   | MicrosoftCalendarCreatedEvent;
 export const oauth2Reasons = ['link', 'signup', 'login'] as const;
-export const MAX_EVENT_RESULTS = 100;
 
 export class OAuth2NotConfiguredError extends Error {}
 export class OAuth2ErrorResponseError extends Error {

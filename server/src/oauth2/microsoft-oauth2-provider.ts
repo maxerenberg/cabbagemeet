@@ -247,10 +247,7 @@ private generateClientAssertion(privateKey: Buffer, clientID: string): Promise<s
       this.logger.debug(response);
     } catch (err: any) {
       // See https://learn.microsoft.com/en-us/graph/delta-query-overview?tabs=http#synchronization-reset
-      if (
-        err instanceof OAuth2ErrorResponseError
-        && err.statusCode === 410
-      ) {
+      if (err instanceof OAuth2ErrorResponseError && err.statusCode === 410) {
         // Full synchronization required
         return null;
       }
