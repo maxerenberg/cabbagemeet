@@ -225,7 +225,7 @@ function LinkedAccount({
   return (
     <div className="mt-4">
       <div className="d-flex flex-wrap align-items-center justify-content-between">
-        <h5 className="text-primary">{provider}</h5>
+        <h5 className="text-primary">{capitalizedProvider}</h5>
         <ButtonWithSpinner
           as="NonFocusButton"
           style={{minWidth: 'max-content'}}

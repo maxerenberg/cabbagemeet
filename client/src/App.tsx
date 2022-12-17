@@ -145,27 +145,19 @@ function AppRoot() {
 function HeaderLinks({onClick}: {onClick: () => void}) {
   // assume that user info will be successfully fetched if token is present (optimistic)
   const isOrWillBeLoggedIn = useAppSelector(selectTokenIsPresent);
-  const links = [
-    {
-      to: "/how-it-works",
-      desc: "How it works",
-    },
-  ];
+  const links = [{to: '/', desc: 'Meet'}];
   if (isOrWillBeLoggedIn) {
     links.push({to: '/me', desc: 'Profile'});
   } else {
-    links.push({to: '/signup', desc: 'Sign up'});
-    links.push({to: '/login', desc: 'Login'});
+    links.push(
+      {to: "/how-it-works", desc: "How it works"},
+      {to: '/signup', desc: 'Sign up'},
+      {to: '/login', desc: 'Login'},
+    );
   }
   const offcanvasOnlyLinks = [
-    {
-      to: '/privacy',
-      desc: 'Privacy',
-    },
-    {
-      to: '/feedback',
-      desc: 'Feedback',
-    },
+    {to: '/privacy', desc: 'Privacy'},
+    {to: '/feedback', desc: 'Feedback'},
   ];
   // The @types/react-router-bootstrap package is wrong - className needs to be a string
   // See https://github.com/react-bootstrap/react-router-bootstrap/blob/master/src/LinkContainer.js
