@@ -12,7 +12,6 @@ import {
   ParseBoolPipe,
   UseGuards,
   Logger,
-  Req,
   Res,
   ServiceUnavailableException,
 } from '@nestjs/common';
@@ -50,9 +49,9 @@ import RateLimiter, { SECONDS_PER_MINUTE } from '../rate-limiter';
 import ResetPasswordDto from './reset-password.dto';
 import JwtAuthGuard from './jwt-auth.guard';
 import { AuthUser } from './auth-user.decorator';
-import ConfirmResetPasswordDto from './ConfirmResetPassword.dto';
+import ConfirmResetPasswordDto from './confirm-reset-password';
 import VerifyEmailAddressResponse from './verify-email-address-response';
-import { Request, Response } from 'express';
+import { Response } from 'express';
 import VerifyEmailAddressDto from './verify-email-address.dto';
 
 const setTokenDescription = (
@@ -117,7 +116,6 @@ export class AuthController {
   @Post('signup')
   async signup(
     @Body() body: LocalSignupDto,
-    @Req() req: Request,
     @Res({passthrough: true}) res: Response,
   ): Promise<UserResponseWithToken | VerifyEmailAddressResponse> {
     // TODO: rate limit based on IP address as well
@@ -132,8 +130,8 @@ export class AuthController {
         this.logger.debug(`Cannot signup user with email=${body.email}: already exists`);
         return {mustVerifyEmailAddress: true};
       }
-      const verificationCodeWasSent = await this.authService.generateAndSendVerificationCode(body.name, body.email);
-      if (!verificationCodeWasSent) {
+      const verificationEmailWasSent = await this.authService.generateAndSendVerificationEmail(body);
+      if (!verificationEmailWasSent) {
         throw new ServiceUnavailableException('Please try again later');
       }
       return {mustVerifyEmailAddress: true};
@@ -158,19 +156,17 @@ export class AuthController {
     operationId: 'verifyEmail',
   })
   @Post('verify-email')
-  async verifyEmail(@Body() body: VerifyEmailAddressDto): Promise<UserResponseWithToken> {
-    const {code, ...signupArgs} = body;
+  @HttpCode(HttpStatus.NO_CONTENT)
+  async verifyEmail(@Body() body: VerifyEmailAddressDto): Promise<void> {
     let user: User | null = null;
     try {
-      user = await this.authService.signupIfEmailIsVerified(signupArgs, code);
+      user = await this.authService.signupIfEmailIsVerified(body);
     } catch (err) {
       throw this.convertUserCreationError(err);
     }
     if (!user) {
       throw new UnauthorizedException();
     }
-    // TODO: avoid extra round-trip with database
-    return this.createTokenAndUpdateSavedTimestamp(user);
   }
 
   @ApiOperation({

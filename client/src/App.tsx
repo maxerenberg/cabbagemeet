@@ -35,6 +35,7 @@ import ErrorPage from 'components/ErrorPage';
 import ConfirmLinkExternalCalendar from 'components/ConfirmLinkExternalCalendar';
 import ConfirmPasswordReset from 'components/ConfirmPasswordReset';
 import { BottomOverlayFiller } from 'components/BottomOverlay';
+import VerifyEmail from 'components/VerifyEmail';
 
 export default function App() {
   return (
@@ -52,6 +53,7 @@ export default function App() {
             <Route path="confirm-link-microsoft-account" element={<ConfirmLinkExternalCalendar provider="microsoft" />} />
             <Route path="forgot-password" element={<ForgotPassword />} />
             <Route path="confirm-password-reset" element={<ConfirmPasswordReset />} />
+            <Route path="verify-email" element={<VerifyEmail />} />
             <Route path="error" element={<ErrorPage />} />
             <Route path="me">
               <Route index element={<Profile />} />

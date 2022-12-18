@@ -1,5 +1,5 @@
 import { randomInt as randomIntWithCb } from 'crypto';
-import { Injectable, Logger } from '@nestjs/common';
+import { BadRequestException, Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import * as bcrypt from 'bcrypt';
 import { EnvironmentVariables } from '../env.validation';
@@ -8,8 +8,10 @@ import UsersService from '../users/users.service';
 import LocalSignupDto from './local-signup.dto';
 import MailService from '../mail/mail.service';
 import CustomJwtService from '../custom-jwt/custom-jwt.service';
-import Cacher from '../cacher';
 import { SECONDS_PER_MINUTE } from '../rate-limiter';
+import VerifyEmailAddressDto, { VerifyEmailAddressEntity } from './verify-email-address.dto';
+import { getSecondsSinceUnixEpoch } from 'src/dates.utils';
+import { encodeQueryParams } from 'src/misc.utils';
 
 const SALT_ROUNDS = 10;
 
@@ -31,7 +33,6 @@ function randomInt(max: number): Promise<number> {
 export default class AuthService {
   private readonly logger = new Logger(AuthService.name);
   private readonly publicURL: string;
-  private readonly verificationCodes = new Cacher();
 
   constructor(
     private usersService: UsersService,
@@ -57,11 +58,13 @@ export default class AuthService {
     return user;
   }
 
-  private createEmailVerificationEmailBody(name: string, verificationCode: string, expiresMinutes: number): string {
+  private createEmailVerificationEmailBody(name: string, url: string, expiresMinutes: number): string {
     return (
       `Hello ${name},\n` +
       '\n' +
-      `Your verification code is: ${verificationCode}\n` +
+      'Please click the following link to verify your email address:\n' +
+      '\n' +
+      `${url}\n` +
       '\n' +
       `This code will expire in ${expiresMinutes} minutes.\n` +
       '\n' +
@@ -70,22 +73,30 @@ export default class AuthService {
     );
   }
 
-  async generateAndSendVerificationCode(name: string, email: string): Promise<boolean> {
-    // We want a 6-digit code
-    const code = await randomInt(1000000);
-    const codeStr = String(code).padStart(6, '0');
+  async generateAndSendVerificationEmail(body: LocalSignupDto) {
     const expiresMinutes = 30;
+    const bodyWithExp: VerifyEmailAddressEntity = {
+      ...body,
+      exp: getSecondsSinceUnixEpoch() + expiresMinutes * SECONDS_PER_MINUTE,
+    };
+    const {encrypted, iv, salt, tag} = await this.jwtService.encryptText(JSON.stringify(bodyWithExp));
+    const params: VerifyEmailAddressDto = {
+      encrypted_entity: encrypted.toString('base64url'),
+      iv: iv.toString('base64url'),
+      salt: salt.toString('base64url'),
+      tag: tag.toString('base64url'),
+    };
+    const url = this.publicURL + '/verify-email?' + encodeQueryParams(params as unknown as Record<string, string>);
     const sent = await this.mailService.sendNowIfAllowed({
-      recipient: email,
-      subject: 'CabbageMeet verification code',
-      body: this.createEmailVerificationEmailBody(name, codeStr, expiresMinutes),
+      recipient: body.email,
+      subject: 'CabbageMeet signup confirmation',
+      body: this.createEmailVerificationEmailBody(body.name, url, expiresMinutes),
     });
     if (!sent) {
       return false;
     }
-    this.verificationCodes.add(`${email}:${codeStr}`, true, SECONDS_PER_MINUTE * expiresMinutes);
     if (process.env.NODE_ENV === 'development') {
-      this.logger.debug(`verification code=${codeStr}`);
+      this.logger.debug(`verification url=${url}`);
     }
     return true;
   }
@@ -105,10 +116,26 @@ export default class AuthService {
     return this.usersService.create(user);
   }
 
-  signupIfEmailIsVerified(signupArgs: LocalSignupDto, code: string): Promise<User | null> {
-    if (!this.verificationCodes.pop(`${signupArgs.email}:${code}`)) {
-      return null;
+  async signupIfEmailIsVerified({encrypted_entity, iv, salt, tag}: VerifyEmailAddressDto): Promise<User | null> {
+    const entity = JSON.parse(await this.jwtService.decryptText(
+      Buffer.from(encrypted_entity, 'base64url'),
+      Buffer.from(iv, 'base64url'),
+      Buffer.from(salt, 'base64url'),
+      Buffer.from(tag, 'base64url'),
+    )) as VerifyEmailAddressEntity;
+    if (!(
+      typeof entity === 'object'
+      && typeof entity.name === 'string'
+      && typeof entity.email === 'string'
+      && typeof entity.password === 'string'
+      && typeof entity.exp === 'number'
+    )) {
+      throw new BadRequestException('Invalid encrypted entity');
     }
+    if (getSecondsSinceUnixEpoch() > entity.exp) {
+      throw new BadRequestException('Link expired');
+    }
+    const {exp, ...signupArgs} = entity;
     return this.signup(signupArgs);
   }
 

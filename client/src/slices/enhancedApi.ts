@@ -72,9 +72,6 @@ export const enhancedApi = replacedApi.enhanceEndpoints({
     signup: {
       onQueryStarted: (arg, api) => signup_onQueryStarted(arg, api),
     },
-    verifyEmail: {
-      onQueryStarted: (arg, api) => loginOrVerifyEmail_onQueryStarted(arg, api),
-    },
     logout: {
       onQueryStarted: (arg, api) => logoutOrDeleteAccount_onQueryStarted(arg, api),
       invalidatesTags: allTags,

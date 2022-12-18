@@ -9,7 +9,7 @@ import ButtonWithSpinner from './ButtonWithSpinner';
 import { useSignupMutation } from 'slices/api';
 import { HistoryContext } from './HistoryProvider';
 import { isVerifyEmailAddressResponse } from 'slices/enhancedApi';
-import VerifyEmailAddress from './VerifyEmailAddress';
+import VerifyEmailAddress from './SignupConfirmation';
 import ContinueWithMicrosoftButton from './ContinueWithMicrosoftButton';
 
 export default function Signup() {
@@ -29,7 +29,7 @@ export default function Signup() {
   }, [navigate]);
 
   if (shouldShowVerificationPage) {
-    return <VerifyEmailAddress {...{name, email, password, redirectAfterSuccessfulSignup}} />;
+    return <VerifyEmailAddress email={email} />;
   }
   return (
     <div className={styles.signupContainer}>

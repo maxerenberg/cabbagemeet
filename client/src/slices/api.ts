@@ -282,7 +282,7 @@ export type SignupApiResponse = /** status 200  */
   | VerifyEmailAddressResponse
   | /** status 201  */ UserResponseWithToken;
 export type SignupApiArg = LocalSignupDto;
-export type VerifyEmailApiResponse = /** status 201  */ UserResponseWithToken;
+export type VerifyEmailApiResponse = unknown;
 export type VerifyEmailApiArg = VerifyEmailAddressDto;
 export type LoginApiResponse = /** status 200  */ UserResponseWithToken;
 export type LoginApiArg = LocalLoginDto;
@@ -404,11 +404,10 @@ export type LocalSignupDto = {
   subscribe_to_notifications?: boolean;
 };
 export type VerifyEmailAddressDto = {
-  name: string;
-  email: string;
-  password: string;
-  subscribe_to_notifications?: boolean;
-  code: string;
+  encrypted_entity: string;
+  iv: string;
+  salt: string;
+  tag: string;
 };
 export type UnauthorizedResponse = {
   statusCode: number;
