@@ -1,6 +1,6 @@
 import React, { useMemo, useReducer } from 'react';
 import { LeftArrow as SVGLeftArrow, RightArrow as SVGRightArrow } from 'components/Arrows';
-import { getDateFromString, getDayOfWeekAbbr, getMonthAbbr, getYearMonthDayFromDateString } from 'utils/dates.utils';
+import { getDateFromString, getDayOfWeekAbbr, getMonthAbbr, getYearMonthDayFromDateString, tzAbbr } from 'utils/dates.utils';
 import AvailabilitiesRow from './AvailabilitiesRow';
 import MeetingGridBodyCells from './MeetingGridBodyCells';
 import MeetingRespondents from './MeetingRespondents';
@@ -127,26 +127,31 @@ export default function WeeklyViewTimePicker() {
     <>
       <AvailabilitiesRow {...{moreDaysToRight, pageDispatch}} />
       <div className="d-md-flex mt-3 mt-md-5">
-        <div
-          style={{
-            display: 'grid',
-            /* Column order: left arrow, hours, schedule grid, right arrow */
-            gridTemplateColumns: `auto auto repeat(${numDaysDisplayed}, minmax(3em, 1fr)) auto`,
-            /* Row order: month title, days of week, schedule grid */
-            gridTemplateRows: `auto auto repeat(${numRows}, 1.75em)`,
-            gridTemplateAreas,
-          }}
-          className="flex-md-grow-1 weeklyview-grid"
-        >
-          <MeetingGridMonthTextCell dateStrings={datesDisplayed} />
-          <MeetingGridDayOfWeekCells dateStrings={datesDisplayed} />
-          <MeetingTimesHoursColumn startHour={startHour} endHour={endHour} />
-          <MeetingDaysLeftArrow {...{moreDaysToLeft, pageDispatch}} />
-          <MeetingGridBodyCells
-            numRows={numRows} numCols={numCols} startHour={startHour}
-            dateStrings={datesDisplayed}
-          />
-          <MeetingDaysRightArrow {...{moreDaysToRight, pageDispatch}} />
+        <div className="flex-md-grow-1">
+          <div
+            style={{
+              display: 'grid',
+              /* Column order: left arrow, hours, schedule grid, right arrow */
+              gridTemplateColumns: `auto auto repeat(${numDaysDisplayed}, minmax(3em, 1fr)) auto`,
+              /* Row order: month title, days of week, schedule grid */
+              gridTemplateRows: `auto auto repeat(${numRows}, 1.75em)`,
+              gridTemplateAreas,
+            }}
+            className="weeklyview-grid"
+          >
+            <MeetingGridMonthTextCell dateStrings={datesDisplayed} />
+            <MeetingGridDayOfWeekCells dateStrings={datesDisplayed} />
+            <MeetingTimesHoursColumn startHour={startHour} endHour={endHour} />
+            <MeetingDaysLeftArrow {...{moreDaysToLeft, pageDispatch}} />
+            <MeetingGridBodyCells
+              numRows={numRows} numCols={numCols} startHour={startHour}
+              dateStrings={datesDisplayed}
+            />
+            <MeetingDaysRightArrow {...{moreDaysToRight, pageDispatch}} />
+          </div>
+          <div className="mt-4 text-center weeklyview__local_time_text">
+            Shown in local time ({tzAbbr})
+          </div>
         </div>
         <MeetingRespondents />
       </div>

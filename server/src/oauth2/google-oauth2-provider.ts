@@ -1,7 +1,7 @@
 import { ConfigService } from "@nestjs/config";
 import { Repository } from "typeorm";
 import type { Dispatcher } from 'undici';
-import { toISOStringUTCFromDateStrAndHourAndTz, toISOStringUTC } from '../dates.utils';
+import { toISOStringUTCFromDateStrAndHourAndTz, toISOStringUTC, toISOStringUTCFromDateTimeStr } from '../dates.utils';
 import type { EnvironmentVariables } from "../env.validation";
 import type Meeting from "../meetings/meeting.entity";
 import { encodeQueryParams } from '../misc.utils';
@@ -73,6 +73,14 @@ function GoogleListEventsResponseItem_to_OAuth2CalendarEvent(item: GoogleListEve
     start: toISOStringUTC(new Date(item.start.dateTime)),
     end: toISOStringUTC(new Date(item.end.dateTime)),
   };
+}
+
+function filterOutEventsWhichAreOutOfRange(events: GoogleListEventsResponseItem[], timeMin: string, timeMax: string): GoogleListEventsResponseItem[] {
+  return events.filter(
+    ({start, end}) =>
+      toISOStringUTCFromDateTimeStr(end.dateTime) > timeMin
+      && toISOStringUTCFromDateTimeStr(start.dateTime) < timeMax
+  );
 }
 
 export default class GoogleOAuth2Provider implements IOAuth2Provider {
@@ -197,6 +205,7 @@ export default class GoogleOAuth2Provider implements IOAuth2Provider {
         throw err;
       }
       atLeastOneEventChanged = atLeastOneEventChanged || response.items.length > 0;
+      response.items = filterOutEventsWhichAreOutOfRange(response.items, timeMin, timeMax);
       this.mergeResultsFromIncrementalSync(eventsMap, response.items);
       if (response.nextSyncToken) {
         nextSyncToken = response.nextSyncToken;
@@ -213,8 +222,8 @@ export default class GoogleOAuth2Provider implements IOAuth2Provider {
 
   private async getEventsForMeetingUsingFullSync(
     creds: GoogleOAuth2,
-    apiTimeMin: string,
-    apiTimeMax: string,
+    timeMin: string,
+    timeMax: string,
   ): Promise<{
     events: OAuth2CalendarEvent[],
     nextSyncToken: string,
@@ -223,8 +232,8 @@ export default class GoogleOAuth2Provider implements IOAuth2Provider {
     const params: Record<string, string> = {
       maxAttendees: '1',
       singleEvents: 'true',
-      timeMin: apiTimeMin,
-      timeMax: apiTimeMax,
+      timeMin,
+      timeMax,
     };
     const events: OAuth2CalendarEvent[] = [];
     let nextSyncToken: string | undefined;
@@ -232,6 +241,7 @@ export default class GoogleOAuth2Provider implements IOAuth2Provider {
       const url = GOOGLE_API_CALENDAR_EVENTS_BASE_URL + '?' + encodeQueryParams(params);
       const response = await this.oauth2Service.apiRequest<GoogleListEventsResponse>(this, creds, url);
       this.logger.debug(response);
+      response.items = filterOutEventsWhichAreOutOfRange(response.items, timeMin, timeMax);
       events.push(...response.items.map(GoogleListEventsResponseItem_to_OAuth2CalendarEvent));
       if (response.nextSyncToken) {
         nextSyncToken = response.nextSyncToken;

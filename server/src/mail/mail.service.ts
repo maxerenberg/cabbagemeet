@@ -1,10 +1,9 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import * as nodemailer from 'nodemailer';
-import SMTPTransport from 'nodemailer/lib/smtp-transport';
 import { sleep } from '../misc.utils';
 import { EnvironmentVariables } from '../env.validation';
 import RateLimiter, { SECONDS_PER_DAY, SECONDS_PER_MINUTE } from '../rate-limiter';
+import SMTPMailStrategy from './smtp-mail-strategy';
 
 const KEY = 'mail';
 
@@ -14,60 +13,31 @@ export interface SendParams {
   body: string;
 }
 
+export interface IMailStrategy {
+  sendNow(params: SendParams): Promise<void>;
+}
+
 @Injectable()
 export default class MailService {
-  private transport: nodemailer.Transporter = undefined;
+  private strategy: IMailStrategy | undefined;
   private readonly logger = new Logger(MailService.name);
   private readonly rateLimiter: RateLimiter;
 
   constructor(configService: ConfigService<EnvironmentVariables, true>) {
     const dailyLimit = configService.get('EMAIL_DAILY_LIMIT', {infer: true});
     this.rateLimiter = new RateLimiter(SECONDS_PER_DAY, dailyLimit);
-    const smtpHost = configService.get('SMTP_HOST', {infer: true});
-    const smtpPort = +configService.get('SMTP_PORT', {infer: true});
-    const smtpFrom = configService.get('SMTP_FROM', {infer: true});
-    const smtpUser = configService.get('SMTP_USER', {infer: true});
-    const smtpPass = configService.get('SMTP_PASSWORD', {infer: true});
-    const transportOptions: SMTPTransport.Options = {
-      port: smtpPort,
-      host: smtpHost,
-      connectionTimeout: 10,
-    };
-    if (smtpUser && smtpPass) {
-      transportOptions.auth = {
-        user: smtpUser,
-        pass: smtpPass,
-      };
-    }
-    if (smtpPort === 465) {
-      transportOptions.secure = true;
-    }
-    if (process.env.NODE_ENV === 'production') {
-      transportOptions.requireTLS = true;
-    }
-    if (smtpHost && smtpPort && smtpFrom) {
-      this.transport = nodemailer.createTransport(transportOptions, {
-        from: `CabbageMeet <${smtpFrom}>`,
-      });
+    if (configService.get('SMTP_HOST')) {
+      this.strategy = new SMTPMailStrategy(configService);
     }
   }
 
   isConfigured(): boolean {
-    return this.transport !== undefined;
-  }
-
-  private async sendNow({recipient, subject, body}: SendParams) {
-    this.logger.debug(`Sending to=${recipient} (subject="${subject}")`);
-    await this.transport.sendMail({
-      to: recipient,
-      subject,
-      text: body,
-    });
+    return this.strategy !== undefined;
   }
 
   private async trySendNow(args: SendParams): Promise<boolean> {
     try {
-      await this.sendNow(args);
+      await this.strategy.sendNow(args);
       return true;
     } catch (err: any) {
       this.logger.error(err);

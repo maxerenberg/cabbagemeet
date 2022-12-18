@@ -43,6 +43,10 @@ export function toISOStringUTC(date: Date): string {
   return `${YYYY}-${MM}-${DD}T${HH}:${mm}:${ss}Z`;
 }
 
+export function toISOStringUTCFromDateTimeStr(dateTimeStr: string): string {
+  return toISOStringUTC(new Date(dateTimeStr));
+}
+
 export function toISOStringUTCFromDateTimeStrAndTz(dateTimeStr: string, tz: string): string {
   const date = DateTime.fromISO(dateTimeStr, { zone: tz }).toJSDate();
   return toISOStringUTC(date);

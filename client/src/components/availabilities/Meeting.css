@@ -12,6 +12,11 @@
   }
 }
 
+.weeklyview__local_time_text {
+  color: gray;
+  font-size: 0.9em;
+}
+
 .weeklyview__bodycell {
   user-select: none;
   text-align: left;
