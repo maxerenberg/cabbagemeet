@@ -1,6 +1,6 @@
 export default function VerifyEmailAddress({email}: {email: string}) {
   return (
-    <div className="align-self-center" style={{width: 'min(100%, 600px)'}}>
+    <div className="align-self-center" style={{maxWidth: '600px'}}>
       <h3>Signup Confirmation</h3>
       <hr className="my-4" />
       <p>

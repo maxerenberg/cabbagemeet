@@ -10,14 +10,6 @@ export function setToday(date: Date) {
 // Need to put this in a separate function or else we can't use it outside
 // of React components
 export function getToday() {
-  const freshDate = new Date();
-  if (
-    freshDate.getFullYear() !== today.getFullYear()
-    || freshDate.getMonth() !== today.getMonth()
-    || freshDate.getDay() !== today.getDay()
-  ) {
-    today = freshDate;
-  }
   return today;
 }
 export function useToday() {

@@ -36,6 +36,9 @@ import ConfirmLinkExternalCalendar from 'components/ConfirmLinkExternalCalendar'
 import ConfirmPasswordReset from 'components/ConfirmPasswordReset';
 import { BottomOverlayFiller } from 'components/BottomOverlay';
 import VerifyEmail from 'components/VerifyEmail';
+import Privacy from 'components/Privacy';
+import Feedback from 'components/Feedback';
+import TermsOfService from 'components/TermsOfService';
 
 export default function App() {
   return (
@@ -45,6 +48,9 @@ export default function App() {
           <Route path="/" element={<AppRoot />}>
             <Route index element={<DayPicker />} />
             <Route path="how-it-works" element={<HowItWorksPage />} />
+            <Route path="privacy" element={<Privacy />} />
+            <Route path="feedback" element={<Feedback />} />
+            <Route path="terms-of-service" element={<TermsOfService />} />
             <Route path="create" element={<MeetingForm />} />
             <Route path="m/:id" element={<Meeting />} />
             <Route path="signup" element={<Signup />} />
@@ -205,6 +211,8 @@ function Footer() {
     <footer className="d-none d-md-flex align-items-center justify-content-center border-top mt-md-5">
       <Link to="/privacy" >Privacy</Link>
       <Link to="/feedback">Feedback</Link>
+      <Link to="/terms-of-service">Terms of Service</Link>
+      <a href="https://github.com/maxerenberg/cabbagemeet">GitHub</a>
     </footer>
   );
 }
