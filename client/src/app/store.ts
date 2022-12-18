@@ -4,7 +4,6 @@ import authenticationReducer from 'slices/authentication';
 import availabilitiesSelectionReducer from 'slices/availabilitiesSelection';
 import currentMeetingReducer from 'slices/currentMeeting';
 import selectedDatesReducer from 'slices/selectedDates';
-import visitedDayPickerReducer from 'slices/visitedDayPicker';
 
 export const store = configureStore({
   reducer: {
@@ -13,7 +12,6 @@ export const store = configureStore({
     availabilitiesSelection: availabilitiesSelectionReducer,
     currentMeeting: currentMeetingReducer,
     selectedDates: selectedDatesReducer,
-    visitedDayPicker: visitedDayPickerReducer,
   },
   middleware: getDefaultMiddleware =>
     getDefaultMiddleware().concat(enhancedApi.middleware),

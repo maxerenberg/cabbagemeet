@@ -4,12 +4,13 @@ import { range } from 'utils/arrays.utils'
 import {
   addDaysToDateString,
   daysOfWeekAbbr,
+  getDateFromString,
  } from 'utils/dates.utils';
 import CalendarCell from './CalendarCell';
 
 export default function Calendar({firstVisibleDate}: {firstVisibleDate: string}) {
   const [page, setPage] = useState(0);
-  const firstSelectedDate_dayOfWeek = new Date(firstVisibleDate).getDay();
+  const firstSelectedDate_dayOfWeek = getDateFromString(firstVisibleDate).getDay();
   const firstDateInGridForPage0 = addDaysToDateString(firstVisibleDate, -firstSelectedDate_dayOfWeek);
   const firstDateInGrid = addDaysToDateString(firstDateInGridForPage0, 28 * page);
 

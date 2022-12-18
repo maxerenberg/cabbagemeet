@@ -13,6 +13,7 @@ export function getToday() {
   return today;
 }
 export function useToday() {
+  // TODO: use timer which updates `today` when midnight passes
   return getToday();
 }
 export function useTodayString() {
@@ -80,8 +81,11 @@ export function getDateString(yearOrDate: number | Date, month?: number, day?: n
  * Returns a date object for the given date string in local time
  * @param date a date string in YYYY-MM-DD format
  */
-export function getDateFromString(date: string): Date {
-  const [year, month, day] = getYearMonthDayFromDateString(date);
+export function getDateFromString(dateStr: string): Date {
+  // Do not pass the dateStr directly to the Date constructor, because
+  // that will assume midnight at UTC, which, if you're in the Western
+  // hemisphere, will actually be yesterday in local time
+  const [year, month, day] = getYearMonthDayFromDateString(dateStr);
   return new Date(year, month-1, day);
 }
 

@@ -1,32 +1,43 @@
-import { useNavigate, Link } from 'react-router-dom';
+import { useEffect } from 'react';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAppDispatch, useAppSelector } from 'app/hooks';
 import BottomOverlay from 'components/BottomOverlay';
-import { selectDefaultDate, selectSelectedDates, selectSelectedDatesModifiedSinceLastReset } from 'slices/selectedDates';
-import { setVisitedDayPicker } from 'slices/visitedDayPicker';
+import MeetingForm from 'components/MeetingForm';
+import { selectSelectedDates, setSelectedDates } from 'slices/selectedDates';
 import './DayPicker.css';
 import Calendar from './Calendar';
-import { useEffect } from 'react';
 import { useTodayString } from 'utils/dates.utils';
+import { useState } from 'react';
 
 export default function DayPicker() {
   const dispatch = useAppDispatch();
+  const { pathname } = useLocation();
   const navigate = useNavigate();
+  const [clickedMeetButton, setClickedMeetButton] = useState(false);
   const todayString = useTodayString();
-  const modifiedSinceLastReset = useAppSelector(selectSelectedDatesModifiedSinceLastReset);
   const atLeastOneDateSelected = useAppSelector(
     state => Object.keys(selectSelectedDates(state)).length > 0
   );
   useEffect(() => {
     // Select today's date by default
-    if (!modifiedSinceLastReset) {
-      dispatch(selectDefaultDate(todayString));
-    }
-  }, [modifiedSinceLastReset, dispatch, todayString]);
-  const onClick = () => {
-    dispatch(setVisitedDayPicker(true));
-    navigate("/create");
-  };
+    dispatch(setSelectedDates({[todayString]: true}));
+  }, [dispatch, todayString]);
 
+  useEffect(() => {
+    if (pathname === '/create' && !clickedMeetButton) {
+      // user navigated directly to /create without visiting the homepage first
+      navigate('/');
+    }
+  }, [pathname, clickedMeetButton, navigate]);
+
+  if (clickedMeetButton && pathname === '/create') {
+    return <MeetingForm />;
+  }
+
+  const onClick = () => {
+    setClickedMeetButton(true);
+    navigate('/create');
+  };
   return (
     <>
       <section className="d-flex align-items-center justify-content-center justify-content-md-between fs-4">

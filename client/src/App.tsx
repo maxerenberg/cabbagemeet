@@ -22,7 +22,6 @@ import ForgotPassword from 'components/ForgotPassword';
 import HistoryProvider from 'components/HistoryProvider';
 import HowItWorksPage from 'components/HowItWorksPage';
 import Login from 'components/Login';
-import MeetingForm from 'components/MeetingForm';
 import Signup from 'components/Signup';
 import Meeting from 'components/availabilities/Meeting';
 import Profile from 'components/Profile';
@@ -41,17 +40,18 @@ import Feedback from 'components/Feedback';
 import TermsOfService from 'components/TermsOfService';
 
 export default function App() {
+  const dayPicker = <DayPicker />;
   return (
     <BrowserRouter>
       <HistoryProvider>
         <Routes>
           <Route path="/" element={<AppRoot />}>
-            <Route index element={<DayPicker />} />
+            <Route index element={dayPicker} />
+            <Route path="create" element={dayPicker} />
             <Route path="how-it-works" element={<HowItWorksPage />} />
             <Route path="privacy" element={<Privacy />} />
             <Route path="feedback" element={<Feedback />} />
             <Route path="terms-of-service" element={<TermsOfService />} />
-            <Route path="create" element={<MeetingForm />} />
             <Route path="m/:id" element={<Meeting />} />
             <Route path="signup" element={<Signup />} />
             <Route path="login" element={<Login />} />
