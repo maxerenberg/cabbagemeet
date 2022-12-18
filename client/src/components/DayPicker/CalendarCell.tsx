@@ -1,24 +1,22 @@
 import React from 'react';
 import {
   addDaysToDateString,
-  getDateString,
   getMonthAbbr,
   getYearMonthDayFromDateString,
-  today,
-  todayString,
 } from 'utils/dates.utils';
 import { useAppDispatch, useAppSelector } from 'app/hooks';
 import { addDate, removeDate, selectSelectedDates } from 'slices/selectedDates';
 
 type CalendarCellProps = {
+  firstVisibleDate: string; // YYYY-MM-DD
   firstDateInGrid: string;  // YYYY-MM-DD
   cellIdx: number;
 };
 
-function CalendarCell({firstDateInGrid, cellIdx}: CalendarCellProps) {
+function CalendarCell({firstVisibleDate, firstDateInGrid, cellIdx}: CalendarCellProps) {
   const dateString = addDaysToDateString(firstDateInGrid, cellIdx);
   const [, month, day] = getYearMonthDayFromDateString(dateString);
-  const isEmpty = dateString < getDateString(today);
+  const isEmpty = dateString < firstVisibleDate;
   const isSelected = useAppSelector(state => !!selectSelectedDates(state)[dateString]);
   const dispatch = useAppDispatch();
   const onClick = () => {
@@ -36,7 +34,7 @@ function CalendarCell({firstDateInGrid, cellIdx}: CalendarCellProps) {
       {!isEmpty && (
         <>
           {
-            (dateString === todayString || dateString === firstDateInGrid || day === 1) ? (
+            (dateString === firstVisibleDate || dateString === firstDateInGrid || day === 1) ? (
               <div className="daypicker-calendar-cell-month-indicator">
                 {getMonthAbbr(month-1)}
               </div>

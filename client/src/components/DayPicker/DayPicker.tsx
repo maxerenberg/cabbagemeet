@@ -1,17 +1,27 @@
 import { useNavigate, Link } from 'react-router-dom';
 import { useAppDispatch, useAppSelector } from 'app/hooks';
 import BottomOverlay from 'components/BottomOverlay';
-import { selectSelectedDates } from 'slices/selectedDates';
+import { selectDefaultDate, selectSelectedDates, selectSelectedDatesModifiedSinceLastReset } from 'slices/selectedDates';
 import { setVisitedDayPicker } from 'slices/visitedDayPicker';
 import './DayPicker.css';
 import Calendar from './Calendar';
+import { useEffect } from 'react';
+import { useTodayString } from 'utils/dates.utils';
 
 export default function DayPicker() {
   const dispatch = useAppDispatch();
   const navigate = useNavigate();
+  const todayString = useTodayString();
+  const modifiedSinceLastReset = useAppSelector(selectSelectedDatesModifiedSinceLastReset);
   const atLeastOneDateSelected = useAppSelector(
     state => Object.keys(selectSelectedDates(state)).length > 0
   );
+  useEffect(() => {
+    // Select today's date by default
+    if (!modifiedSinceLastReset) {
+      dispatch(selectDefaultDate(todayString));
+    }
+  }, [modifiedSinceLastReset, dispatch, todayString]);
   const onClick = () => {
     dispatch(setVisitedDayPicker(true));
     navigate("/create");
@@ -30,7 +40,7 @@ export default function DayPicker() {
         </button>
       </section>
       <section style={{marginTop: '4rem'}}>
-        <Calendar />
+        <Calendar firstVisibleDate={todayString} />
       </section>
       <BottomOverlay>
         <Link to="/how-it-works" className="custom-link custom-link-inverted">How it works</Link>

@@ -107,7 +107,7 @@ export default function EditMeeting({
       <MeetingAboutPrompt {...{meetingAbout, setMeetingAbout}} />
       <div className="create-meeting-form-group">
         <p className="fs-5">On which days would you like to meet?</p>
-        <Calendar />
+        <Calendar firstVisibleDate={meeting.tentativeDates[0]} />
       </div>
       <div className="d-md-flex align-items-md-end">
         <MeetingTimesPrompt {...{startTime, setStartTime, endTime, setEndTime}} />

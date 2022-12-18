@@ -77,10 +77,10 @@ export class AuthController {
     private usersService: UsersService,
     configService: ConfigService<EnvironmentVariables, true>,
   ) {
-    // A user can reset their password at most once every 10 minutes
-    this.pwresetRateLimiter = new RateLimiter(SECONDS_PER_MINUTE * 10, 1);
-    // A user can try to sign up at most once every 10 minutes
-    this.signupRateLimiter = new RateLimiter(SECONDS_PER_MINUTE * 10, 1);
+    // A user can reset their password at most once every 5 minutes
+    this.pwresetRateLimiter = new RateLimiter(SECONDS_PER_MINUTE * 5, 1);
+    // A user can try to sign up at most three times per minute
+    this.signupRateLimiter = new RateLimiter(SECONDS_PER_MINUTE, 3);
     // A user can try to login at most 10 times per minute
     this.loginRateLimiter = new RateLimiter(SECONDS_PER_MINUTE, 10);
     this.verifySignupEmailAddress = configService.get('VERIFY_SIGNUP_EMAIL_ADDRESS', {infer: true});

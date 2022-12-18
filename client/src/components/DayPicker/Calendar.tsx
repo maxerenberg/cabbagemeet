@@ -4,21 +4,21 @@ import { range } from 'utils/arrays.utils'
 import {
   addDaysToDateString,
   daysOfWeekAbbr,
-  today,
-  todayString,
  } from 'utils/dates.utils';
 import CalendarCell from './CalendarCell';
 
-export default function Calendar() {
+export default function Calendar({firstVisibleDate}: {firstVisibleDate: string}) {
   const [page, setPage] = useState(0);
-  const firstDateInGridForPage0 = addDaysToDateString(todayString, -today.getDay());
+  const firstSelectedDate_dayOfWeek = new Date(firstVisibleDate).getDay();
+  const firstDateInGridForPage0 = addDaysToDateString(firstVisibleDate, -firstSelectedDate_dayOfWeek);
   const firstDateInGrid = addDaysToDateString(firstDateInGridForPage0, 28 * page);
 
   const monthCells = range(28).map((cellIdx) => (
     <CalendarCell
-      cellIdx={cellIdx}
-      firstDateInGrid={firstDateInGrid}
       key={cellIdx}
+      firstVisibleDate={firstVisibleDate}
+      firstDateInGrid={firstDateInGrid}
+      cellIdx={cellIdx}
     />
   ));
 

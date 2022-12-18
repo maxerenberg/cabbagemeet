@@ -1,10 +1,33 @@
-import {DateTime} from 'luxon';
+import { DateTime } from 'luxon';
+import { useMemo } from 'react';
 import { assert } from './misc.utils';
 
-// change this as desired for testing etc.
-export const today = new Date();
-export const todayString = getDateString(today);
-// from https://stackoverflow.com/a/34405528
+let today = new Date();
+// For unit testing
+export function setToday(date: Date) {
+  today = date;
+}
+// Need to put this in a separate function or else we can't use it outside
+// of React components
+export function getToday() {
+  const freshDate = new Date();
+  if (
+    freshDate.getFullYear() !== today.getFullYear()
+    || freshDate.getMonth() !== today.getMonth()
+    || freshDate.getDay() !== today.getDay()
+  ) {
+    today = freshDate;
+  }
+  return today;
+}
+export function useToday() {
+  return getToday();
+}
+export function useTodayString() {
+  const today = useToday();
+  const todayString = useMemo(() => getDateString(today), [today]);
+  return todayString;
+}
 // TODO: what should we show when there are two dates displayed
 // with different time zones (due to Daylight Savings Time)?
 export const tzAbbr = getTzAbbr(today);
@@ -16,6 +39,7 @@ export const ianaTzName = Intl.DateTimeFormat().resolvedOptions().timeZone;
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
 export function getTzAbbr(date: Date): string {
+  // from https://stackoverflow.com/a/34405528
   return date.toLocaleTimeString('en-us', {timeZoneName: 'short'}).split(' ')[2];
 }
 

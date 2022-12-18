@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import Form from 'react-bootstrap/Form';
 import { to12HourClock, tzAbbr } from 'utils/dates.utils';
 import { range } from 'utils/arrays.utils';
@@ -15,7 +15,6 @@ export default function MeetingTimesPrompt({
   endTime: number,
   setEndTime: (time: number) => void,
 }) {
-  const [endTimeSuffix, setEndTimeSuffix] = useState<'am' | 'pm'>(endTime < 12 ? 'am' : 'pm');
   return (
     <fieldset className="create-meeting-form-group">
       <legend className="create-meeting-question">Between which times would you like to meet?</legend>
@@ -62,16 +61,23 @@ function TimePicker({
       document.body.removeEventListener('click', listener);
     };
   }, []);
-  const [hourSuffix, setHourSuffix] = useState<'am' | 'pm'>(hour24 < 12 ? 'am' : 'pm');
+  // Use useRef instead of useState because the setHour12 callback would sometimes
+  // use a stale value
+  const hourSuffix = useRef<'am' | 'pm'>(hour24 < 12 ? 'am' : 'pm');
   const setHour12 = (hour12: number) => {
-    if (hourSuffix === 'am') {
+    if (hourSuffix.current === 'am') {
       setHour24(hour12 === 12 ? 0 : hour12);
     } else {
       setHour24(hour12 === 12 ? 12 : hour12 + 12);
     }
   };
   const hour12 = to12HourClock(hour24);  // [1, 12]
-  const text = hour12 + ' ' + hourSuffix;
+  const setHourSuffix = (suffix: 'am' | 'pm') => {
+    hourSuffix.current = suffix;
+    // update the parent's state
+    setHour12(hour12);
+  };
+  const text = hour12 + ' ' + hourSuffix.current;
   return (
     <div className="position-relative">
       <Form.Control
@@ -102,7 +108,7 @@ function TimePicker({
             {(['am', 'pm'] as const).map(suffix => (
               <li
                 key={suffix}
-                className={suffix === hourSuffix ? 'selected' : ''}
+                className={suffix === hourSuffix.current ? 'selected' : ''}
                 onClick={() => setHourSuffix(suffix)}
               >
                 {suffix}
