@@ -1,17 +1,24 @@
 import { useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { useAppSelector } from 'app/hooks';
-import { selectTokenIsPresent } from 'slices/authentication';
-import GenericSpinner from './GenericSpinner';
 import { Link } from 'react-router-dom';
-import { useToast } from './Toast';
-import { getReqErrorMessage } from 'utils/requests.utils';
-import ButtonWithSpinner from './ButtonWithSpinner';
+import { useAppSelector } from 'app/hooks';
+import ButtonWithSpinner from 'components/ButtonWithSpinner';
+import GenericSpinner from 'components/GenericSpinner';
+import { useToast } from 'components/Toast';
+import {
+  useConfirmLinkGoogleAccountMutation,
+  useConfirmLinkMicrosoftAccountMutation,
+} from 'slices/api';
+import { selectTokenIsPresent } from 'slices/authentication';
 import { useGetSelfInfoIfTokenIsPresent } from 'utils/auth.hooks';
-import { calendarBrandNames, confirmLinkAccountHooks, OAuth2Provider } from 'utils/oauth2-common';
-import { logos } from 'utils/oauth2-common';
 import { capitalize } from 'utils/misc.utils';
+import { calendarProductNames, logos, OAuth2Provider } from 'utils/oauth2-common';
+import { getReqErrorMessage } from 'utils/requests.utils';
 
+const confirmLinkAccountHooks: Record<OAuth2Provider, typeof useConfirmLinkGoogleAccountMutation> = {
+  'google': useConfirmLinkGoogleAccountMutation,
+  'microsoft': useConfirmLinkMicrosoftAccountMutation,
+};
 
 export default function ConfirmLinkExternalCalendar({provider}: {provider: OAuth2Provider}) {
   const capitalizedProvider = capitalize(provider);
@@ -52,7 +59,7 @@ export default function ConfirmLinkExternalCalendar({provider}: {provider: OAuth
   if (!userInfo) {
     return <GenericSpinner />;
   }
-  const calendarBrandName = calendarBrandNames[provider] ?? capitalizedProvider;
+  const calendarBrandName = calendarProductNames[provider] ?? capitalizedProvider;
   const onClick = () => confirmLinkAccount({
     encrypted_entity: encryptedEntity,
     iv,

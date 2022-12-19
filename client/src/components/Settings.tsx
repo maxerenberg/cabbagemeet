@@ -23,7 +23,7 @@ import {
 } from "slices/api";
 import ButtonWithSpinner from "./ButtonWithSpinner";
 import { useGetSelfInfoIfTokenIsPresent } from "utils/auth.hooks";
-import { calendarBrandNames, OAuth2Provider } from "utils/oauth2-common";
+import { calendarProductNames, OAuth2Provider } from "utils/oauth2-common";
 
 export default function Settings() {
   const tokenIsPresent = useAppSelector(selectTokenIsPresent);
@@ -210,7 +210,7 @@ function LinkedAccount({
       window.location.href = link_data!.redirect;
     }
   }, [link_data, link_isSuccess]);
-  const calendarProductName = calendarBrandNames[provider] ?? capitalizedProvider;
+  const calendarProductName = calendarProductNames[provider] ?? capitalizedProvider;
   const buttonVariant = hasLinkedAccount ? 'secondary' : 'primary';
   let onClick: React.MouseEventHandler<HTMLButtonElement> | undefined;
   if (hasLinkedAccount) {

@@ -1,8 +1,9 @@
+import { capitalize } from "src/misc.utils";
 import type GoogleCalendarCreatedEvent from "./google-calendar-created-event.entity";
 import type MicrosoftCalendarCreatedEvent from "./microsoft-calendar-created-event.entity";
 
-// These need to be in a separate file to avoid a circular import
 export const oidcScopes = ['openid', 'profile', 'email'] as const;
+// NOTE: if you add a new provider, make sure to update server-info-response.ts
 export enum OAuth2ProviderType {
   GOOGLE = 1,
   MICROSOFT,
@@ -12,11 +13,13 @@ export enum OAuth2ProviderType {
 // See https://stackoverflow.com/a/39439520
 export const oauth2ProviderTypes = Object.values(OAuth2ProviderType)
   .filter(val => typeof val !== 'string') as OAuth2ProviderType[];
-export const oauth2ProviderNamesMap: Record<OAuth2ProviderType, string> = {
-  [OAuth2ProviderType.GOOGLE]: 'Google',
-  [OAuth2ProviderType.MICROSOFT]: 'Microsoft',
-};
-export const oauth2ProviderNames = Object.values(oauth2ProviderNamesMap);
+export const oauth2ProviderNames = (Object.values(OAuth2ProviderType)
+  .filter(val => typeof val === 'string') as string[])
+  .map(capitalize);
+export const oauth2ProviderNamesMap: Record<OAuth2ProviderType, string> = Object.entries(OAuth2ProviderType)
+  .filter(([key, val]) => typeof val === 'string')
+  .reduce((o, [providerType, providerNameUpper]) => ({...o, [providerType]: capitalize(providerNameUpper as string)}),
+          {} as Record<OAuth2ProviderType, string>);
 export const oauth2TableNames = oauth2ProviderNames.map(name => `${name}OAuth2`);
 export const oauth2TableNamesMap = Object.entries(oauth2ProviderNamesMap)
   .reduce((o, [key, val]) => ({...o, [key]: `${val}OAuth2`}),

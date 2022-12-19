@@ -4,20 +4,20 @@ import { getReqErrorMessage, useMutationWithPersistentError } from 'utils/reques
 import ButtonWithSpinner from './ButtonWithSpinner';
 import { createAndStoreSessionNonce } from 'utils/auth.utils';
 import { HistoryContext } from './HistoryProvider';
+import { logos, OAuth2Provider } from 'utils/oauth2-common';
+import { capitalize } from 'utils/misc.utils';
 
 export default function ContinueWithButton({
   reason,
-  providerName,
+  provider,
   useLoginMutation,
   useSignupMutation,
-  logoPath,
   className,
 }: {
   reason: 'signup' | 'login',
-  providerName: string,
+  provider: OAuth2Provider,
   useLoginMutation: typeof useLoginWithGoogleMutation,
   useSignupMutation: typeof useSignupWithGoogleMutation,
-  logoPath: string,
   className?: string;
 }) {
   const [
@@ -69,6 +69,8 @@ export default function ContinueWithButton({
   const isSuccess = login_isSuccess || signup_isSuccess;
   const error = login_error || signup_error;
   const btnDisabled = isLoading || isSuccess;
+  const capitalizedProvider = capitalize(provider);
+  const logoPath = logos[provider];
   className = 'btn btn-light border w-100' + (className ? ` ${className}` : '');
   return (
     <>
@@ -79,12 +81,12 @@ export default function ContinueWithButton({
       >
         <img
           src={logoPath}
-          alt={`${providerName} Logo`}
+          alt={`${capitalizedProvider} Logo`}
           className="me-3"
           style={{maxHeight: '1.2em', verticalAlign: 'middle'}}
         />
         <span style={{verticalAlign: 'middle'}}>
-          Continue with {providerName}
+          Continue with {capitalizedProvider}
         </span>
       </ButtonWithSpinner>
       {error && (

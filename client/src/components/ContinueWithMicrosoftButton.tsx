@@ -1,4 +1,3 @@
-import MicrosoftLogo from 'assets/microsoft-logo.svg';
 import { useLoginWithMicrosoftMutation, useSignupWithMicrosoftMutation } from 'slices/api';
 import ContinueWithButton from './ContinueWithButton';
 
@@ -9,10 +8,9 @@ export default function ContinueWithMicrosoftButton({reason, className}: {reason
   return (
     <ContinueWithButton
       reason={reason}
-      providerName="Microsoft"
+      provider="microsoft"
       useLoginMutation={useLoginWithMicrosoftMutation}
       useSignupMutation={useSignupWithMicrosoftMutation}
-      logoPath={MicrosoftLogo}
       className={className}
     />
   );

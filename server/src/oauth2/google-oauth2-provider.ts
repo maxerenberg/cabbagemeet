@@ -252,11 +252,9 @@ export default class GoogleOAuth2Provider implements IOAuth2Provider {
     return {events, nextSyncToken};
   }
 
-  async getEventsForMeeting(userID: number, meeting: Meeting): Promise<OAuth2CalendarEvent[]> {
-    const creds = await this.oauth2Service.getOrRefreshCreds(this, userID) as GoogleOAuth2;
-    if (!creds || !creds.LinkedCalendar) {
-      return [];
-    }
+  async getEventsForMeeting(abstractCreds: AbstractOAuth2, meeting: Meeting): Promise<OAuth2CalendarEvent[]> {
+    const creds = abstractCreds as GoogleOAuth2;
+    const userID = creds.UserID;
     const tentativeDates = meeting.TentativeDates;
     const minDate = tentativeDates.reduce((a, b) => a < b ? a : b);
     const maxDate = tentativeDates.reduce((a, b) => a > b ? a : b);

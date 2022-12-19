@@ -125,7 +125,7 @@ export interface IOAuth2Provider {
   getPartialTokenFormParams(serverNonce?: string): Promise<PartialTokenFormParams>;
   getPartialRefreshParams(): Promise<PartialRefreshParams>;
   setLinkedCalendarToTrue(user: User): void;
-  getEventsForMeeting(userID: number, meeting: Meeting): Promise<OAuth2CalendarEvent[]>;
+  getEventsForMeeting(creds: AbstractOAuth2, meeting: Meeting): Promise<OAuth2CalendarEvent[]>;
   createOrUpdateEventForMeeting(
     creds: AbstractOAuth2,
     existingEvent: AbstractOAuth2CalendarCreatedEvent | null,
@@ -213,9 +213,22 @@ export default class OAuth2Service {
     );
   }
 
-  async getRequestURL(providerType: OAuth2ProviderType, state: OAuth2State, promptConsent: boolean): Promise<string> {
+  private getProvider(providerType: OAuth2ProviderType): IOAuth2Provider {
     const provider = this.oauth2Providers[providerType];
     if (!provider.isConfigured()) throw new OAuth2NotConfiguredError();
+    return provider;
+  }
+
+  providerIsSupported(providerType: OAuth2ProviderType): boolean {
+    return this.oauth2Providers[providerType].isConfigured();
+  }
+
+  private getSupportedProviders(): IOAuth2Provider[] {
+    return Object.values(this.oauth2Providers).filter(provider => provider.isConfigured());
+  }
+
+  async getRequestURL(providerType: OAuth2ProviderType, state: OAuth2State, promptConsent: boolean): Promise<string> {
+    const provider = this.getProvider(providerType);
     const {authzEndpoint, scopes} = provider.getStaticOAuth2Config();
     const {serverNonce, ...partialParams} = await provider.getPartialAuthzQueryParams();
     if (serverNonce) {
@@ -307,7 +320,7 @@ export default class OAuth2Service {
 
   async handleLogin(providerType: OAuth2ProviderType, code: string, state: OAuth2State): Promise<OIDCLoginResult> {
     assert(state.reason === 'login');
-    const provider = this.oauth2Providers[providerType];
+    const provider = this.getProvider(providerType);
     const oauth2ClassName = oauth2EntityClasses[providerType].name;
     const oauth2Repository = this.oauth2Repositories[providerType];
     const {data, decodedIDToken} = await this.getTokenFromCode(provider, code, state);
@@ -377,13 +390,13 @@ export default class OAuth2Service {
   }
 
   async fetchAndStoreUserInfoForSignup(providerType: OAuth2ProviderType, code: string, state: OAuth2State): Promise<User> {
-    const provider = this.oauth2Providers[providerType];
+    const provider = this.getProvider(providerType);
     const {data, decodedIDToken} = await this.getTokenFromCode(provider, code, state);
     return this.updateDatabaseFromOIDCResponseForSignup(provider, data, decodedIDToken);
   }
 
   async fetchAndStoreUserInfoForLinking(providerType: OAuth2ProviderType, code: string, state: OAuth2State) {
-    const provider = this.oauth2Providers[providerType];
+    const provider = this.getProvider(providerType);
     const {data, decodedIDToken} = await this.getTokenFromCode(provider, code, state);
     await this.updateDatabaseFromOIDCResponseForLinking(provider, state.userID!, data, decodedIDToken);
   }
@@ -453,7 +466,7 @@ export default class OAuth2Service {
   }
 
   async linkAccountFromConfirmation(providerType: OAuth2ProviderType, user: User, oauth2Entity: Partial<AbstractOAuth2>) {
-    const provider = this.oauth2Providers[providerType];
+    const provider = this.getProvider(providerType);
     const repository = this.oauth2Repositories[providerType];
     try {
       await repository.insert(oauth2Entity);
@@ -527,6 +540,7 @@ export default class OAuth2Service {
   }
 
   async unlinkAccount(providerType: OAuth2ProviderType, userID: number) {
+    const provider = this.getProvider(providerType);
     const oauth2Repository = this.oauth2Repositories[providerType];
     const creds = await oauth2Repository.findOneBy({UserID: userID});
     if (!creds) {
@@ -545,7 +559,6 @@ export default class OAuth2Service {
       });
       return;
     }
-    const provider = this.oauth2Providers[providerType];
     const {revokeEndpoint} = provider.getStaticOAuth2Config();
     // Microsoft doesn't have a revocation endpoint
     if (revokeEndpoint) {
@@ -560,9 +573,10 @@ export default class OAuth2Service {
   }
 
   async unlinkAllOAuth2Accounts(userID: number) {
-    const results = await Promise.allSettled(oauth2ProviderTypes.map(
-      providerType => this.unlinkAccount(providerType, userID)
-    ));
+    const results = await Promise.allSettled(
+      this.getSupportedProviders()
+        .map(provider => this.unlinkAccount(provider.type, userID))
+    );
     for (const result of results) {
       if (result.status === 'rejected') {
         this.logger.error(result.reason);
@@ -575,8 +589,13 @@ export default class OAuth2Service {
     userID: number,
     meetingID: number,
   ): Promise<OAuth2CalendarEvent[]> {
+    const provider = this.getProvider(providerType);
     const meeting = await this.meetingsService.getMeetingOrThrow(meetingID);
-    const events = await this.oauth2Providers[providerType].getEventsForMeeting(userID, meeting);
+    const creds = await this.getOrRefreshCreds(provider, userID);
+    if (!creds || !creds.LinkedCalendar) {
+      return [];
+    }
+    const events = await provider.getEventsForMeeting(creds, meeting);
     // sort by start date
     events.sort((event1, event2) => event1.start.localeCompare(event2.start));
     return events;
@@ -587,7 +606,6 @@ export default class OAuth2Service {
   ): Promise<AbstractOAuth2[]> {
     const oauth2TableName = oauth2TableNamesMap[provider.type];
     const createdEventTableName = oauth2CreatedEventTableNamesMap[provider.type];
-    console.log(oauth2TableName, createdEventTableName);
     return this.oauth2Repositories[provider.type]
       .createQueryBuilder()
       .innerJoin(`${oauth2TableName}.User`, 'User')
@@ -626,9 +644,10 @@ export default class OAuth2Service {
     if (meeting.ScheduledStartDateTime === null || meeting.ScheduledEndDateTime === null) {
       return;
     }
-    const results = await Promise.allSettled(Object.values(this.oauth2Providers).map(
-      provider => this.tryCreateOrUpdateEventsForMeetingForAllRespondents_provider(provider, meeting)
-    ));
+    const results = await Promise.allSettled(
+      this.getSupportedProviders()
+        .map(provider => this.tryCreateOrUpdateEventsForMeetingForAllRespondents_provider(provider, meeting))
+    );
     for (const result of results) {
       if (result.status === 'rejected') {
         this.logger.error(result.reason);
@@ -683,9 +702,10 @@ export default class OAuth2Service {
     if (meeting.ScheduledStartDateTime === null || meeting.ScheduledEndDateTime === null) {
       return;
     }
-    const results = await Promise.allSettled(Object.values(this.oauth2Providers).map(
-      provider => this.tryCreateOrUpdateEventsForMeetingForSingleRespondent_provider(provider, userID, meeting)
-    ));
+    const results = await Promise.allSettled(
+      this.getSupportedProviders()
+        .map(provider => this.tryCreateOrUpdateEventsForMeetingForSingleRespondent_provider(provider, userID, meeting))
+    );
     for (const result of results) {
       if (result.status === 'rejected') {
         this.logger.error(result.reason);
@@ -721,9 +741,10 @@ export default class OAuth2Service {
   }
 
   async tryDeleteEventsForMeetingForAllRespondents(meetingID: number) {
-    const results = await Promise.allSettled(Object.values(this.oauth2Providers).map(
-      provider => this.tryDeleteEventsForMeeting_provider(provider, meetingID)
-    ));
+    const results = await Promise.allSettled(
+      this.getSupportedProviders()
+        .map(provider => this.tryDeleteEventsForMeeting_provider(provider, meetingID))
+    );
     for (const result of results) {
       if (result.status === 'rejected') {
         this.logger.error(result.reason);
@@ -755,9 +776,10 @@ export default class OAuth2Service {
   }
 
   async tryDeleteEventsForMeetingForSingleRespondent(userID: number, meetingID: number) {
-    const results = await Promise.allSettled(Object.values(this.oauth2Providers).map(
-      provider => this.tryDeleteEventsForMeetingForSingleRespondent_provider(provider, userID, meetingID)
-    ));
+    const results = await Promise.allSettled(
+      this.getSupportedProviders()
+        .map(provider => this.tryDeleteEventsForMeetingForSingleRespondent_provider(provider, userID, meetingID))
+    );
     for (const result of results) {
       if (result.status === 'rejected') {
         this.logger.error(result.reason);

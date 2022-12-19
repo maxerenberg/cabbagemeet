@@ -66,6 +66,12 @@ const allTags = [
 export const enhancedApi = replacedApi.enhanceEndpoints({
   addTagTypes: allTags,
   endpoints: {
+    getServerInfo: {
+      query: () => ({
+        url: `/api/server-info`,
+        keepUnusedDataFor: Number.MAX_VALUE,
+      }),
+    },
     login: {
       onQueryStarted: (arg, api) => loginOrVerifyEmail_onQueryStarted(arg, api),
     },

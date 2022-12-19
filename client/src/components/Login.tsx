@@ -2,13 +2,12 @@ import React, { useContext, useEffect, useRef, useState } from 'react';
 import Form from 'react-bootstrap/Form';
 import { Link, useNavigate } from 'react-router-dom';
 import BottomOverlay from 'components/BottomOverlay';
-import ContinueWithGoogleButton from 'components/ContinueWithGoogleButton';
-import styles from './Login.module.css';
-import { getReqErrorMessage, useMutationWithPersistentError } from "utils/requests.utils";
-import ButtonWithSpinner from './ButtonWithSpinner';
+import ButtonWithSpinner from 'components/ButtonWithSpinner';
+import { HistoryContext } from 'components/HistoryProvider';
+import OAuth2ProviderButtons from 'components/OAuth2ProviderButtons';
 import { useLoginMutation } from 'slices/api';
-import { HistoryContext } from './HistoryProvider';
-import ContinueWithMicrosoftButton from './ContinueWithMicrosoftButton';
+import { getReqErrorMessage, useMutationWithPersistentError } from "utils/requests.utils";
+import styles from './Login.module.css';
 
 // TODO: reduce code duplication with Signup.tsx
 
@@ -19,16 +18,6 @@ export default function Login() {
     </div>
   );
 };
-
-function ORBar() {
-  return (
-    <div className="d-flex align-items-center my-4">
-      <div className="border-top flex-grow-1"></div>
-      <span className="fw-bold mx-2">OR</span>
-      <div className="border-top flex-grow-1"></div>
-    </div>
-  );
-}
 
 function LoginForm() {
   const [validated, setValidated] = useState(false);
@@ -67,9 +56,7 @@ function LoginForm() {
   return (
     <Form noValidate className={styles.loginForm} {...{validated, onSubmit}}>
       <h4 className="mb-5">Login</h4>
-      <ContinueWithGoogleButton reason='login' />
-      <ContinueWithMicrosoftButton reason='login' className="mt-4" />
-      <ORBar />
+      <OAuth2ProviderButtons reason="login" />
       <Form.Group controlId="login-form-email">
         <Form.Label>Email address</Form.Label>
         <Form.Control

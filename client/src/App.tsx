@@ -27,9 +27,8 @@ import Meeting from 'components/availabilities/Meeting';
 import Profile from 'components/Profile';
 import Settings from 'components/Settings';
 import { selectTokenIsPresent } from 'slices/authentication';
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { useExtractTokenFromQueryParams, useGetSelfInfoIfTokenIsPresent } from 'utils/auth.hooks';
-import { getReqErrorMessage } from 'utils/requests.utils';
 import ErrorPage from 'components/ErrorPage';
 import ConfirmLinkExternalCalendar from 'components/ConfirmLinkExternalCalendar';
 import ConfirmPasswordReset from 'components/ConfirmPasswordReset';
@@ -38,6 +37,7 @@ import VerifyEmail from 'components/VerifyEmail';
 import Privacy from 'components/Privacy';
 import Feedback from 'components/Feedback';
 import TermsOfService from 'components/TermsOfService';
+import { useGetServerInfoQuery } from 'slices/api';
 
 export default function App() {
   const dayPicker = <DayPicker />;
@@ -94,12 +94,11 @@ function BrandWithLogo({onClick}: {onClick: () => void}) {
 }
 
 function AppRoot() {
-  const {error} = useGetSelfInfoIfTokenIsPresent();
-  useEffect(() => {
-    if (error) {
-      console.error(`Failed to get user info: ${getReqErrorMessage(error!)}`);
-    }
-  }, [error]);
+  // Eager fetching: these data will be needed later by other parts of the app,
+  // so load them now.
+  useGetSelfInfoIfTokenIsPresent();
+  useGetServerInfoQuery();
+
   const [showToggle, setShowToggle] = useState(false);
   const tokenIsInURL = useExtractTokenFromQueryParams();
   if (tokenIsInURL) {

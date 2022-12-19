@@ -1,4 +1,3 @@
-import GoogleLogo from 'assets/google-g-logo.svg';
 import { useLoginWithGoogleMutation, useSignupWithGoogleMutation } from 'slices/api';
 import ContinueWithButton from './ContinueWithButton';
 
@@ -9,10 +8,9 @@ export default function ContinueWithGoogleButton({reason, className}: {reason: '
   return (
     <ContinueWithButton
       reason={reason}
-      providerName="Google"
+      provider="google"
       useLoginMutation={useLoginWithGoogleMutation}
       useSignupMutation={useSignupWithGoogleMutation}
-      logoPath={GoogleLogo}
       className={className}
     />
   );

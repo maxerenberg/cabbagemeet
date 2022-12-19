@@ -274,6 +274,9 @@ const injectedRtkApi = api.injectEndpoints({
         method: "DELETE",
       }),
     }),
+    getServerInfo: build.query<GetServerInfoApiResponse, GetServerInfoApiArg>({
+      query: () => ({ url: `/api/server-info` }),
+    }),
   }),
   overrideExisting: false,
 });
@@ -380,6 +383,8 @@ export type DeleteRespondentApiArg = {
   id: number;
   respondentId: number;
 };
+export type GetServerInfoApiResponse = /** status 200  */ ServerInfoResponse;
+export type GetServerInfoApiArg = void;
 export type VerifyEmailAddressResponse = {
   mustVerifyEmailAddress: boolean;
 };
@@ -527,6 +532,10 @@ export type AddGuestRespondentDto = {
 export type PutRespondentDto = {
   availabilities: string[];
 };
+export type ServerInfoResponse = {
+  googleOAuth2IsSupported: boolean;
+  microsoftOAuth2IsSupported: boolean;
+};
 export const {
   useSignupMutation,
   useVerifyEmailMutation,
@@ -561,4 +570,5 @@ export const {
   usePutSelfRespondentMutation,
   useUpdateAvailabilitiesMutation,
   useDeleteRespondentMutation,
+  useGetServerInfoQuery,
 } = injectedRtkApi;

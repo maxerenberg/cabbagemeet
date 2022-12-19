@@ -25,7 +25,7 @@ export function getReqErrorMessage(error: FetchBaseQueryError | SerializedError)
     }
     return String((error as FetchBaseQueryError).status);
   }
-  return (error as SerializedError)?.message || 'unknown';
+  return (error as SerializedError).message || 'unknown';
 }
 
 /**

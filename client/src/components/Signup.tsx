@@ -2,7 +2,6 @@ import React, { useCallback, useContext, useEffect, useRef, useState } from 'rea
 import Form from 'react-bootstrap/Form';
 import { Link, useNavigate } from 'react-router-dom';
 import BottomOverlay from 'components/BottomOverlay';
-import ContinueWithGoogleButton from 'components/ContinueWithGoogleButton';
 import styles from './Signup.module.css';
 import { getReqErrorMessage, useMutationWithPersistentError } from 'utils/requests.utils';
 import ButtonWithSpinner from './ButtonWithSpinner';
@@ -10,7 +9,8 @@ import { useSignupMutation } from 'slices/api';
 import { HistoryContext } from './HistoryProvider';
 import { isVerifyEmailAddressResponse } from 'slices/enhancedApi';
 import VerifyEmailAddress from './SignupConfirmation';
-import ContinueWithMicrosoftButton from './ContinueWithMicrosoftButton';
+import WaitForServerInfo from './WaitForServerInfo';
+import OAuth2ProviderButtons from './OAuth2ProviderButtons';
 
 export default function Signup() {
   const [name, setName] = useState('');
@@ -32,25 +32,17 @@ export default function Signup() {
     return <VerifyEmailAddress email={email} />;
   }
   return (
-    <div className={styles.signupContainer}>
-      <SignupForm {...{
-        name, setName, email, setEmail, password, setPassword,
-        setShouldShowVerificationPage, redirectAfterSuccessfulSignup,
-      }} />
-      <WhyShouldISignUp />
-    </div>
+    <WaitForServerInfo>
+      <div className={styles.signupContainer}>
+        <SignupForm {...{
+          name, setName, email, setEmail, password, setPassword,
+          setShouldShowVerificationPage, redirectAfterSuccessfulSignup,
+        }} />
+        <WhyShouldISignUp />
+      </div>
+    </WaitForServerInfo>
   );
 };
-
-function ORBar() {
-  return (
-    <div className="d-flex align-items-center my-4">
-      <div className="border-top flex-grow-1"></div>
-      <span className="fw-bold mx-2">OR</span>
-      <div className="border-top flex-grow-1"></div>
-    </div>
-  );
-}
 
 function SignupForm({
   name, setName,
@@ -101,9 +93,7 @@ function SignupForm({
   return (
     <Form noValidate className={styles.signupForm} {...{validated, onSubmit}}>
       <h4 className="mb-5">Sign up</h4>
-      <ContinueWithGoogleButton reason='signup' />
-      <ContinueWithMicrosoftButton reason='login' className="mt-4" />
-      <ORBar />
+      <OAuth2ProviderButtons reason="signup" />
       <Form.Group controlId="signup-form-name">
         <Form.Label>Name</Form.Label>
         <Form.Control
