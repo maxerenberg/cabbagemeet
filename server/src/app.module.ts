@@ -1,5 +1,4 @@
-import { MiddlewareConsumer, Module } from '@nestjs/common';
-import * as morgan from 'morgan';
+import { Module } from '@nestjs/common';
 import getCommonImports from './common-imports';
 import AuthModule from './auth/auth.module';
 import UsersModule from './users/users.module';
@@ -23,10 +22,4 @@ import ServerInfoModule from './server-info/server-info.module';
     ServerInfoModule,
   ],
 })
-export class AppModule {
-  async configure(consumer: MiddlewareConsumer) {
-    consumer
-      .apply(morgan('combined'))
-      .forRoutes('*');
-  }
-}
+export class AppModule {}
