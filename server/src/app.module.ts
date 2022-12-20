@@ -1,4 +1,6 @@
 import { Module } from '@nestjs/common';
+import RateLimiterModule from './rate-limiter/rate-limiter.module';
+import CacherModule from './cacher/cacher.module';
 import getCommonImports from './common-imports';
 import AuthModule from './auth/auth.module';
 import UsersModule from './users/users.module';
@@ -20,6 +22,8 @@ import ServerInfoModule from './server-info/server-info.module';
     CustomJwtModule,
     MailModule,
     ServerInfoModule,
+    CacherModule,
+    RateLimiterModule,
   ],
 })
 export class AppModule {}

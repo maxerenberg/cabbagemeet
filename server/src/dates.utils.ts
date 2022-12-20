@@ -1,5 +1,11 @@
 import { DateTime } from 'luxon';
 
+export const SECONDS_PER_MINUTE = 60;
+export const MINUTES_PER_HOUR = 60;
+export const SECONDS_PER_HOUR = SECONDS_PER_MINUTE * MINUTES_PER_HOUR;
+export const HOURS_PER_DAY = 24;
+export const SECONDS_PER_DAY = SECONDS_PER_HOUR * HOURS_PER_DAY;
+
 export function getSecondsSinceUnixEpoch(): number {
   return Math.floor(Date.now() / 1000);
 }

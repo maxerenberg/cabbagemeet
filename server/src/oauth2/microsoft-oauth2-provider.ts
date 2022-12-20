@@ -11,8 +11,8 @@ import { ConfigService } from "@nestjs/config";
 import { sign as jwtSignCb } from 'jsonwebtoken';
 import { Repository } from 'typeorm';
 import type { Dispatcher } from 'undici';
-import Cacher from '../cacher';
 import {
+  SECONDS_PER_MINUTE,
   getSecondsSinceUnixEpoch,
   toISOStringUTCFromDateTimeStrAndTz,
   toISOStringUTCFromDateStrAndHourAndTz,
@@ -20,7 +20,6 @@ import {
 import type { EnvironmentVariables } from "../env.validation";
 import type Meeting from '../meetings/meeting.entity';
 import { encodeQueryParams } from '../misc.utils';
-import { SECONDS_PER_MINUTE } from '../rate-limiter';
 import User from "../users/user.entity";
 import MicrosoftOAuth2 from './microsoft-oauth2.entity';
 import MicrosoftCalendarEvents from './microsoft-calendar-events.entity';
@@ -44,6 +43,7 @@ import {
 import type { MicrosoftCreateEventResponse, MicrosoftEventDeltaResponse } from './oauth2-response-types';
 import AbstractOAuth2 from './abstract-oauth2.entity';
 import MicrosoftCalendarCreatedEvent from './microsoft-calendar-created-event.entity';
+import CacherService from 'src/cacher/cacher.service';
 
 const randomBytes: (size: number) => Promise<Buffer> = promisify(randomBytesCb);
 const randomInt: (max: number) => Promise<number> = promisify(randomIntCb);
@@ -130,10 +130,11 @@ export default class MicrosoftOAuth2Provider implements IOAuth2Provider {
   private readonly x5t: string | undefined;
   // Map each nonce to a code verifier. The nonce is stored in the 'state'
   // parameter passed to the authorization endpoint.
-  private readonly codeVerifierCache = new Cacher<string>();
+  private readonly codeVerifierCache: CacherService;
 
   constructor(
     configService: ConfigService<EnvironmentVariables, true>,
+    cacherService: CacherService,
     private readonly oauth2Service: OAuth2Service,
     private readonly calendarEventsRepository: Repository<MicrosoftCalendarEvents>,
     private readonly calendarCreatedEventsRepository: Repository<MicrosoftCalendarCreatedEvent>,
@@ -151,6 +152,7 @@ export default class MicrosoftOAuth2Provider implements IOAuth2Provider {
       this.envConfig = {client_id, redirect_uri, private_key};
     }
     this.publicURL = configService.get('PUBLIC_URL', {infer: true});
+    this.codeVerifierCache = cacherService;
   }
 
   isConfigured(): boolean {
@@ -173,7 +175,7 @@ export default class MicrosoftOAuth2Provider implements IOAuth2Provider {
     const nonce = (await randomBytes(16)).toString('base64url');
     const codeVerifier = await generatePkceCodeVerifier();
     const codeChallenge = generatePkceCodeChallenge(codeVerifier);
-    this.codeVerifierCache.add(nonce, codeVerifier, codeChallengeLifetimeSeconds);
+    await this.codeVerifierCache.add(nonce, codeVerifier, codeChallengeLifetimeSeconds);
     return {
       client_id: this.envConfig!.client_id,
       redirect_uri: this.envConfig!.redirect_uri,
@@ -206,7 +208,7 @@ private generateClientAssertion(privateKey: Buffer, clientID: string): Promise<s
 
   async getPartialTokenFormParams(nonce?: string): Promise<PartialTokenFormParams> {
     if (!nonce) throw new OAuth2InvalidStateError();
-    const codeVerifier = this.codeVerifierCache.getAndPop(nonce);
+    const codeVerifier = await this.codeVerifierCache.getAndPop(nonce);
     if (!codeVerifier) {
       throw new OAuth2InvalidOrExpiredNonceError();
     }

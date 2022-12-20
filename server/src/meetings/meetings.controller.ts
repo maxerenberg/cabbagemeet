@@ -1,4 +1,23 @@
-import { BadRequestException, Body, Controller, Delete, ForbiddenException, Get, HttpCode, HttpException, HttpStatus, Ip, NotFoundException, Param, ParseIntPipe, Patch, Post, Put, UseGuards } from '@nestjs/common';
+import {
+  BadRequestException,
+  Body,
+  Controller,
+  Delete,
+  ForbiddenException,
+  Get,
+  HttpCode,
+  HttpException,
+  HttpStatus,
+  Ip,
+  NotFoundException,
+  Param,
+  ParseIntPipe,
+  Patch,
+  Post,
+  Put,
+  UseGuards,
+} from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { AuthUser, MaybeAuthUser } from 'src/auth/auth-user.decorator';
 import JwtAuthGuard from 'src/auth/jwt-auth.guard';
 import OptionalJwtAuthGuard from 'src/auth/optional-jwt-auth.guard';
@@ -15,10 +34,9 @@ import AddGuestRespondentDto from './add-guest-respondent.dto';
 import EditMeetingDto from './edit-meeting.dto';
 import ScheduleMeetingDto from './schedule-meeting.dto';
 import type MeetingShortResponse from './meeting-short-response';
-import RateLimiter, { SECONDS_PER_HOUR } from 'src/rate-limiter';
-import { ConfigService } from '@nestjs/config';
+import RateLimiterService, { IRateLimiter } from '../rate-limiter/rate-limiter.service';
 import { EnvironmentVariables } from 'src/env.validation';
-import { oneYearAgoDateString, oneYearFromNowDateString } from 'src/dates.utils';
+import { oneYearAgoDateString, oneYearFromNowDateString, SECONDS_PER_HOUR } from 'src/dates.utils';
 
 const modifyMeetingAuthzDoc = (
   'If the meeting was created by a registed user, then '
@@ -100,15 +118,16 @@ function tentativeDatesAreOutOfRange(tentativeDates: string[]): boolean {
 @ApiTags('meetings')
 @Controller('meetings')
 export class MeetingsController {
-  private meetingCreationRateLimiter: RateLimiter = undefined;
+  private meetingCreationRateLimiter: IRateLimiter | undefined;
 
   constructor(
     private meetingsService: MeetingsService,
     configService: ConfigService<EnvironmentVariables, true>,
+    rateLimiterService: RateLimiterService,
   ) {
     const meetingCreationLimit = configService.get('HOURLY_MEETING_CREATION_LIMIT_PER_IP', {infer: true});
     if (meetingCreationLimit !== 0) {
-      this.meetingCreationRateLimiter = new RateLimiter(SECONDS_PER_HOUR, meetingCreationLimit);
+      this.meetingCreationRateLimiter = rateLimiterService.factory(SECONDS_PER_HOUR, meetingCreationLimit);
     }
   }
 
@@ -157,7 +176,7 @@ export class MeetingsController {
     @Body() body: CreateMeetingDto,
     @MaybeAuthUser() maybeUser: User | null,
   ): Promise<MeetingResponse> {
-    if (this.meetingCreationRateLimiter && !this.meetingCreationRateLimiter.tryAddRequestIfWithinLimits(ip)) {
+    if (this.meetingCreationRateLimiter && !await this.meetingCreationRateLimiter.tryAddRequestIfWithinLimits(ip)) {
       throw new HttpException('Too many requests', HttpStatus.TOO_MANY_REQUESTS);
     }
     if (tentativeDatesAreOutOfRange(body.tentativeDates)) {

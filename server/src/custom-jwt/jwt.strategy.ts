@@ -10,7 +10,7 @@ import User from '../users/user.entity';
 import UsersService from '../users/users.service';
 import { getSecondsSinceUnixEpoch } from '../dates.utils';
 import { Request } from 'express';
-import Cacher from '../cacher';
+import CacherService from 'src/cacher/cacher.service';
 
 export async function getJWTSigningKey(
   configService: ConfigService<EnvironmentVariables, true>,
@@ -45,11 +45,11 @@ const PWRESET_TOKEN_LIFETIME_SECONDS = 4 * 60 * 60;
 @Injectable()
 export default class JwtStrategy extends PassportStrategy(Strategy) {
   private jwtFromRequest = ExtractJwt.fromAuthHeaderAsBearerToken();
-  private cacher = new Cacher();
   private logger = new Logger(JwtStrategy.name);
 
   constructor(
     @Inject('JWT_SIGNING_KEY') secret: string,
+    private cacherService: CacherService,
     private jwtService: JwtService,
     private usersService: UsersService,
   ) {
@@ -71,11 +71,10 @@ export default class JwtStrategy extends PassportStrategy(Strategy) {
         return null;
       }
       const token = this.jwtFromRequest(req);
-      if (this.cacher.has(token)) {
+      if (!await this.cacherService.addIfNotPresent(token, '1', PWRESET_TOKEN_LIFETIME_SECONDS)) {
         this.logger.debug('Detected attempt to re-use password reset token');
         return null;
       }
-      this.cacher.add(token, true, PWRESET_TOKEN_LIFETIME_SECONDS);
     } else {
       if (
         user.TimestampOfEarliestValidToken === null

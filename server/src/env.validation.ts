@@ -184,6 +184,18 @@ export class EnvironmentVariables {
   @IsOptional()
   @IsBoolean()
   SIGNUP_REQUIRES_EMAIL_VALIDATION?: boolean = true;
+
+  @IsOptional()
+  @IsString()
+  REDIS_HOST?: string;
+
+  @IsOptional()
+  @IsPort()
+  REDIS_PORT?: string = '6379';
+
+  @IsOptional()
+  @IsNumber()
+  REDIS_DATABASE?: number = 0;
 }
 
 export function validate(

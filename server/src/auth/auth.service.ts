@@ -8,10 +8,9 @@ import UsersService from '../users/users.service';
 import LocalSignupDto from './local-signup.dto';
 import MailService from '../mail/mail.service';
 import CustomJwtService from '../custom-jwt/custom-jwt.service';
-import { SECONDS_PER_MINUTE } from '../rate-limiter';
 import VerifyEmailAddressDto, { VerifyEmailAddressEntity } from './verify-email-address.dto';
-import { getSecondsSinceUnixEpoch } from 'src/dates.utils';
-import { encodeQueryParams } from 'src/misc.utils';
+import { SECONDS_PER_MINUTE, getSecondsSinceUnixEpoch } from '../dates.utils';
+import { encodeQueryParams } from '../misc.utils';
 
 const SALT_ROUNDS = 10;
 
@@ -117,12 +116,19 @@ export default class AuthService {
   }
 
   async signupIfEmailIsVerified({encrypted_entity, iv, salt, tag}: VerifyEmailAddressDto): Promise<User | null> {
-    const entity = JSON.parse(await this.jwtService.decryptText(
-      Buffer.from(encrypted_entity, 'base64url'),
-      Buffer.from(iv, 'base64url'),
-      Buffer.from(salt, 'base64url'),
-      Buffer.from(tag, 'base64url'),
-    )) as VerifyEmailAddressEntity;
+    let decryptedText: string | undefined;
+    try {
+      decryptedText = await this.jwtService.decryptText(
+        Buffer.from(encrypted_entity, 'base64url'),
+        Buffer.from(iv, 'base64url'),
+        Buffer.from(salt, 'base64url'),
+        Buffer.from(tag, 'base64url'),
+      );
+    } catch (err) {
+      this.logger.error(err);
+      throw new BadRequestException('Invalid encrypted entity');
+    }
+    const entity = JSON.parse(decryptedText) as VerifyEmailAddressEntity;
     if (!(
       typeof entity === 'object'
       && typeof entity.name === 'string'
@@ -130,6 +136,7 @@ export default class AuthService {
       && typeof entity.password === 'string'
       && typeof entity.exp === 'number'
     )) {
+      this.logger.debug(entity);
       throw new BadRequestException('Invalid encrypted entity');
     }
     if (getSecondsSinceUnixEpoch() > entity.exp) {
@@ -152,7 +159,7 @@ export default class AuthService {
       'CabbageMeet account. If this was you, please click the following link ' +
       'to proceed:\n' +
       '\n' +
-      url +
+      url + '\n' +
       '\n' +
       'If this was not you, you may disregard this email.\n' +
       '\n' +

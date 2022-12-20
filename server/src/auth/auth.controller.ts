@@ -2,7 +2,6 @@ import {
   Controller,
   Post,
   Body,
-  BadRequestException,
   UnauthorizedException,
   NotFoundException,
   HttpCode,
@@ -14,6 +13,7 @@ import {
   Logger,
   Res,
   ServiceUnavailableException,
+  ConflictException,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import {
@@ -26,7 +26,9 @@ import {
   ApiCreatedResponse,
   ApiOkResponse,
   ApiNotFoundResponse,
+  ApiConflictResponse,
 } from '@nestjs/swagger';
+import { Response } from 'express';
 import {
   BadRequestResponse,
   UnauthorizedResponse,
@@ -34,25 +36,26 @@ import {
   CustomRedirectResponse,
 } from '../common-responses';
 import CustomJwtService from '../custom-jwt/custom-jwt.service';
+import { SECONDS_PER_MINUTE } from '../dates.utils';
 import { EnvironmentVariables } from '../env.validation';
+import OAuth2Service, { OAuth2Reason } from '../oauth2/oauth2.service';
+import { OAuth2ProviderType, oauth2ProviderNamesMap, OAuth2NotConfiguredError } from '../oauth2/oauth2-common';
+import OAuth2ConsentPostRedirectDto from '../oauth2/oauth2-consent-post-redirect.dto';
 import { UserResponseWithToken } from '../users/user-response';
-import User from '../users/user.entity';
 import { UserToUserResponse } from '../users/users.controller';
+import User from '../users/user.entity';
 import UsersService, { UserAlreadyExistsError } from '../users/users.service';
 import AuthService from './auth.service';
 import LocalLoginDto from './local-login.dto';
 import LocalSignupDto from './local-signup.dto';
-import OAuth2Service, { OAuth2Reason } from '../oauth2/oauth2.service';
-import { OAuth2ProviderType, oauth2ProviderNamesMap, OAuth2NotConfiguredError } from '../oauth2/oauth2-common';
-import OAuth2ConsentPostRedirectDto from '../oauth2/oauth2-consent-post-redirect.dto';
-import RateLimiter, { SECONDS_PER_MINUTE } from '../rate-limiter';
+import RateLimiterService, { IRateLimiter } from '../rate-limiter/rate-limiter.service';
 import ResetPasswordDto from './reset-password.dto';
 import JwtAuthGuard from './jwt-auth.guard';
 import { AuthUser } from './auth-user.decorator';
 import ConfirmResetPasswordDto from './confirm-reset-password';
 import VerifyEmailAddressResponse from './verify-email-address-response';
-import { Response } from 'express';
 import VerifyEmailAddressDto from './verify-email-address.dto';
+import ConflictResponse from 'src/common-responses/conflict-response';
 
 const setTokenDescription = (
   "A token will be set in the response body which must be included in the Authorization"
@@ -64,9 +67,9 @@ const RATE_LIMIT_ERROR_MESSAGE = 'Rate limit reached. Please try again later';
 @Controller()
 export class AuthController {
   private readonly logger = new Logger(AuthController.name);
-  private readonly pwresetRateLimiter: RateLimiter;
-  private readonly loginRateLimiter: RateLimiter;
-  private readonly signupRateLimiter: RateLimiter;
+  private readonly pwresetRateLimiter: IRateLimiter;
+  private readonly loginRateLimiter: IRateLimiter;
+  private readonly signupRateLimiter: IRateLimiter;
   private readonly verifySignupEmailAddress: boolean;
 
   constructor(
@@ -75,13 +78,14 @@ export class AuthController {
     private oauth2Service: OAuth2Service,
     private usersService: UsersService,
     configService: ConfigService<EnvironmentVariables, true>,
+    rateLimiterService: RateLimiterService,
   ) {
     // A user can reset their password at most once every 5 minutes
-    this.pwresetRateLimiter = new RateLimiter(SECONDS_PER_MINUTE * 5, 1);
+    this.pwresetRateLimiter = rateLimiterService.factory(SECONDS_PER_MINUTE * 5, 1);
     // A user can try to sign up at most three times per minute
-    this.signupRateLimiter = new RateLimiter(SECONDS_PER_MINUTE, 3);
+    this.signupRateLimiter = rateLimiterService.factory(SECONDS_PER_MINUTE, 3);
     // A user can try to login at most 10 times per minute
-    this.loginRateLimiter = new RateLimiter(SECONDS_PER_MINUTE, 10);
+    this.loginRateLimiter = rateLimiterService.factory(SECONDS_PER_MINUTE, 10);
     this.verifySignupEmailAddress = configService.get('VERIFY_SIGNUP_EMAIL_ADDRESS', {infer: true});
   }
 
@@ -96,7 +100,7 @@ export class AuthController {
 
   private convertUserCreationError(err: any): Error {
     if (err instanceof UserAlreadyExistsError) {
-      return new BadRequestException('user already exists');
+      return new ConflictException('user already exists');
     }
     return err;
   }
@@ -105,21 +109,21 @@ export class AuthController {
     summary: 'Sign up',
     description: (
       'Create a new account.<br><br>' + setTokenDescription + '<br><br>'
-      + 'If email address verification is enabled, the user will be sent a code'
-      + ' via email which they will need to enter at a later step.'
+      + 'If email address verification is enabled, the user will be sent a link'
+      + ' via email which they will need to follow at a later step.'
     ),
     operationId: 'signup',
   })
   @ApiCreatedResponse({type: UserResponseWithToken})
   @ApiOkResponse({type: VerifyEmailAddressResponse})
-  @ApiBadRequestResponse({type: BadRequestResponse})
+  @ApiConflictResponse({type: ConflictResponse})
   @Post('signup')
   async signup(
     @Body() body: LocalSignupDto,
     @Res({passthrough: true}) res: Response,
   ): Promise<UserResponseWithToken | VerifyEmailAddressResponse> {
     // TODO: rate limit based on IP address as well
-    if (!this.signupRateLimiter.tryAddRequestIfWithinLimits(body.email)) {
+    if (!await this.signupRateLimiter.tryAddRequestIfWithinLimits(body.email)) {
       throw new HttpException(RATE_LIMIT_ERROR_MESSAGE, HttpStatus.TOO_MANY_REQUESTS);
     }
     if (this.verifySignupEmailAddress) {
@@ -150,11 +154,12 @@ export class AuthController {
   @ApiOperation({
     summary: 'Verify email address',
     description: (
-      'Verify the email address of a user who recently signed up by providing'
-      + ' the code sent via email.'
+      'Verify the email address of a user who recently signed up by following'
+      + ' the link sent via email.'
     ),
     operationId: 'verifyEmail',
   })
+  @ApiConflictResponse({type: ConflictResponse})
   @Post('verify-email')
   @HttpCode(HttpStatus.NO_CONTENT)
   async verifyEmail(@Body() body: VerifyEmailAddressDto): Promise<void> {
@@ -180,7 +185,7 @@ export class AuthController {
   @HttpCode(HttpStatus.OK)
   async login(@Body() body: LocalLoginDto): Promise<UserResponseWithToken> {
     // TODO: rate limit based on IP address as well
-    if (!this.loginRateLimiter.tryAddRequestIfWithinLimits(body.email)) {
+    if (!await this.loginRateLimiter.tryAddRequestIfWithinLimits(body.email)) {
       throw new HttpException(RATE_LIMIT_ERROR_MESSAGE, HttpStatus.TOO_MANY_REQUESTS);
     }
     const user = await this.authService.validateUser(body.email, body.password);
@@ -225,7 +230,7 @@ export class AuthController {
   @Post('reset-password')
   @HttpCode(HttpStatus.NO_CONTENT)
   async resetPassword(@Body() {email}: ResetPasswordDto): Promise<void> {
-    if (!this.pwresetRateLimiter.tryAddRequestIfWithinLimits(email)) {
+    if (!await this.pwresetRateLimiter.tryAddRequestIfWithinLimits(email)) {
       this.logger.debug(`User for email=${email} already reset password recently, ignoring`);
       return;
     }

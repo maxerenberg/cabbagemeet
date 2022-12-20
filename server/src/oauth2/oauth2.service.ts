@@ -33,6 +33,7 @@ import AbstractOAuth2 from './abstract-oauth2.entity';
 import MicrosoftOAuth2 from './microsoft-oauth2.entity';
 import MicrosoftCalendarEvents from './microsoft-calendar-events.entity';
 import MicrosoftCalendarCreatedEvent from './microsoft-calendar-created-event.entity';
+import CacherService from 'src/cacher/cacher.service';
 
 // TODO: use truncated exponential backoff
 // See https://developers.google.com/calendar/api/guides/quota
@@ -145,6 +146,7 @@ export default class OAuth2Service {
 
   constructor(
     configService: ConfigService<EnvironmentVariables, true>,
+    cacherService: CacherService,
     private meetingsService: MeetingsService,
     private dataSource: DataSource,
     @InjectRepository(User) private usersRepository: Repository<User>,
@@ -157,7 +159,7 @@ export default class OAuth2Service {
   ) {
     this.oauth2Providers = {
       [OAuth2ProviderType.GOOGLE]: new GoogleOAuth2Provider(configService, this, googleCalendarEventsRepository, googleCalendarCreatedEventsRepository),
-      [OAuth2ProviderType.MICROSOFT]: new MicrosoftOAuth2Provider(configService, this, microsoftCalendarEventsRepository, microsoftCalendarCreatedEventsRepository),
+      [OAuth2ProviderType.MICROSOFT]: new MicrosoftOAuth2Provider(configService, cacherService, this, microsoftCalendarEventsRepository, microsoftCalendarCreatedEventsRepository),
     };
     this.oauth2Repositories = {
       [OAuth2ProviderType.GOOGLE]: googleOAuth2Repository,

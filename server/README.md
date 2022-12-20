@@ -68,7 +68,7 @@ echo 'DROP DATABASE cabbagemeet; CREATE DATABASE cabbagemeet; \q' | docker exec 
 
 ## Running the SMTP server
 By default, email address verification is enabled, even in development mode.
-To disable this, set `SIGNUP_REQUIRES_EMAIL_VALIDATION = false` in development.env.
+To disable this, set `SIGNUP_REQUIRES_EMAIL_VALIDATION = false` in .development.env.
 
 In development mode, you can run a mock SMTP server in a new terminal window, which
 will listen on `localhost:8025`:
@@ -78,6 +78,39 @@ npm run smtp
 
 In development mode, whenever the server generates a verification code or link,
 it will print it to stdout after sending it via email.
+
+## Redis
+If you are running multiple instances of the application, and a user could be directed
+to any of them (e.g. round-robin load balancing), then Redis must be used to avoid cache
+incoherency between the instances. For example, with Docker:
+```bash
+docker run -d --name cabbagemeet-redis -p 127.0.0.1:6379:6379 redis
+```
+
+Then set the following environment variables:
+```
+REDIS_HOST=127.0.0.1
+REDIS_PORT=6379
+```
+
+If you are using an existing Redis server and would like to use a different
+database number (0-15), you can specify that too, e.g.
+```
+REDIS_DATABASE=1
+```
+
+### Connecting to Redis
+```bash
+docker exec -it cabbagemeet-redis redis-cli
+```
+
+### Flushing the database
+```
+127.0.0.1:6379> FLUSHDB
+OK
+127.0.0.1:6379> SCRIPT FLUSH
+OK
+```
 
 ## Running the app
 ```bash
