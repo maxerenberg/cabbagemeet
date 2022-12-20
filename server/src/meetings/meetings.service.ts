@@ -6,6 +6,7 @@ import { DateTime } from 'luxon';
 import { EnvironmentVariables } from '../env.validation';
 import MailService from '../mail/mail.service';
 import OAuth2Service from '../oauth2/oauth2.service';
+import User from '../users/user.entity';
 import { Repository } from 'typeorm';
 import MeetingRespondent from './meeting-respondent.entity';
 import Meeting from './meeting.entity';
@@ -69,6 +70,7 @@ export default class MeetingsService {
       .createQueryBuilder()
       .leftJoin('MeetingRespondent.User', 'User')
       .select(['MeetingRespondent.GuestName', 'MeetingRespondent.GuestEmail', 'User.Name', 'User.Email'])
+      .where('MeetingRespondent.MeetingID = :meetingID', {meetingID})
       .where('MeetingRespondent.GuestEmail IS NOT NULL OR User.IsSubscribedToNotifications')
       .getMany();
   }
@@ -112,7 +114,7 @@ export default class MeetingsService {
     );
   }
 
-  async scheduleMeeting(meeting: Meeting, startDateTime: string, endDateTime: string) {
+  async scheduleMeeting(maybeUser: User | null, meeting: Meeting, startDateTime: string, endDateTime: string) {
     // Update database
     const {WasScheduledAtLeastOnce: wasScheduledAtLeastOnce} = meeting;
     const updatedInfo: Partial<Meeting> = {
@@ -125,6 +127,10 @@ export default class MeetingsService {
     if (!wasScheduledAtLeastOnce) {
       const respondentsToBeNotified = await this.getRespondentsWithNotificationsEnabled(meeting.ID);
       for (const respondent of respondentsToBeNotified) {
+        if (maybeUser && respondent.User?.ID === maybeUser.ID) {
+          // Don't notify the person who scheduled the meeting
+          continue;
+        }
         const recipient = respondent.GuestEmail || respondent.User.Email;
         const name = respondent.GuestName || respondent.User.Name;
         // Do not await the Promise so that we don't block the caller

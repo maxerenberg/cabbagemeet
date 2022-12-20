@@ -4,13 +4,16 @@ import User from '../users/user.entity';
 import Meeting from './meeting.entity';
 
 @Entity('MeetingRespondent')
-// Composite partial index
-@Index(['MeetingID', 'UserID'], { unique: true, where: 'UserID IS NOT NULL' })
+// Null values are distinct in UNIQUE indices for Postgres, MySQL and SQLite.
+// We omit the "WHERE UserID IS NOT NULL" clause here so that we can re-use
+// this composite index when searching on MeetingID, which means that we
+// don't need to create a separate index on the MeetingID column.
+// Also see https://www.sqlite.org/nulls.html.
+@Index(['MeetingID', 'UserID'], { unique: true })
 export default class MeetingRespondent {
   @PrimaryGeneratedColumn()
   RespondentID: number;
 
-  @Index()
   @Column()
   MeetingID: number;
 

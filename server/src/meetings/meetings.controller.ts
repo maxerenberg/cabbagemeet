@@ -256,7 +256,7 @@ export class MeetingsController {
       throw new BadRequestException('end time must be greater than start time');
     }
     const meeting = await this.checkIfMeetingExistsAndClientIsAllowedToModifyIt(meetingID, maybeUser);
-    await this.meetingsService.scheduleMeeting(meeting, body.startDateTime, body.endDateTime);
+    await this.meetingsService.scheduleMeeting(maybeUser, meeting, body.startDateTime, body.endDateTime);
     return meetingToMeetingResponse(meeting, maybeUser);
   }
 
