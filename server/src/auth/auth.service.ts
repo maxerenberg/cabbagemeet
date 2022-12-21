@@ -1,4 +1,3 @@
-import { randomInt as randomIntWithCb } from 'crypto';
 import { BadRequestException, Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import * as bcrypt from 'bcrypt';
@@ -8,25 +7,13 @@ import UsersService from '../users/users.service';
 import LocalSignupDto from './local-signup.dto';
 import MailService from '../mail/mail.service';
 import CustomJwtService from '../custom-jwt/custom-jwt.service';
-import VerifyEmailAddressDto, { VerifyEmailAddressEntity } from './verify-email-address.dto';
+import VerifyEmailAddressDto, {
+  VerifyEmailAddressEntity,
+} from './verify-email-address.dto';
 import { SECONDS_PER_MINUTE, getSecondsSinceUnixEpoch } from '../dates.utils';
 import { encodeQueryParams } from '../misc.utils';
 
 const SALT_ROUNDS = 10;
-
-// Unfortunately we can't use util.promisify on this one because the
-// behaviour changes depending on the types of arguments passed
-function randomInt(max: number): Promise<number> {
-  return new Promise((resolve, reject) => {
-    randomIntWithCb(max, (err, n) => {
-      if (err) {
-        reject(err);
-      } else {
-        resolve(n);
-      }
-    });
-  });
-}
 
 @Injectable()
 export default class AuthService {
@@ -39,7 +26,7 @@ export default class AuthService {
     private jwtService: CustomJwtService,
     configService: ConfigService<EnvironmentVariables, true>,
   ) {
-    this.publicURL = configService.get('PUBLIC_URL', {infer: true});
+    this.publicURL = configService.get('PUBLIC_URL', { infer: true });
   }
 
   async validateUser(email: string, password: string): Promise<User | null> {
@@ -57,7 +44,11 @@ export default class AuthService {
     return user;
   }
 
-  private createEmailVerificationEmailBody(name: string, url: string, expiresMinutes: number): string {
+  private createEmailVerificationEmailBody(
+    name: string,
+    url: string,
+    expiresMinutes: number,
+  ): string {
     return (
       `Hello ${name},\n` +
       '\n' +
@@ -68,7 +59,7 @@ export default class AuthService {
       `This code will expire in ${expiresMinutes} minutes.\n` +
       '\n' +
       '-- \n' +
-      'CabbageMeet | ' + this.publicURL + '\n'
+      `CabbageMeet | ${this.publicURL}\n`
     );
   }
 
@@ -78,18 +69,27 @@ export default class AuthService {
       ...body,
       exp: getSecondsSinceUnixEpoch() + expiresMinutes * SECONDS_PER_MINUTE,
     };
-    const {encrypted, iv, salt, tag} = await this.jwtService.encryptText(JSON.stringify(bodyWithExp));
+    const { encrypted, iv, salt, tag } = await this.jwtService.encryptText(
+      JSON.stringify(bodyWithExp),
+    );
     const params: VerifyEmailAddressDto = {
       encrypted_entity: encrypted.toString('base64url'),
       iv: iv.toString('base64url'),
       salt: salt.toString('base64url'),
       tag: tag.toString('base64url'),
     };
-    const url = this.publicURL + '/verify-email?' + encodeQueryParams(params as unknown as Record<string, string>);
+    const url =
+      this.publicURL +
+      '/verify-email?' +
+      encodeQueryParams(params as unknown as Record<string, string>);
     const sent = await this.mailService.sendNowIfAllowed({
       recipient: body.email,
       subject: 'CabbageMeet signup confirmation',
-      body: this.createEmailVerificationEmailBody(body.name, url, expiresMinutes),
+      body: this.createEmailVerificationEmailBody(
+        body.name,
+        url,
+        expiresMinutes,
+      ),
     });
     if (!sent) {
       return false;
@@ -104,7 +104,7 @@ export default class AuthService {
     name,
     email,
     password,
-    subscribe_to_notifications
+    subscribe_to_notifications,
   }: LocalSignupDto): Promise<User> {
     const user: Partial<User> = {
       Name: name,
@@ -115,7 +115,12 @@ export default class AuthService {
     return this.usersService.create(user);
   }
 
-  async signupIfEmailIsVerified({encrypted_entity, iv, salt, tag}: VerifyEmailAddressDto): Promise<User | null> {
+  async signupIfEmailIsVerified({
+    encrypted_entity,
+    iv,
+    salt,
+    tag,
+  }: VerifyEmailAddressDto): Promise<User | null> {
     let decryptedText: string | undefined;
     try {
       decryptedText = await this.jwtService.decryptText(
@@ -129,42 +134,48 @@ export default class AuthService {
       throw new BadRequestException('Invalid encrypted entity');
     }
     const entity = JSON.parse(decryptedText) as VerifyEmailAddressEntity;
-    if (!(
-      typeof entity === 'object'
-      && typeof entity.name === 'string'
-      && typeof entity.email === 'string'
-      && typeof entity.password === 'string'
-      && typeof entity.exp === 'number'
-    )) {
+    if (
+      !(
+        typeof entity === 'object' &&
+        typeof entity.name === 'string' &&
+        typeof entity.email === 'string' &&
+        typeof entity.password === 'string' &&
+        typeof entity.exp === 'number'
+      )
+    ) {
       this.logger.debug(entity);
       throw new BadRequestException('Invalid encrypted entity');
     }
     if (getSecondsSinceUnixEpoch() > entity.exp) {
       throw new BadRequestException('Link expired');
     }
-    const {exp, ...signupArgs} = entity;
+    const { exp, ...signupArgs } = entity;
     return this.signup(signupArgs);
   }
 
   private createPasswordResetEmailBody(user: User): string {
-    const {token} = this.jwtService.serializeUserToJwt(user, 'pwreset');
-    const url = this.publicURL + `/confirm-password-reset?pwresetToken=${token}`;
+    const { token } = this.jwtService.serializeUserToJwt(user, 'pwreset');
+    const url =
+      this.publicURL + `/confirm-password-reset?pwresetToken=${token}`;
     if (process.env.NODE_ENV === 'development') {
       this.logger.debug(`password reset URL=${url}`);
     }
     return (
       `Hello ${user.Name},\n` +
       '\n' +
-      'Someone (hopefully you) recently requested a password reset for your ' +
-      'CabbageMeet account. If this was you, please click the following link ' +
+      'Someone (hopefully you) recently requested a password reset for your\n' +
+      'CabbageMeet account. If this was you, please click the following link\n' +
       'to proceed:\n' +
       '\n' +
-      url + '\n' +
+      url +
+      '\n' +
       '\n' +
       'If this was not you, you may disregard this email.\n' +
       '\n' +
       '-- \n' +
-      'CabbageMeet | ' + this.publicURL + '\n'
+      'CabbageMeet | ' +
+      this.publicURL +
+      '\n'
     );
   }
 

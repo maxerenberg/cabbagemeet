@@ -4,6 +4,6 @@ import CustomMigrationsService from './custom-migrations.service';
 @Global()
 @Module({
   providers: [CustomMigrationsService],
-  exports: [CustomMigrationsService]
+  exports: [CustomMigrationsService],
 })
 export default class CustomMigrationsModule {}

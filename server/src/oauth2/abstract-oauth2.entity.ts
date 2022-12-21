@@ -7,22 +7,22 @@ export default abstract class AbstractOAuth2 {
 
   // If true, the credentials will be used for both OIDC and the Calendar API.
   // If false, the credentials will only be used for OIDC.
-  @Column({default: true})
+  @Column({ default: true })
   LinkedCalendar: boolean;
 
   // 'sub' claim in JWT
-  @Index({unique: true})
+  @Index({ unique: true })
   @Column()
   Sub: string;
 
-  @Column({type: 'text'})
+  @Column({ type: 'text' })
   AccessToken: string;
 
   // Unix epoch timestamp in seconds
   @Column()
   AccessTokenExpiresAt: number;
 
-  @Column({type: 'text'})
+  @Column({ type: 'text' })
   RefreshToken: string;
 
   // Exact type depends on implementation

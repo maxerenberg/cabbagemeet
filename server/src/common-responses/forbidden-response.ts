@@ -1,9 +1,9 @@
-import { ApiProperty } from "@nestjs/swagger";
+import { ApiProperty } from '@nestjs/swagger';
 
 export default class ForbiddenResponse {
-  @ApiProperty({example: 403})
+  @ApiProperty({ example: 403 })
   statusCode: number;
 
-  @ApiProperty({example: 'Forbidden'})
+  @ApiProperty({ example: 'Forbidden' })
   message: string;
 }

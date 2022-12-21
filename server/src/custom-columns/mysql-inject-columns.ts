@@ -1,4 +1,4 @@
-import { Column, Index } from "typeorm";
+import { Column, Index } from 'typeorm';
 import Meeting from '../meetings/meeting.entity';
 
 // As of this writing, functional indexes are not supported in MariaDB,
@@ -6,7 +6,8 @@ import Meeting from '../meetings/meeting.entity';
 
 const columnName = 'LatestTentativeOrScheduledDate';
 // As of this writing, MariaDB does not support the '$[last]' JSONPATH selector
-const latestTentativeDateExpr = "JSON_EXTRACT(TentativeDates, CONCAT('$[', JSON_LENGTH(TentativeDates)-1, ']'))";
+const latestTentativeDateExpr =
+  "JSON_EXTRACT(TentativeDates, CONCAT('$[', JSON_LENGTH(TentativeDates)-1, ']'))";
 const asExpression = `CASE WHEN ScheduledEndDateTime IS NULL THEN ${latestTentativeDateExpr} ELSE ScheduledEndDateTime END`;
 
 export function injectTypeOrmColumns() {
@@ -29,11 +30,8 @@ export function injectTypeOrmColumns() {
     generatedType: 'VIRTUAL',
   })(
     // This needs to be close to the format passed by reflect-metadata
-    {constructor: Meeting, propertyName: columnName},
-    columnName
+    { constructor: Meeting, propertyName: columnName },
+    columnName,
   );
-  Index()(
-    {constructor: Meeting, propertyName: columnName},
-    columnName
-  );
+  Index()({ constructor: Meeting, propertyName: columnName }, columnName);
 }

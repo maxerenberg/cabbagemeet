@@ -3,7 +3,9 @@ import { ConfigService } from '@nestjs/config';
 import { SECONDS_PER_DAY, SECONDS_PER_MINUTE } from '../dates.utils';
 import { sleep } from '../misc.utils';
 import { EnvironmentVariables } from '../env.validation';
-import RateLimiterService, { IRateLimiter } from '../rate-limiter/rate-limiter.service';
+import RateLimiterService, {
+  IRateLimiter,
+} from '../rate-limiter/rate-limiter.service';
 import SMTPMailStrategy from './smtp-mail-strategy';
 
 const KEY = 'mail';
@@ -22,14 +24,16 @@ export interface IMailStrategy {
 export default class MailService {
   private strategy: IMailStrategy | undefined;
   private readonly logger = new Logger(MailService.name);
-  private readonly rateLimiter: IRateLimiter;
+  private readonly rateLimiter: IRateLimiter | undefined;
 
   constructor(
     configService: ConfigService<EnvironmentVariables, true>,
     rateLimiterService: RateLimiterService,
   ) {
-    const dailyLimit = configService.get('EMAIL_DAILY_LIMIT', {infer: true});
-    this.rateLimiter = rateLimiterService.factory(SECONDS_PER_DAY, dailyLimit);
+    const dailyLimit = configService.get('EMAIL_DAILY_LIMIT', { infer: true });
+    if (dailyLimit) {
+      this.rateLimiter = rateLimiterService.factory(SECONDS_PER_DAY, dailyLimit);
+    }
     if (configService.get('SMTP_HOST')) {
       this.strategy = new SMTPMailStrategy(configService);
     }
@@ -52,7 +56,7 @@ export default class MailService {
   async sendNowOrLater(args: SendParams) {
     const MAX_TRIES = 3;
     for (let i = 0; i < MAX_TRIES; i++) {
-      if (await this.rateLimiter.tryAddRequestIfWithinLimits(KEY)) {
+      if (!this.rateLimiter || await this.rateLimiter.tryAddRequestIfWithinLimits(KEY)) {
         if (await this.trySendNow(args)) {
           return;
         }
@@ -68,7 +72,7 @@ export default class MailService {
   }
 
   async sendNowIfAllowed(args: SendParams): Promise<boolean> {
-    if (await this.rateLimiter.tryAddRequestIfWithinLimits(KEY)) {
+    if (!this.rateLimiter || await this.rateLimiter.tryAddRequestIfWithinLimits(KEY)) {
       return this.trySendNow(args);
     }
     return false;

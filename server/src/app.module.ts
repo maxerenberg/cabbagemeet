@@ -1,7 +1,7 @@
 import { Module } from '@nestjs/common';
 import RateLimiterModule from './rate-limiter/rate-limiter.module';
 import CacherModule from './cacher/cacher.module';
-import getCommonImports from './common-imports';
+import { getCommonImports } from './common-setup';
 import AuthModule from './auth/auth.module';
 import UsersModule from './users/users.module';
 import DbconfigModule from './dbconfig/dbconfig.module';

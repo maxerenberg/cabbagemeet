@@ -3,23 +3,40 @@ import type { CustomRedisClientType } from '../cacher/cacher.module';
 
 export interface IRateLimiter {
   tryAddRequestIfWithinLimits(key: string): Promise<boolean>;
+  shutdown(): void;
 }
 
 @Injectable()
 export default class RateLimiterService {
-  constructor(@Inject('REDIS_CLIENT') private readonly redisClient: CustomRedisClientType | null) {}
+  private readonly rateLimiters: IRateLimiter[] = [];
+
+  constructor(
+    @Inject('REDIS_CLIENT')
+    private readonly redisClient: CustomRedisClientType | null,
+  ) {}
+
+  onApplicationShutdown() {
+    for (const rateLimiter of this.rateLimiters) {
+      rateLimiter.shutdown();
+    }
+  }
 
   factory(intervalSeconds: number, limit: number): IRateLimiter {
+    let rateLimiter: IRateLimiter | undefined;
     if (this.redisClient) {
-      return new RedisRateLimiter(this.redisClient, intervalSeconds, limit);
+      rateLimiter = new RedisRateLimiter(this.redisClient, intervalSeconds, limit);
+    } else {
+      rateLimiter = new MemoryRateLimiter(intervalSeconds, limit);
     }
-    return new MemoryRateLimiter(intervalSeconds, limit);
+    this.rateLimiters.push(rateLimiter);
+    return rateLimiter;
   }
 }
 
 class MemoryRateLimiter implements IRateLimiter {
   private readonly intervalMs: number;
-  private counters: Record<string, number> = {};
+  private readonly counters: Record<string, number> = {};
+  private readonly timeouts = new Set<NodeJS.Timeout>();
 
   constructor(
     intervalSeconds: number,
@@ -38,12 +55,22 @@ class MemoryRateLimiter implements IRateLimiter {
     } else {
       this.counters[key] = 1;
     }
-    setTimeout(() => {
+    const timeout = setTimeout(() => {
       if (--this.counters[key] === 0) {
         delete this.counters[key];
+        this.timeouts.delete(timeout);
       }
     }, this.intervalMs);
+    this.timeouts.add(timeout);
     return true;
+  }
+
+  shutdown() {
+    // Need to clear timeouts or else tests will hang
+    for (const timeout of this.timeouts) {
+      clearTimeout(timeout);
+    }
+    this.timeouts.clear();
   }
 }
 
@@ -56,6 +83,12 @@ class RedisRateLimiter implements IRateLimiter {
   ) {}
 
   tryAddRequestIfWithinLimits(key: string) {
-    return this.client.tryAddRequestIfWithinLimits(key, this.intervalSeconds, this.limit);
+    return this.client.tryAddRequestIfWithinLimits(
+      key,
+      this.intervalSeconds,
+      this.limit,
+    );
   }
+
+  shutdown() {}
 }

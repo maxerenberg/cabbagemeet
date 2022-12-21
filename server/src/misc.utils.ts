@@ -22,7 +22,7 @@ export function stripTrailingSlash(s: string): string {
 }
 
 export function sleep(millis: number): Promise<void> {
-  return new Promise(resolve => {
+  return new Promise((resolve) => {
     setTimeout(() => {
       resolve();
     }, millis);

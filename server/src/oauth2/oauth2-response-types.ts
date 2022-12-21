@@ -29,17 +29,17 @@ export interface DecodedIDToken {
 // Determined empirically :')
 export interface GoogleOAuth2ErrorResponse {
   error: {
-    code: number;  // e.g. 401
-    message: string;  // e.g. "Request had invalid authentication credentials...""
+    code: number; // e.g. 401
+    message: string; // e.g. "Request had invalid authentication credentials...""
     errors: {
-      message: string;  // e.g. "Invalid Credentials"
-      domain: string;  // e.g. "global"
-      reason: string;  // e.g. "authError"
-      location: string;  // e.g. "Authorization"
-      locationType: string;  // e.g. "header"
+      message: string; // e.g. "Invalid Credentials"
+      domain: string; // e.g. "global"
+      reason: string; // e.g. "authError"
+      location: string; // e.g. "Authorization"
+      locationType: string; // e.g. "header"
     }[];
-    status: string;  // e.g. 'UNAUTHENTICATED'
-  }
+    status: string; // e.g. 'UNAUTHENTICATED'
+  };
 }
 
 // See https://developers.google.com/calendar/api/v3/reference/events/list
@@ -72,7 +72,7 @@ export interface MicrosoftEventDeltaResponse {
     // Properties in which we are not interested have been omitted
     id: string;
     // See https://learn.microsoft.com/en-us/graph/delta-query-overview?tabs=http#resource-representation-in-the-delta-query-response
-    '@removed'?: {reason: 'changed' | 'deleted'};
+    '@removed'?: { reason: 'changed' | 'deleted' };
     // The following properties are optional because update instances will only
     // have at least the properties which have changed
     // See https://learn.microsoft.com/en-us/graph/delta-query-overview?tabs=http#resource-representation-in-the-delta-query-response
@@ -80,12 +80,12 @@ export interface MicrosoftEventDeltaResponse {
     isCancelled?: boolean;
     // See https://learn.microsoft.com/en-us/graph/api/resources/datetimetimezone?view=graph-rest-1.0
     start?: {
-      dateTime: string;  // e.g. "2023-04-01T18:00:00.0000000"
-      timeZone: string;  // e.g. "UTC"
+      dateTime: string; // e.g. "2023-04-01T18:00:00.0000000"
+      timeZone: string; // e.g. "UTC"
     };
     end?: {
-      dateTime: string;  // e.g. "2023-04-01T18:00:00.0000000"
-      timeZone: string;  // e.g. "UTC"
+      dateTime: string; // e.g. "2023-04-01T18:00:00.0000000"
+      timeZone: string; // e.g. "UTC"
     };
   }[];
 }

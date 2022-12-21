@@ -10,7 +10,7 @@ import User from '../users/user.entity';
 import UsersService from '../users/users.service';
 import { getSecondsSinceUnixEpoch } from '../dates.utils';
 import { Request } from 'express';
-import CacherService from 'src/cacher/cacher.service';
+import CacherService from '../cacher/cacher.service';
 
 export async function getJWTSigningKey(
   configService: ConfigService<EnvironmentVariables, true>,
@@ -33,12 +33,12 @@ export async function getJWTSigningKey(
 
 export type TokenPurpose = 'pwreset';
 export type SerializedUserJwt = {
-  sub: string;  // user ID
-  iat: number;  // when the JWT was created (seconds since Unix epoch)
+  sub: string; // user ID
+  iat: number; // when the JWT was created (seconds since Unix epoch)
 
   // Custom claims
   cabbagemeet__token_purpose?: TokenPurpose;
-}
+};
 
 const PWRESET_TOKEN_LIFETIME_SECONDS = 4 * 60 * 60;
 
@@ -60,7 +60,10 @@ export default class JwtStrategy extends PassportStrategy(Strategy) {
     });
   }
 
-  async validate(req: Request, payload: SerializedUserJwt): Promise<User | null> {
+  async validate(
+    req: Request,
+    payload: SerializedUserJwt,
+  ): Promise<User | null> {
     const user = await this.usersService.findOneByID(+payload.sub);
     if (user === null) {
       return null;
@@ -71,14 +74,20 @@ export default class JwtStrategy extends PassportStrategy(Strategy) {
         return null;
       }
       const token = this.jwtFromRequest(req);
-      if (!await this.cacherService.addIfNotPresent(token, '1', PWRESET_TOKEN_LIFETIME_SECONDS)) {
+      if (
+        !(await this.cacherService.addIfNotPresent(
+          token,
+          '1',
+          PWRESET_TOKEN_LIFETIME_SECONDS,
+        ))
+      ) {
         this.logger.debug('Detected attempt to re-use password reset token');
         return null;
       }
     } else {
       if (
-        user.TimestampOfEarliestValidToken === null
-        || payload.iat < user.TimestampOfEarliestValidToken
+        user.TimestampOfEarliestValidToken === null ||
+        payload.iat < user.TimestampOfEarliestValidToken
       ) {
         return null;
       }
@@ -86,9 +95,12 @@ export default class JwtStrategy extends PassportStrategy(Strategy) {
     return user;
   }
 
-  serializeUserToJwt(user: User, purpose?: TokenPurpose): {
-    payload: SerializedUserJwt,
-    token: string,
+  serializeUserToJwt(
+    user: User,
+    purpose?: TokenPurpose,
+  ): {
+    payload: SerializedUserJwt;
+    token: string;
   } {
     const payload: SerializedUserJwt = {
       sub: String(user.ID),
@@ -98,6 +110,6 @@ export default class JwtStrategy extends PassportStrategy(Strategy) {
       payload.cabbagemeet__token_purpose = purpose;
     }
     const token = this.jwtService.sign(payload);
-    return {payload, token};
+    return { payload, token };
   }
 }

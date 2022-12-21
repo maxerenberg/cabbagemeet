@@ -13,12 +13,20 @@ import Meeting from './meeting.entity';
 
 export class NoSuchMeetingError extends Error {}
 
-function formatScheduledTimeRange(startDateTime: string, endDateTime: string, tz: string): string {
+function formatScheduledTimeRange(
+  startDateTime: string,
+  endDateTime: string,
+  tz: string,
+): string {
   // remove space so that e.g. "8:00 AM" becomes "8:00AM"
-  const start = DateTime.fromISO(startDateTime).setZone(tz)
-    .toLocaleString(DateTime.TIME_SIMPLE).replace(' ', '');
-  const end = DateTime.fromISO(endDateTime).setZone(tz)
-    .toLocaleString(DateTime.TIME_SIMPLE).replace(' ', '');
+  const start = DateTime.fromISO(startDateTime)
+    .setZone(tz)
+    .toLocaleString(DateTime.TIME_SIMPLE)
+    .replace(' ', '');
+  const end = DateTime.fromISO(endDateTime)
+    .setZone(tz)
+    .toLocaleString(DateTime.TIME_SIMPLE)
+    .replace(' ', '');
   const tzShort = DateTime.fromISO(startDateTime).setZone(tz).offsetNameShort;
   return `${start} to ${end} ${tzShort}`;
 }
@@ -30,17 +38,18 @@ export default class MeetingsService {
 
   constructor(
     @InjectRepository(Meeting) private meetingsRepository: Repository<Meeting>,
-    @InjectRepository(MeetingRespondent) private respondentsRepository: Repository<MeetingRespondent>,
+    @InjectRepository(MeetingRespondent)
+    private respondentsRepository: Repository<MeetingRespondent>,
     private readonly mailService: MailService,
     private moduleRef: ModuleRef,
     configService: ConfigService<EnvironmentVariables, true>,
   ) {
-    this.publicURL = configService.get('PUBLIC_URL', {infer: true});
+    this.publicURL = configService.get('PUBLIC_URL', { infer: true });
   }
 
   onModuleInit() {
     // circular dependency
-    this.oauth2Service = this.moduleRef.get(OAuth2Service, {strict: false});
+    this.oauth2Service = this.moduleRef.get(OAuth2Service, { strict: false });
   }
 
   createMeeting(partialMeeting: Partial<Meeting>): Promise<Meeting> {
@@ -48,7 +57,7 @@ export default class MeetingsService {
   }
 
   async getMeetingOrThrow(meetingID: number): Promise<Meeting> {
-    const meeting = await this.meetingsRepository.findOneBy({ID: meetingID});
+    const meeting = await this.meetingsRepository.findOneBy({ ID: meetingID });
     if (!meeting) {
       throw new NoSuchMeetingError();
     }
@@ -61,45 +70,63 @@ export default class MeetingsService {
       .leftJoin('Meeting.Respondents', 'MeetingRespondent')
       .leftJoin('MeetingRespondent.User', 'User')
       .select(['Meeting', 'MeetingRespondent', 'User.ID', 'User.Name'])
-      .where('Meeting.ID = :meetingID', {meetingID})
+      .where('Meeting.ID = :meetingID', { meetingID })
       .getOne();
   }
 
-  private getRespondentsWithNotificationsEnabled(meetingID: number): Promise<MeetingRespondent[]> {
+  private getRespondentsWithNotificationsEnabled(
+    meetingID: number,
+  ): Promise<MeetingRespondent[]> {
     return this.respondentsRepository
       .createQueryBuilder()
       .leftJoin('MeetingRespondent.User', 'User')
-      .select(['MeetingRespondent.GuestName', 'MeetingRespondent.GuestEmail', 'User.Name', 'User.Email'])
-      .where('MeetingRespondent.MeetingID = :meetingID', {meetingID})
-      .where('MeetingRespondent.GuestEmail IS NOT NULL OR User.IsSubscribedToNotifications')
+      .select([
+        'MeetingRespondent.GuestName',
+        'MeetingRespondent.GuestEmail',
+        'User.Name',
+        'User.Email',
+      ])
+      .where('MeetingRespondent.MeetingID = :meetingID', { meetingID })
+      .where(
+        'MeetingRespondent.GuestEmail IS NOT NULL OR User.IsSubscribedToNotifications',
+      )
       .getMany();
   }
 
-  private async updateMeetingDB(meeting: Meeting, meetingInfo: Partial<Meeting>) {
+  private async updateMeetingDB(
+    meeting: Meeting,
+    meetingInfo: Partial<Meeting>,
+  ) {
     // TODO: use a transaction to wrap the initial read of the meeting + the update
     await this.meetingsRepository.update(meeting.ID, meetingInfo);
     Object.assign(meeting, meetingInfo);
   }
 
   async editMeeting(meeting: Meeting, partialUpdate: Partial<Meeting>) {
-    const {Name: oldName, About: oldAbout} = meeting;
+    const { Name: oldName, About: oldAbout } = meeting;
     await this.updateMeetingDB(meeting, partialUpdate);
     if (
-      meeting.ScheduledStartDateTime !== null
-      && meeting.ScheduledEndDateTime !== null
-      && (
-        meeting.Name !== oldName
-        || meeting.About !== oldAbout
-      )
+      meeting.ScheduledStartDateTime !== null &&
+      meeting.ScheduledEndDateTime !== null &&
+      (meeting.Name !== oldName || meeting.About !== oldAbout)
     ) {
       // Update respondents' external calendars
       // Do not await the Promise so that we don't block the caller
-      this.oauth2Service.tryCreateOrUpdateEventsForMeetingForAllRespondents(meeting);
+      this.oauth2Service.tryCreateOrUpdateEventsForMeetingForAllRespondents(
+        meeting,
+      );
     }
   }
 
-  private createScheduledNotificationEmailBody(meeting: Meeting, name: string): string {
-    const scheduledTimeRange = formatScheduledTimeRange(meeting.ScheduledStartDateTime, meeting.ScheduledEndDateTime, meeting.Timezone);
+  private createScheduledNotificationEmailBody(
+    meeting: Meeting,
+    name: string,
+  ): string {
+    const scheduledTimeRange = formatScheduledTimeRange(
+      meeting.ScheduledStartDateTime,
+      meeting.ScheduledEndDateTime,
+      meeting.Timezone,
+    );
     return (
       `Hello ${name},\n` +
       '\n' +
@@ -114,9 +141,14 @@ export default class MeetingsService {
     );
   }
 
-  async scheduleMeeting(maybeUser: User | null, meeting: Meeting, startDateTime: string, endDateTime: string) {
+  async scheduleMeeting(
+    maybeUser: User | null,
+    meeting: Meeting,
+    startDateTime: string,
+    endDateTime: string,
+  ) {
     // Update database
-    const {WasScheduledAtLeastOnce: wasScheduledAtLeastOnce} = meeting;
+    const { WasScheduledAtLeastOnce: wasScheduledAtLeastOnce } = meeting;
     const updatedInfo: Partial<Meeting> = {
       ScheduledStartDateTime: startDateTime,
       ScheduledEndDateTime: endDateTime,
@@ -125,7 +157,8 @@ export default class MeetingsService {
     await this.updateMeetingDB(meeting, updatedInfo);
     // Send email notifications
     if (!wasScheduledAtLeastOnce) {
-      const respondentsToBeNotified = await this.getRespondentsWithNotificationsEnabled(meeting.ID);
+      const respondentsToBeNotified =
+        await this.getRespondentsWithNotificationsEnabled(meeting.ID);
       for (const respondent of respondentsToBeNotified) {
         if (maybeUser && respondent.User?.ID === maybeUser.ID) {
           // Don't notify the person who scheduled the meeting
@@ -143,7 +176,9 @@ export default class MeetingsService {
     }
     // Update respondents' external calendars
     // Do not await the Promise so that we don't block the caller
-    this.oauth2Service.tryCreateOrUpdateEventsForMeetingForAllRespondents(meeting);
+    this.oauth2Service.tryCreateOrUpdateEventsForMeetingForAllRespondents(
+      meeting,
+    );
   }
 
   async unscheduleMeeting(meeting: Meeting) {
@@ -167,22 +202,49 @@ export default class MeetingsService {
     // Promise.allSettled() in the OAuth2Service should hopefully speed things up.
     //
     // Alternative solution: use a tombstoned row
-    await this.oauth2Service.tryDeleteEventsForMeetingForAllRespondents(meetingID);
+    await this.oauth2Service.tryDeleteEventsForMeetingForAllRespondents(
+      meetingID,
+    );
     await this.meetingsRepository.delete(meetingID);
   }
 
   async getRespondent(respondentID: number): Promise<MeetingRespondent | null>;
-  async getRespondent(meetingID: number, userID: number): Promise<MeetingRespondent | null>;
-  async getRespondent(respondentIDOrMeetingID: number, userID?: number): Promise<MeetingRespondent | null> {
+  async getRespondent(
+    meetingID: number,
+    userID: number,
+  ): Promise<MeetingRespondent | null>;
+  async getRespondent(
+    respondentIDOrMeetingID: number,
+    userID?: number,
+  ): Promise<MeetingRespondent | null> {
     if (userID === undefined) {
-      return this.respondentsRepository.findOneBy({RespondentID: respondentIDOrMeetingID});
+      return this.respondentsRepository.findOneBy({
+        RespondentID: respondentIDOrMeetingID,
+      });
     }
-    return this.respondentsRepository.findOneBy({MeetingID: respondentIDOrMeetingID, UserID: userID});
+    return this.respondentsRepository.findOneBy({
+      MeetingID: respondentIDOrMeetingID,
+      UserID: userID,
+    });
   }
 
-  async addRespondent(meetingID: number, availabilities: string[], userID: number): Promise<MeetingRespondent>;
-  async addRespondent(meetingID: number, availabilities: string[], guestName: string, guestEmail?: string): Promise<MeetingRespondent>;
-  async addRespondent(meetingID: number, availabilities: string[], userIDOrGuestName: number | string, guestEmail?: string): Promise<MeetingRespondent> {
+  async addRespondent(
+    meetingID: number,
+    availabilities: string[],
+    userID: number,
+  ): Promise<MeetingRespondent>;
+  async addRespondent(
+    meetingID: number,
+    availabilities: string[],
+    guestName: string,
+    guestEmail?: string,
+  ): Promise<MeetingRespondent>;
+  async addRespondent(
+    meetingID: number,
+    availabilities: string[],
+    userIDOrGuestName: number | string,
+    guestEmail?: string,
+  ): Promise<MeetingRespondent> {
     const respondent: Partial<MeetingRespondent> = {
       MeetingID: meetingID,
       Availabilities: JSON.stringify(availabilities),
@@ -196,19 +258,28 @@ export default class MeetingsService {
     return this.respondentsRepository.save(respondent);
   }
 
-  async updateRespondent(respondentID: number, availabilities: string[]): Promise<MeetingRespondent | null> {
+  async updateRespondent(
+    respondentID: number,
+    availabilities: string[],
+  ): Promise<MeetingRespondent | null> {
     // TODO: wrap in transaction
-    await this.respondentsRepository.update(
-      respondentID,
-      {Availabilities: JSON.stringify(availabilities)},
-    );
-    return this.respondentsRepository.findOneBy({RespondentID: respondentID});
+    await this.respondentsRepository.update(respondentID, {
+      Availabilities: JSON.stringify(availabilities),
+    });
+    return this.respondentsRepository.findOneBy({ RespondentID: respondentID });
   }
 
-  async addOrUpdateRespondent(meetingID: number, userID: number, availabilities: string[]): Promise<Meeting> {
+  async addOrUpdateRespondent(
+    meetingID: number,
+    userID: number,
+    availabilities: string[],
+  ): Promise<Meeting> {
     const existingRespondent = await this.getRespondent(meetingID, userID);
     if (existingRespondent) {
-      await this.updateRespondent(existingRespondent.RespondentID, availabilities);
+      await this.updateRespondent(
+        existingRespondent.RespondentID,
+        availabilities,
+      );
     } else {
       await this.addRespondent(meetingID, availabilities, userID);
     }
@@ -216,7 +287,10 @@ export default class MeetingsService {
     const updatedMeeting = await this.getMeetingWithRespondents(meetingID);
     // Update respondent's external calendars
     // Do not await the Promise so that we don't block the caller
-    this.oauth2Service.tryCreateOrUpdateEventsForMeetingForSingleRespondent(userID, updatedMeeting);
+    this.oauth2Service.tryCreateOrUpdateEventsForMeetingForSingleRespondent(
+      userID,
+      updatedMeeting,
+    );
     return updatedMeeting;
   }
 
@@ -225,7 +299,10 @@ export default class MeetingsService {
       // We need to wait until this runs to completion or else the row in
       // the GoogleCalendarCreatedEvents table might be deleted prematurely
       // (due to cascading deletions).
-      await this.oauth2Service.tryDeleteEventsForMeetingForSingleRespondent(respondent.UserID, respondent.MeetingID);
+      await this.oauth2Service.tryDeleteEventsForMeetingForSingleRespondent(
+        respondent.UserID,
+        respondent.MeetingID,
+      );
     }
     await this.respondentsRepository.delete(respondent.RespondentID);
     // TODO: wrap in transaction
@@ -237,7 +314,7 @@ export default class MeetingsService {
     return this.meetingsRepository
       .createQueryBuilder()
       .select(['Meeting'])
-      .where('CreatorID = :userID', {userID})
+      .where('CreatorID = :userID', { userID })
       .limit(100)
       .getMany();
   }
@@ -248,7 +325,7 @@ export default class MeetingsService {
       .createQueryBuilder()
       .innerJoin('Meeting.Respondents', 'MeetingRespondent')
       .select(['Meeting'])
-      .where('MeetingRespondent.UserID = :userID', {userID})
+      .where('MeetingRespondent.UserID = :userID', { userID })
       .limit(100)
       .getMany();
   }

@@ -1,4 +1,4 @@
-import { defineScript } from "redis";
+import { defineScript } from 'redis';
 
 // Adapted from https://developer.redis.com/develop/dotnet/aspnetcore/rate-limiting/sliding-window/
 // KEYS[1]: name of sorted set
@@ -22,12 +22,16 @@ export const luaScriptConfig = {
   tryAddRequestIfWithinLimits: defineScript({
     NUMBER_OF_KEYS: 1,
     SCRIPT: luaScriptText,
-    transformArguments(key: string, intervalSeconds: number, limit: number): string[] {
+    transformArguments(
+      key: string,
+      intervalSeconds: number,
+      limit: number,
+    ): string[] {
       return [key, intervalSeconds.toString(), limit.toString()];
     },
     transformReply(this, reply: number): boolean {
       // Note that 0 means success in our script
       return reply === 0;
     },
-  })
+  }),
 };

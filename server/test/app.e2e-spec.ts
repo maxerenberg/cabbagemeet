@@ -1,24 +1,23 @@
-import { Test, TestingModule } from '@nestjs/testing';
-import { INestApplication } from '@nestjs/common';
+import { HttpStatus } from '@nestjs/common';
+import type { NestExpressApplication } from '@nestjs/platform-express';
 import * as request from 'supertest';
-import { AppModule } from './../src/app.module';
+import { commonAfterAll, commonBeforeAll, commonBeforeEach } from './e2e-testing-helpers';
 
 describe('AppController (e2e)', () => {
-  let app: INestApplication;
+  let app: NestExpressApplication;
 
-  beforeEach(async () => {
-    const moduleFixture: TestingModule = await Test.createTestingModule({
-      imports: [AppModule],
-    }).compile();
+  beforeAll(async () => { app = await commonBeforeAll(); });
+  beforeEach(commonBeforeEach);
 
-    app = moduleFixture.createNestApplication();
-    await app.init();
-  });
-
-  it('/ (GET)', () => {
+  it('/api/server-info (GET)', () => {
     return request(app.getHttpServer())
-      .get('/')
-      .expect(200)
-      .expect('Hello World!');
+      .get('/api/server-info')
+      .expect(HttpStatus.OK)
+      .expect({
+        googleOAuth2IsSupported: !!process.env.OAUTH2_GOOGLE_CLIENT_ID,
+        microsoftOAuth2IsSupported: !!process.env.OAUTH2_MICROSOFT_CLIENT_ID,
+      });
   });
+
+  afterAll(() => commonAfterAll(app));
 });

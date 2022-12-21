@@ -5,10 +5,12 @@ import { EnvironmentVariables } from '../env.validation';
 import { luaScriptConfig as rateLimiterLuaScript } from '../rate-limiter/redis-rate-limiter-lua-script';
 import CacherService from './cacher.service';
 
-function redisClientFactory(configService: ConfigService<EnvironmentVariables, true>) {
-  const host = configService.get('REDIS_HOST', {infer: true});
-  const port = configService.get('REDIS_PORT', {infer: true});
-  const database = configService.get('REDIS_DATABASE', {infer: true});
+function redisClientFactory(
+  configService: ConfigService<EnvironmentVariables, true>,
+) {
+  const host = configService.get('REDIS_HOST', { infer: true });
+  const port = configService.get('REDIS_PORT', { infer: true });
+  const database = configService.get('REDIS_DATABASE', { infer: true });
   if (!host || !port) {
     return null;
   }
@@ -20,13 +22,18 @@ function redisClientFactory(configService: ConfigService<EnvironmentVariables, t
     },
   });
 }
-export type CustomRedisClientType = Exclude<ReturnType<typeof redisClientFactory>, null>;
+export type CustomRedisClientType = Exclude<
+  ReturnType<typeof redisClientFactory>,
+  null
+>;
 
 @Module({
   providers: [
     {
       provide: 'REDIS_CLIENT',
-      useFactory: async (configService: ConfigService<EnvironmentVariables, true>): Promise<CustomRedisClientType | null> => {
+      useFactory: async (
+        configService: ConfigService<EnvironmentVariables, true>,
+      ): Promise<CustomRedisClientType | null> => {
         const client = redisClientFactory(configService);
         if (client) {
           await client.connect();

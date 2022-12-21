@@ -1,5 +1,12 @@
 import User from '../users/user.entity';
-import { Entity, Column, PrimaryGeneratedColumn, OneToMany, Index, ManyToOne } from 'typeorm';
+import {
+  Entity,
+  Column,
+  PrimaryGeneratedColumn,
+  OneToMany,
+  Index,
+  ManyToOne,
+} from 'typeorm';
 import { CustomJoinColumn } from '../custom-columns/custom-join-column';
 import MeetingRespondent from './meeting-respondent.entity';
 import GoogleCalendarEvents from '../oauth2/google-calendar-events.entity';
@@ -44,52 +51,68 @@ export default class Meeting {
   Timezone: string;
 
   // Must be a multiple of 0.25 and be between [0, 24)
-  @Column('decimal', { precision: 4, scale: 2, transformer: decimalTransformer })
+  @Column('decimal', {
+    precision: 4,
+    scale: 2,
+    transformer: decimalTransformer,
+  })
   MinStartHour: number;
 
   // Must be a multiple of 0.25 and be between [0, 24)
-  @Column('decimal', { precision: 4, scale: 2, transformer: decimalTransformer })
+  @Column('decimal', {
+    precision: 4,
+    scale: 2,
+    transformer: decimalTransformer,
+  })
   MaxEndHour: number;
 
   // JSON array
   // e.g. '["2022-10-23", "2022-10-24"]'
-  @Column({type: 'simple-json'})
+  @Column({ type: 'simple-json' })
   TentativeDates: string[];
 
   // e.g. '2022-10-23T10:00:00Z'
-  @Column({nullable: true})
+  @Column({ nullable: true })
   ScheduledStartDateTime?: string;
 
   // e.g. '2022-10-23T10:30:00Z'
-  @Column({nullable: true})
+  @Column({ nullable: true })
   ScheduledEndDateTime?: string;
 
   // This is used to avoid sending redundant email notifications when
   // a meeting is rescheduled
-  @Column({default: false})
+  @Column({ default: false })
   WasScheduledAtLeastOnce: boolean;
 
   @OneToMany(() => MeetingRespondent, (respondent) => respondent.Meeting)
   Respondents: MeetingRespondent[];
 
   // Will be null if meeting was created by an anonymous user
-  @Index({where: 'CreatorID IS NOT NULL'})
-  @Column({nullable: true})
+  @Index({ where: 'CreatorID IS NOT NULL' })
+  @Column({ nullable: true })
   CreatorID?: number;
 
-  @ManyToOne(() => User, (user) => user.CreatedMeetings, {onDelete: 'CASCADE'})
-  @CustomJoinColumn({name: 'CreatorID'})
+  @ManyToOne(() => User, (user) => user.CreatedMeetings, {
+    onDelete: 'CASCADE',
+  })
+  @CustomJoinColumn({ name: 'CreatorID' })
   Creator?: User;
 
-  @OneToMany(() => GoogleCalendarEvents, googleEvent => googleEvent.Meeting)
+  @OneToMany(() => GoogleCalendarEvents, (googleEvent) => googleEvent.Meeting)
   GoogleCalendarEvents: GoogleCalendarEvents[];
 
-  @OneToMany(() => GoogleCalendarCreatedEvent, googleEvent => googleEvent.Meeting)
+  @OneToMany(
+    () => GoogleCalendarCreatedEvent,
+    (googleEvent) => googleEvent.Meeting,
+  )
   GoogleCalendarCreatedEvents: GoogleCalendarCreatedEvent[];
 
-  @OneToMany(() => MicrosoftCalendarEvents, msftEvent => msftEvent.Meeting)
+  @OneToMany(() => MicrosoftCalendarEvents, (msftEvent) => msftEvent.Meeting)
   MicrosoftCalendarEvents: MicrosoftCalendarEvents[];
 
-  @OneToMany(() => MicrosoftCalendarCreatedEvent, msftEvent => msftEvent.Meeting)
+  @OneToMany(
+    () => MicrosoftCalendarCreatedEvent,
+    (msftEvent) => msftEvent.Meeting,
+  )
   MicrosoftCalendarCreatedEvents: MicrosoftCalendarCreatedEvent[];
-};
+}

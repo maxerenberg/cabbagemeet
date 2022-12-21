@@ -1,4 +1,10 @@
-import { Entity, Column, PrimaryGeneratedColumn, Index, ManyToOne } from 'typeorm';
+import {
+  Entity,
+  Column,
+  PrimaryGeneratedColumn,
+  Index,
+  ManyToOne,
+} from 'typeorm';
 import { CustomJoinColumn } from '../custom-columns/custom-join-column';
 import User from '../users/user.entity';
 import Meeting from './meeting.entity';
@@ -17,22 +23,24 @@ export default class MeetingRespondent {
   @Column()
   MeetingID: number;
 
-  @ManyToOne(() => Meeting, meeting => meeting.Respondents, {onDelete: 'CASCADE'})
-  @CustomJoinColumn({name: 'MeetingID'})
+  @ManyToOne(() => Meeting, (meeting) => meeting.Respondents, {
+    onDelete: 'CASCADE',
+  })
+  @CustomJoinColumn({ name: 'MeetingID' })
   Meeting: Meeting;
 
-  @Index({where: 'UserID IS NOT NULL'})
-  @Column({nullable: true})
+  @Index({ where: 'UserID IS NOT NULL' })
+  @Column({ nullable: true })
   UserID?: number;
 
-  @ManyToOne(() => User, user => user.Respondents, {onDelete: 'CASCADE'})
-  @CustomJoinColumn({name: 'UserID'})
+  @ManyToOne(() => User, (user) => user.Respondents, { onDelete: 'CASCADE' })
+  @CustomJoinColumn({ name: 'UserID' })
   User?: User;
 
-  @Column({nullable: true})
+  @Column({ nullable: true })
   GuestName?: string;
 
-  @Column({nullable: true})
+  @Column({ nullable: true })
   GuestEmail?: string;
 
   // This is a JSON array of the start times of the 30-minute intervals

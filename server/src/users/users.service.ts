@@ -2,16 +2,18 @@ import { Injectable } from '@nestjs/common';
 import { ModuleRef } from '@nestjs/core';
 import { InjectRepository } from '@nestjs/typeorm';
 import { normalizeDBError, UniqueConstraintFailed } from '../database.utils';
+import { oauth2ProviderNamesMap, oauth2TableNames } from '../oauth2/oauth2-common';
 import OAuth2Service from '../oauth2/oauth2.service';
 import { Repository } from 'typeorm';
 import User from './user.entity';
-import { oauth2ProviderNamesMap, oauth2TableNames } from 'src/oauth2/oauth2-common';
 
 export class UserAlreadyExistsError extends Error {}
 
 const columnsForGetUser = [
   'User',
-  ...Object.values(oauth2ProviderNamesMap).map(name => `${name}OAuth2.LinkedCalendar`)
+  ...Object.values(oauth2ProviderNamesMap).map(
+    (name) => `${name}OAuth2.LinkedCalendar`,
+  ),
 ];
 
 export function selectUserLeftJoinOAuth2Tables(repository: Repository<User>) {
@@ -34,28 +36,34 @@ export default class UsersService {
 
   onModuleInit() {
     // circular dependency
-    this.oauth2Service = this.moduleRef.get(OAuth2Service, {strict: false});
+    this.oauth2Service = this.moduleRef.get(OAuth2Service, { strict: false });
   }
 
   async updateTimestamp(user: User, timestamp: number) {
     if (
-      user.TimestampOfEarliestValidToken !== null
-      && timestamp >= user.TimestampOfEarliestValidToken
+      user.TimestampOfEarliestValidToken !== null &&
+      timestamp >= user.TimestampOfEarliestValidToken
     ) {
       // We want to store the earliest timestamp for which a token could possibly
       // be valid (anything older than it will be considered invalid).
       return;
     }
-    await this.userRepository.update({ID: user.ID}, {TimestampOfEarliestValidToken: timestamp});
+    await this.userRepository.update(
+      { ID: user.ID },
+      { TimestampOfEarliestValidToken: timestamp },
+    );
   }
 
   async invalidateTimestamp(userID: number) {
-    await this.userRepository.update({ID: userID}, {TimestampOfEarliestValidToken: null});
+    await this.userRepository.update(
+      { ID: userID },
+      { TimestampOfEarliestValidToken: null },
+    );
   }
 
   async findOneByID(userID: number): Promise<User | null> {
     return selectUserLeftJoinOAuth2Tables(this.userRepository)
-      .where('User.ID = :userID', {userID})
+      .where('User.ID = :userID', { userID })
       .getOne();
   }
 
@@ -82,7 +90,7 @@ export default class UsersService {
   }
 
   async editUser(userID: number, userInfo: Partial<User>): Promise<User> {
-    await this.userRepository.update({ID: userID}, userInfo);
+    await this.userRepository.update({ ID: userID }, userInfo);
     return this.findOneByID(userID);
   }
 }

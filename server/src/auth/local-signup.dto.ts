@@ -10,16 +10,16 @@ import {
 } from 'class-validator';
 
 export default class LocalSignupDto {
-  @ApiProperty({example: 'John Doe'})
+  @ApiProperty({ example: 'John Doe' })
   @IsString()
   @IsNotEmpty()
   name: string;
 
-  @ApiProperty({example: 'john@example.com'})
+  @ApiProperty({ example: 'john@example.com' })
   @IsEmail({ require_tld: false })
   email: string;
 
-  @ApiProperty({example: 'super_secret_password'})
+  @ApiProperty({ example: 'super_secret_password' })
   @IsString()
   @MinLength(6)
   @MaxLength(30)

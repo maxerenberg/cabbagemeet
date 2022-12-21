@@ -8,7 +8,7 @@ import MeetingsService from './meetings/meetings.service';
 import User from './users/user.entity';
 import UsersService from './users/users.service';
 
-export function setJestTimeout(timeout: number = 10000) {
+export function setJestTimeout(timeout = 10000) {
   jest.setTimeout(timeout);
 }
 
@@ -32,26 +32,35 @@ export function deleteDatabase(name: string) {
 
 export function dynamicTypeOrmModule() {
   return TypeOrmModule.forFeature([
-    GoogleOAuth2, Meeting, MeetingRespondent, User,
+    GoogleOAuth2,
+    Meeting,
+    MeetingRespondent,
+    User,
   ]);
 }
 
-export function createRegisteredUser(usersService: UsersService): Promise<User> {
+export function createRegisteredUser(
+  usersService: UsersService,
+): Promise<User> {
   return usersService.create({
     Name: 'Bob',
     Email: 'a@b',
-    PasswordHash: '$2b$11$oaQGacHcVL2CJYCwM4FEnOIeYmBkuvAOoDUUJj5W7A7Okb//vhYBm',
+    PasswordHash:
+      '$2b$11$oaQGacHcVL2CJYCwM4FEnOIeYmBkuvAOoDUUJj5W7A7Okb//vhYBm',
     IsSubscribedToNotifications: true,
   });
 }
 
-export function createMeeting(meetingsService: MeetingsService, partialMeeting: Partial<Meeting> = {}): Promise<Meeting> {
+export function createMeeting(
+  meetingsService: MeetingsService,
+  partialMeeting: Partial<Meeting> = {},
+): Promise<Meeting> {
   return meetingsService.createMeeting({
     Name: 'Some meeting',
     About: '',
     MinStartHour: 13,
     MaxEndHour: 21,
-    TentativeDates: ["2022-10-27"],
+    TentativeDates: ['2022-10-27'],
     ...partialMeeting,
   });
 }

@@ -28,14 +28,17 @@ describe('RateLimitsService', () => {
 
   it('should allow requests under the rate limit', () => {
     const limit = 6;
-    rateLimiter.setLimits({[SECONDS_PER_HOUR]: limit});
+    rateLimiter.setLimits({ [SECONDS_PER_HOUR]: limit });
     const firstMockDateNowValue = mockDateNowValue;
     for (let i = 0; i < limit; i++) {
       expect(rateLimiter.tryAddRequestIfWithinLimits('key')).toBe(true);
       mockDateNowValue += 10;
     }
     expect(setTimeout).toHaveBeenCalledTimes(1);
-    expect(setTimeout).toHaveBeenLastCalledWith(expect.any(Function), timeoutMsForDailyLimit);
+    expect(setTimeout).toHaveBeenLastCalledWith(
+      expect.any(Function),
+      timeoutMsForDailyLimit,
+    );
 
     mockDateNowValue = firstMockDateNowValue + timeoutMsForDailyLimit;
     jest.runOnlyPendingTimers();
@@ -57,8 +60,14 @@ describe('RateLimitsService', () => {
           expect(setTimeout).toHaveBeenLastCalledWith(expect.any(Function), 10);
           mockDateNowValue += 10;
         } else {
-          const expected = (firstMockDateNowValue + 2 * timeoutMsForDailyLimit) - mockDateNowValue;
-          expect(setTimeout).toHaveBeenLastCalledWith(expect.any(Function), expected);
+          const expected =
+            firstMockDateNowValue +
+            2 * timeoutMsForDailyLimit -
+            mockDateNowValue;
+          expect(setTimeout).toHaveBeenLastCalledWith(
+            expect.any(Function),
+            expected,
+          );
           mockDateNowValue += expected;
         }
       } else {
@@ -75,7 +84,7 @@ describe('RateLimitsService', () => {
 
   it('should not allow requests over the rate limit', () => {
     const limit = 6;
-    rateLimiter.setLimits({[SECONDS_PER_HOUR]: limit});
+    rateLimiter.setLimits({ [SECONDS_PER_HOUR]: limit });
     const firstMockDateNowValue = mockDateNowValue;
     for (let i = 0; i < limit; i++) {
       expect(rateLimiter.tryAddRequestIfWithinLimits('key')).toBe(true);

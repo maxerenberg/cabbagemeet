@@ -7,7 +7,7 @@ import {
 } from 'crypto';
 import { promisify } from 'util';
 import { Logger } from '@nestjs/common';
-import { ConfigService } from "@nestjs/config";
+import { ConfigService } from '@nestjs/config';
 import { sign as jwtSignCb } from 'jsonwebtoken';
 import { Repository } from 'typeorm';
 import type { Dispatcher } from 'undici';
@@ -17,10 +17,10 @@ import {
   toISOStringUTCFromDateTimeStrAndTz,
   toISOStringUTCFromDateStrAndHourAndTz,
 } from '../dates.utils';
-import type { EnvironmentVariables } from "../env.validation";
+import type { EnvironmentVariables } from '../env.validation';
 import type Meeting from '../meetings/meeting.entity';
 import { encodeQueryParams } from '../misc.utils';
-import User from "../users/user.entity";
+import User from '../users/user.entity';
 import MicrosoftOAuth2 from './microsoft-oauth2.entity';
 import MicrosoftCalendarEvents from './microsoft-calendar-events.entity';
 import type OAuth2Service from './oauth2.service';
@@ -30,7 +30,7 @@ import type {
   PartialAuthzQueryParams,
   PartialRefreshParams,
   PartialTokenFormParams,
-} from "./oauth2.service";
+} from './oauth2.service';
 import {
   OAuth2ProviderType,
   oidcScopes,
@@ -40,10 +40,13 @@ import {
   OAuth2CalendarEvent,
   AbstractOAuth2CalendarCreatedEvent,
 } from './oauth2-common';
-import type { MicrosoftCreateEventResponse, MicrosoftEventDeltaResponse } from './oauth2-response-types';
+import type {
+  MicrosoftCreateEventResponse,
+  MicrosoftEventDeltaResponse,
+} from './oauth2-response-types';
 import AbstractOAuth2 from './abstract-oauth2.entity';
 import MicrosoftCalendarCreatedEvent from './microsoft-calendar-created-event.entity';
-import CacherService from 'src/cacher/cacher.service';
+import CacherService from '../cacher/cacher.service';
 
 const randomBytes: (size: number) => Promise<Buffer> = promisify(randomBytesCb);
 const randomInt: (max: number) => Promise<number> = promisify(randomIntCb);
@@ -70,16 +73,13 @@ function createOAuth2Config(tenantID: string): OAuth2Config {
     // See https://login.microsoftonline.com/common/v2.0/.well-known/openid-configuration
     authzEndpoint: `https://login.microsoftonline.com/${tenantID}/oauth2/v2.0/authorize`,
     tokenEndpoint: `https://login.microsoftonline.com/${tenantID}/oauth2/v2.0/token`,
-    scopes: [
-      ...oidcScopes,
-      'offline_access',
-      ...microsoftCalendarScopes,
-    ]
+    scopes: [...oidcScopes, 'offline_access', ...microsoftCalendarScopes],
   };
 }
 
 // See https://learn.microsoft.com/en-us/azure/active-directory/develop/v2-oauth2-auth-code-flow#request-an-access-token-with-a-certificate-credential
-const CLIENT_ASSERTION_TYPE = 'urn:ietf:params:oauth:client-assertion-type:jwt-bearer';
+const CLIENT_ASSERTION_TYPE =
+  'urn:ietf:params:oauth:client-assertion-type:jwt-bearer';
 
 const MICROSOFT_API_BASE_URL = 'https://graph.microsoft.com/v1.0';
 // See https://learn.microsoft.com/en-us/graph/api/event-delta?view=graph-rest-1.0
@@ -88,7 +88,8 @@ const MICROSOFT_API_CALENDAR_EVENTS_DELTA_URL = `${MICROSOFT_API_BASE_URL}/me/ca
 const MICROSOFT_API_CALENDAR_EVENTS_URL = `${MICROSOFT_API_BASE_URL}/me/events`;
 
 // See https://www.oauth.com/oauth2-servers/pkce/authorization-request/
-const pkceCodeVerifierValidChars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-._~';
+const pkceCodeVerifierValidChars =
+  'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-._~';
 const pkceCodeVerifierLength = 43;
 const codeChallengeLifetimeSeconds = 5 * SECONDS_PER_MINUTE;
 async function generatePkceCodeVerifier(): Promise<string> {
@@ -105,9 +106,11 @@ function generatePkceCodeChallenge(codeVerifier: string): string {
 
 // See https://learn.microsoft.com/en-us/azure/active-directory/develop/active-directory-certificate-credentials#header
 function certificateToX5t(pemEncodedCert: string): string {
-  const {fingerprint} = new X509Certificate(pemEncodedCert);
+  const { fingerprint } = new X509Certificate(pemEncodedCert);
   // fingerprint looks like "E9:BE:7B:B0:60:7D:33:..."
-  return Buffer.from(fingerprint.replace(/:/g, ''), 'hex').toString('base64url');
+  return Buffer.from(fingerprint.replace(/:/g, ''), 'hex').toString(
+    'base64url',
+  );
 }
 
 type MicrosoftOAuth2EnvConfig = {
@@ -117,8 +120,10 @@ type MicrosoftOAuth2EnvConfig = {
 };
 
 function errorIsMicrosoftCalendarEventNoLongerExists(err: any): boolean {
-  return err instanceof OAuth2ErrorResponseError
-    && (err as OAuth2ErrorResponseError).statusCode === 404;
+  return (
+    err instanceof OAuth2ErrorResponseError &&
+    (err as OAuth2ErrorResponseError).statusCode === 404
+  );
 }
 
 export default class MicrosoftOAuth2Provider implements IOAuth2Provider {
@@ -139,19 +144,33 @@ export default class MicrosoftOAuth2Provider implements IOAuth2Provider {
     private readonly calendarEventsRepository: Repository<MicrosoftCalendarEvents>,
     private readonly calendarCreatedEventsRepository: Repository<MicrosoftCalendarCreatedEvent>,
   ) {
-    const tenantID = configService.get('OAUTH2_MICROSOFT_TENANT_ID', {infer: true});
+    const tenantID = configService.get('OAUTH2_MICROSOFT_TENANT_ID', {
+      infer: true,
+    });
     this.oauth2Config = createOAuth2Config(tenantID);
-    const client_id = configService.get('OAUTH2_MICROSOFT_CLIENT_ID', {infer: true});
-    const certificate_path = configService.get('OAUTH2_MICROSOFT_CERTIFICATE_PATH', {infer: true});
-    const private_key_path = configService.get('OAUTH2_MICROSOFT_PRIVATE_KEY_PATH', {infer: true});
-    const redirect_uri = configService.get('OAUTH2_MICROSOFT_REDIRECT_URI', {infer: true});
+    const client_id = configService.get('OAUTH2_MICROSOFT_CLIENT_ID', {
+      infer: true,
+    });
+    const certificate_path = configService.get(
+      'OAUTH2_MICROSOFT_CERTIFICATE_PATH',
+      { infer: true },
+    );
+    const private_key_path = configService.get(
+      'OAUTH2_MICROSOFT_PRIVATE_KEY_PATH',
+      { infer: true },
+    );
+    const redirect_uri = configService.get('OAUTH2_MICROSOFT_REDIRECT_URI', {
+      infer: true,
+    });
     if (client_id && private_key_path && redirect_uri && certificate_path) {
-      const certificate = fs.readFileSync(certificate_path, {encoding: 'utf8'});
+      const certificate = fs.readFileSync(certificate_path, {
+        encoding: 'utf8',
+      });
       this.x5t = certificateToX5t(certificate);
       const private_key = fs.readFileSync(private_key_path);
-      this.envConfig = {client_id, redirect_uri, private_key};
+      this.envConfig = { client_id, redirect_uri, private_key };
     }
-    this.publicURL = configService.get('PUBLIC_URL', {infer: true});
+    this.publicURL = configService.get('PUBLIC_URL', { infer: true });
     this.codeVerifierCache = cacherService;
   }
 
@@ -165,17 +184,18 @@ export default class MicrosoftOAuth2Provider implements IOAuth2Provider {
 
   getScopesToExpectInResponse(): string[] {
     // Note that 'offline_access' will not be returned in the response
-    return [
-      ...oidcScopes,
-      ...microsoftCalendarScopes,
-    ]
+    return [...oidcScopes, ...microsoftCalendarScopes];
   }
 
   async getPartialAuthzQueryParams(): Promise<PartialAuthzQueryParams> {
     const nonce = (await randomBytes(16)).toString('base64url');
     const codeVerifier = await generatePkceCodeVerifier();
     const codeChallenge = generatePkceCodeChallenge(codeVerifier);
-    await this.codeVerifierCache.add(nonce, codeVerifier, codeChallengeLifetimeSeconds);
+    await this.codeVerifierCache.add(
+      nonce,
+      codeVerifier,
+      codeChallengeLifetimeSeconds,
+    );
     return {
       client_id: this.envConfig!.client_id,
       redirect_uri: this.envConfig!.redirect_uri,
@@ -188,32 +208,40 @@ export default class MicrosoftOAuth2Provider implements IOAuth2Provider {
   }
 
   // See https://learn.microsoft.com/en-us/azure/active-directory/develop/active-directory-certificate-credentials
-private generateClientAssertion(privateKey: Buffer, clientID: string): Promise<string> {
-  const now = getSecondsSinceUnixEpoch();
-  const header = {
-    alg: 'RS256' as const,
-    typ: 'JWT',
-    x5t: this.x5t,
-  };
-  const payload = {
-    aud: this.oauth2Config.tokenEndpoint,
-    exp: now + 5 * SECONDS_PER_MINUTE,
-    iss: clientID,
-    nbf: now,
-    sub: clientID,
-    iat: now,
-  };
-  return jwtSign(payload, privateKey, {algorithm: header.alg, header});
-}
+  private generateClientAssertion(
+    privateKey: Buffer,
+    clientID: string,
+  ): Promise<string> {
+    const now = getSecondsSinceUnixEpoch();
+    const header = {
+      alg: 'RS256' as const,
+      typ: 'JWT',
+      x5t: this.x5t,
+    };
+    const payload = {
+      aud: this.oauth2Config.tokenEndpoint,
+      exp: now + 5 * SECONDS_PER_MINUTE,
+      iss: clientID,
+      nbf: now,
+      sub: clientID,
+      iat: now,
+    };
+    return jwtSign(payload, privateKey, { algorithm: header.alg, header });
+  }
 
-  async getPartialTokenFormParams(nonce?: string): Promise<PartialTokenFormParams> {
+  async getPartialTokenFormParams(
+    nonce?: string,
+  ): Promise<PartialTokenFormParams> {
     if (!nonce) throw new OAuth2InvalidStateError();
     const codeVerifier = await this.codeVerifierCache.getAndPop(nonce);
     if (!codeVerifier) {
       throw new OAuth2InvalidOrExpiredNonceError();
     }
     // See https://learn.microsoft.com/en-us/azure/active-directory/develop/v2-oauth2-auth-code-flow#request-an-access-token-with-a-certificate-credential
-    const clientAssertion = await this.generateClientAssertion(this.envConfig.private_key!, this.envConfig.client_id!);
+    const clientAssertion = await this.generateClientAssertion(
+      this.envConfig.private_key!,
+      this.envConfig.client_id!,
+    );
     return {
       client_id: this.envConfig!.client_id,
       redirect_uri: this.envConfig!.redirect_uri,
@@ -224,7 +252,10 @@ private generateClientAssertion(privateKey: Buffer, clientID: string): Promise<s
   }
 
   async getPartialRefreshParams(): Promise<PartialRefreshParams> {
-    const clientAssertion = await this.generateClientAssertion(this.envConfig.private_key!, this.envConfig.client_id!);
+    const clientAssertion = await this.generateClientAssertion(
+      this.envConfig.private_key!,
+      this.envConfig.client_id!,
+    );
     return {
       client_id: this.envConfig!.client_id,
       client_assertion_type: CLIENT_ASSERTION_TYPE,
@@ -233,7 +264,7 @@ private generateClientAssertion(privateKey: Buffer, clientID: string): Promise<s
   }
 
   setLinkedCalendarToTrue(user: User): void {
-    user.MicrosoftOAuth2 = {LinkedCalendar: true} as MicrosoftOAuth2;
+    user.MicrosoftOAuth2 = { LinkedCalendar: true } as MicrosoftOAuth2;
   }
 
   private async mergeEventsFromSingleRequest(
@@ -245,7 +276,12 @@ private generateClientAssertion(privateKey: Buffer, clientID: string): Promise<s
   ): Promise<MicrosoftEventDeltaResponse | null> {
     let response: MicrosoftEventDeltaResponse | undefined;
     try {
-      response = await this.oauth2Service.apiRequest<MicrosoftEventDeltaResponse>(this, creds, url);
+      response =
+        await this.oauth2Service.apiRequest<MicrosoftEventDeltaResponse>(
+          this,
+          creds,
+          url,
+        );
       this.logger.debug(response);
     } catch (err: any) {
       // See https://learn.microsoft.com/en-us/graph/delta-query-overview?tabs=http#synchronization-reset
@@ -264,17 +300,23 @@ private generateClientAssertion(privateKey: Buffer, clientID: string): Promise<s
         }
         continue;
       }
-      const newStartDateTime = updatedEvent.start ?
-        toISOStringUTCFromDateTimeStrAndTz(updatedEvent.start.dateTime, updatedEvent.start.timeZone)
+      const newStartDateTime = updatedEvent.start
+        ? toISOStringUTCFromDateTimeStrAndTz(
+            updatedEvent.start.dateTime,
+            updatedEvent.start.timeZone,
+          )
         : undefined;
-      const newEndDateTime = updatedEvent.end ?
-        toISOStringUTCFromDateTimeStrAndTz(updatedEvent.end.dateTime, updatedEvent.end.timeZone)
+      const newEndDateTime = updatedEvent.end
+        ? toISOStringUTCFromDateTimeStrAndTz(
+            updatedEvent.end.dateTime,
+            updatedEvent.end.timeZone,
+          )
         : undefined;
       // See https://github.com/microsoftgraph/microsoft-graph-docs/issues/6599 - not every
       // event in the response is guaranteed to be in our original date range
       if (
-        (newStartDateTime && newStartDateTime < apiStartDateTime)
-        || (newEndDateTime && newEndDateTime > apiEndDateTime)
+        (newStartDateTime && newStartDateTime < apiStartDateTime) ||
+        (newEndDateTime && newEndDateTime > apiEndDateTime)
       ) {
         continue;
       }
@@ -312,12 +354,13 @@ private generateClientAssertion(privateKey: Buffer, clientID: string): Promise<s
     needToSaveEvents: boolean;
   } | null> {
     const existingEventsData = await this.calendarEventsRepository.findOneBy({
-      UserID: userID, MeetingID: meetingID
+      UserID: userID,
+      MeetingID: meetingID,
     });
     if (
-      !existingEventsData
-      || existingEventsData.PrevStartDateTime !== apiStartDateTime
-      || existingEventsData.PrevEndDateTime !== apiEndDateTime
+      !existingEventsData ||
+      existingEventsData.PrevStartDateTime !== apiStartDateTime ||
+      existingEventsData.PrevEndDateTime !== apiEndDateTime
     ) {
       return null;
     }
@@ -330,11 +373,18 @@ private generateClientAssertion(privateKey: Buffer, clientID: string): Promise<s
     let nextLink = existingEventsData.DeltaLink;
     let deltaLink: string | undefined;
     for (;;) {
-      const response = await this.mergeEventsFromSingleRequest(creds, eventsMap, nextLink, apiStartDateTime, apiEndDateTime);
+      const response = await this.mergeEventsFromSingleRequest(
+        creds,
+        eventsMap,
+        nextLink,
+        apiStartDateTime,
+        apiEndDateTime,
+      );
       if (!response) {
         return null;
       }
-      atLeastOneEventChanged = atLeastOneEventChanged || response.value.length > 0;
+      atLeastOneEventChanged =
+        atLeastOneEventChanged || response.value.length > 0;
       if (response['@odata.deltaLink']) {
         deltaLink = response['@odata.deltaLink'];
         break;
@@ -365,10 +415,17 @@ private generateClientAssertion(privateKey: Buffer, clientID: string): Promise<s
       startDateTime: apiStartDateTime,
       endDateTime: apiEndDateTime,
     };
-    let url = MICROSOFT_API_CALENDAR_EVENTS_DELTA_URL + '?' + encodeQueryParams(params);
+    let url =
+      MICROSOFT_API_CALENDAR_EVENTS_DELTA_URL + '?' + encodeQueryParams(params);
     const eventsMap: Record<string, OAuth2CalendarEvent> = {};
     for (;;) {
-      const response = await this.mergeEventsFromSingleRequest(creds, eventsMap, url, apiStartDateTime, apiEndDateTime);
+      const response = await this.mergeEventsFromSingleRequest(
+        creds,
+        eventsMap,
+        url,
+        apiStartDateTime,
+        apiEndDateTime,
+      );
       if (!response) {
         throw new Error('Unable to get events on full sync');
       }
@@ -385,23 +442,45 @@ private generateClientAssertion(privateKey: Buffer, clientID: string): Promise<s
   }
 
   // TODO: reduce code duplication with GoogleOAuth2Provider
-  async getEventsForMeeting(abstractCreds: AbstractOAuth2, meeting: Meeting): Promise<OAuth2CalendarEvent[]> {
+  async getEventsForMeeting(
+    abstractCreds: AbstractOAuth2,
+    meeting: Meeting,
+  ): Promise<OAuth2CalendarEvent[]> {
     const creds = abstractCreds as MicrosoftOAuth2;
     const userID = creds.UserID;
     const tentativeDates = meeting.TentativeDates;
-    const minDate = tentativeDates.reduce((a, b) => a < b ? a : b);
-    const maxDate = tentativeDates.reduce((a, b) => a > b ? a : b);
-    const apiStartDateTime = toISOStringUTCFromDateStrAndHourAndTz(minDate, meeting.MinStartHour, meeting.Timezone);
-    const apiEndDateTime = toISOStringUTCFromDateStrAndHourAndTz(maxDate, meeting.MaxEndHour, meeting.Timezone);
-    const existingEventsData = await this.getEventsForMeetingUsingIncrementalSync(creds, userID, meeting.ID, apiStartDateTime, apiEndDateTime);
+    const minDate = tentativeDates.reduce((a, b) => (a < b ? a : b));
+    const maxDate = tentativeDates.reduce((a, b) => (a > b ? a : b));
+    const apiStartDateTime = toISOStringUTCFromDateStrAndHourAndTz(
+      minDate,
+      meeting.MinStartHour,
+      meeting.Timezone,
+    );
+    const apiEndDateTime = toISOStringUTCFromDateStrAndHourAndTz(
+      maxDate,
+      meeting.MaxEndHour,
+      meeting.Timezone,
+    );
+    const existingEventsData =
+      await this.getEventsForMeetingUsingIncrementalSync(
+        creds,
+        userID,
+        meeting.ID,
+        apiStartDateTime,
+        apiEndDateTime,
+      );
     let events: OAuth2CalendarEvent[];
     let deltaLink: string | null = null;
     let needToSaveEvents = true;
     if (existingEventsData) {
-      ({events, deltaLink, needToSaveEvents} = existingEventsData);
+      ({ events, deltaLink, needToSaveEvents } = existingEventsData);
     } else {
-      const newEventsData = await this.getEventsForMeetingUsingFullSync(creds, apiStartDateTime, apiEndDateTime);
-      ({events, deltaLink} = newEventsData);
+      const newEventsData = await this.getEventsForMeetingUsingFullSync(
+        creds,
+        apiStartDateTime,
+        apiEndDateTime,
+      );
+      ({ events, deltaLink } = newEventsData);
     }
     if (needToSaveEvents) {
       await this.calendarEventsRepository.save({
@@ -414,17 +493,27 @@ private generateClientAssertion(privateKey: Buffer, clientID: string): Promise<s
       });
     }
     // Filter out the event which we created for this meeting
-    const createdEvent = await this.calendarCreatedEventsRepository.findOneBy({MeetingID: meeting.ID, UserID: userID});
+    const createdEvent = await this.calendarCreatedEventsRepository.findOneBy({
+      MeetingID: meeting.ID,
+      UserID: userID,
+    });
     if (createdEvent) {
-      events = events.filter(event => event.ID !== createdEvent.CreatedMicrosoftMeetingID);
+      events = events.filter(
+        (event) => event.ID !== createdEvent.CreatedMicrosoftMeetingID,
+      );
     }
 
     return events;
   }
 
   // TODO: reduce code duplication with GoogleOAuth2Provider
-  async createOrUpdateEventForMeeting(creds: AbstractOAuth2, abstractExistingEvent: AbstractOAuth2CalendarCreatedEvent, meeting: Meeting): Promise<void> {
-    const existingEvent = abstractExistingEvent as MicrosoftCalendarCreatedEvent | null;
+  async createOrUpdateEventForMeeting(
+    creds: AbstractOAuth2,
+    abstractExistingEvent: AbstractOAuth2CalendarCreatedEvent,
+    meeting: Meeting,
+  ): Promise<void> {
+    const existingEvent =
+      abstractExistingEvent as MicrosoftCalendarCreatedEvent | null;
     const userID = creds.UserID;
     let apiMethod: Dispatcher.HttpMethod = 'POST';
     let apiURL = MICROSOFT_API_CALENDAR_EVENTS_URL;
@@ -457,18 +546,26 @@ private generateClientAssertion(privateKey: Buffer, clientID: string): Promise<s
     }
     let response: MicrosoftCreateEventResponse | undefined;
     const body = JSON.stringify(params);
-    const headers = {'content-type': 'application/json'};
+    const headers = { 'content-type': 'application/json' };
     try {
-      response = await this.oauth2Service.apiRequest<MicrosoftCreateEventResponse>(
-        this, creds, apiURL, {method: apiMethod, body, headers}
-      );
+      response =
+        await this.oauth2Service.apiRequest<MicrosoftCreateEventResponse>(
+          this,
+          creds,
+          apiURL,
+          { method: apiMethod, body, headers },
+        );
     } catch (err) {
       if (existingEvent && errorIsMicrosoftCalendarEventNoLongerExists(err)) {
         // It's possible that the user deleted the event themselves. Try to create
         // a new one instead.
-        response = await this.oauth2Service.apiRequest<MicrosoftCreateEventResponse>(
-          this, creds, MICROSOFT_API_CALENDAR_EVENTS_URL, {method: 'POST', body, headers}
-        );
+        response =
+          await this.oauth2Service.apiRequest<MicrosoftCreateEventResponse>(
+            this,
+            creds,
+            MICROSOFT_API_CALENDAR_EVENTS_URL,
+            { method: 'POST', body, headers },
+          );
       } else {
         throw err;
       }
@@ -480,18 +577,24 @@ private generateClientAssertion(privateKey: Buffer, clientID: string): Promise<s
     });
   }
 
-  async deleteEventForMeeting(creds: AbstractOAuth2, abstractEvent: AbstractOAuth2CalendarCreatedEvent): Promise<void> {
+  async deleteEventForMeeting(
+    creds: AbstractOAuth2,
+    abstractEvent: AbstractOAuth2CalendarCreatedEvent,
+  ): Promise<void> {
     const event = abstractEvent as MicrosoftCalendarCreatedEvent;
     const apiURL = `${MICROSOFT_API_CALENDAR_EVENTS_URL}/${event.CreatedMicrosoftMeetingID}`;
     try {
-      await this.oauth2Service.apiRequest(this, creds, apiURL, {method: 'DELETE'});
+      await this.oauth2Service.apiRequest(this, creds, apiURL, {
+        method: 'DELETE',
+      });
     } catch (err: any) {
       if (!errorIsMicrosoftCalendarEventNoLongerExists(err)) {
         throw err;
       }
     }
     await this.calendarCreatedEventsRepository.delete({
-      MeetingID: event.MeetingID, UserID: creds.UserID
+      MeetingID: event.MeetingID,
+      UserID: creds.UserID,
     });
   }
 }

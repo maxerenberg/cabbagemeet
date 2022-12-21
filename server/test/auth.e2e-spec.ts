@@ -1,0 +1,111 @@
+import { URL } from 'node:url';
+import { HttpStatus } from '@nestjs/common';
+import type { NestExpressApplication } from '@nestjs/platform-express';
+import { sleep } from '../src/misc.utils';
+import { commonAfterAll, commonBeforeAll, commonBeforeEach, GET, POST, smtpMessages } from './e2e-testing-helpers';
+
+describe('AuthController (e2e)', () => {
+  let app: NestExpressApplication;
+  let token: string | undefined;
+
+  beforeAll(async () => { app = await commonBeforeAll(); });
+  beforeEach(commonBeforeEach);
+
+  it('/api/signup (POST)', async () => {
+    await POST('/api/signup', app)
+      .send({name: 'Bob', email: 'a@b', password: 'abcdef'})
+      .expect(HttpStatus.OK)
+      .expect({ mustVerifyEmailAddress: true });
+    expect(smtpMessages).toHaveLength(1);
+    expect(smtpMessages[0].from).toStrictEqual('no-reply@cabbagemeet.internal');
+    expect(smtpMessages[0].to).toStrictEqual('a@b');
+    expect(smtpMessages[0].body.startsWith(
+`Hello Bob,
+
+Please click the following link to verify your email address:
+
+http://cabbagemeet.internal/verify-email?`
+    )).toBe(true);
+    const url = smtpMessages[0].body.split('\n')[4];
+    const params = new URL(url).searchParams;
+    expect(params.has('encrypted_entity')).toBe(true);
+    const verifyBody = [...params].reduce((o, [key, val]) => ({...o, [key]: val}), {});
+    await POST('/api/verify-email', app)
+      .send(verifyBody)
+      .expect(HttpStatus.NO_CONTENT);
+  });
+
+  it('/api/login (POST)', async () => {
+    const {body} = await POST('/api/login', app)
+      .send({email: 'a@b', password: 'abcdef'})
+      .expect(HttpStatus.OK);
+    expect(body).toEqual({
+      name: 'Bob',
+      email: 'a@b',
+      hasLinkedGoogleAccount: false,
+      hasLinkedMicrosoftAccount: false,
+      isSubscribedToNotifications: false,
+      token: body.token,
+      userID: body.userID,
+    });
+    token = body.token;
+  });
+
+  it('/api/logout (POST)', async () => {
+    expect(token).toBeDefined();
+    await POST('/api/logout', app, token)
+      .expect(HttpStatus.NO_CONTENT);
+    // If the `everywhere` param is not set to true, the API call should do nothing
+    await GET('/api/me', app, token)
+      .expect(HttpStatus.OK);
+    await POST('/api/logout?everywhere=true', app, token)
+      .expect(HttpStatus.NO_CONTENT);
+    // The token should no longer work
+    await GET('/api/me', app, token)
+      .expect(HttpStatus.UNAUTHORIZED);
+    token = undefined;
+  });
+
+  it('/api/reset-password (POST)', async () => {
+    // In my tests, it usually takes around 150ms for the email to get sent.
+    // Increase this if necessary.
+    const delayMs = 200;
+    await POST('/api/reset-password', app)
+      .send({email: 'b@c'})
+      .expect(HttpStatus.NO_CONTENT);
+    await sleep(delayMs);
+    // For an email address with no corresponding user, no email should get sent
+    expect(smtpMessages).toHaveLength(0);
+    await POST('/api/reset-password', app)
+      .send({email: 'a@b'})
+      .expect(HttpStatus.NO_CONTENT);
+    await sleep(delayMs);
+    expect(smtpMessages).toHaveLength(1);
+    expect(smtpMessages[0].from).toStrictEqual('no-reply@cabbagemeet.internal');
+    expect(smtpMessages[0].to).toStrictEqual('a@b');
+    expect(smtpMessages[0].body.startsWith(
+`Hello Bob,
+
+Someone (hopefully you) recently requested a password reset for your
+CabbageMeet account. If this was you, please click the following link
+to proceed:
+
+http://cabbagemeet.internal/confirm-password-reset?pwresetToken=`
+    )).toBe(true);
+    const url = smtpMessages[0].body.split('\n')[6];
+    const pwresetToken = new URL(url).searchParams.get('pwresetToken');
+    await POST('/api/confirm-password-reset', app, pwresetToken)
+      .send({password: 'bcdefg'})
+      .expect(HttpStatus.NO_CONTENT);
+    // Re-using a password reset token should not be allowed
+    await POST('/api/confirm-password-reset', app, pwresetToken)
+      .send({password: 'bcdefg'})
+      .expect(HttpStatus.UNAUTHORIZED);
+    // Should be possible to login with the new password
+    await POST('/api/login', app)
+      .send({email: 'a@b', password: 'bcdefg'})
+      .expect(HttpStatus.OK);
+  });
+
+  afterAll(() => commonAfterAll(app));
+});

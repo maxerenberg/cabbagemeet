@@ -18,11 +18,17 @@ export default class MicrosoftCalendarCreatedEvent {
   @Column()
   CreatedMicrosoftMeetingID: string;
 
-  @ManyToOne(() => Meeting, meeting => meeting.MicrosoftCalendarCreatedEvents, {onDelete: 'CASCADE'})
-  @CustomJoinColumn({name: 'MeetingID'})
+  @ManyToOne(
+    () => Meeting,
+    (meeting) => meeting.MicrosoftCalendarCreatedEvents,
+    { onDelete: 'CASCADE' },
+  )
+  @CustomJoinColumn({ name: 'MeetingID' })
   Meeting: Meeting;
 
-  @ManyToOne(() => MicrosoftOAuth2, msftOAuth2 => msftOAuth2.CreatedEvents, {onDelete: 'CASCADE'})
-  @CustomJoinColumn({name: 'UserID'})
+  @ManyToOne(() => MicrosoftOAuth2, (msftOAuth2) => msftOAuth2.CreatedEvents, {
+    onDelete: 'CASCADE',
+  })
+  @CustomJoinColumn({ name: 'UserID' })
   MicrosoftOAuth2: MicrosoftOAuth2;
 }

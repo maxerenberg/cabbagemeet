@@ -1,4 +1,4 @@
-import { ApiProperty } from "@nestjs/swagger";
+import { ApiProperty } from '@nestjs/swagger';
 
 // Make sure to keep this in sync with oauth2-common.ts
 export default class ServerInfoResponse {

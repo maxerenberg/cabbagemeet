@@ -13,7 +13,7 @@ export default class MicrosoftCalendarEvents {
   @PrimaryColumn()
   UserID: number;
 
-  @Column({type: 'simple-json'})
+  @Column({ type: 'simple-json' })
   Events: OAuth2CalendarEvent[];
 
   // The startDateTime parameter used in the previous API request
@@ -27,14 +27,18 @@ export default class MicrosoftCalendarEvents {
   PrevEndDateTime: string;
 
   // See https://learn.microsoft.com/en-us/graph/delta-query-events
-  @Column({type: 'text'})
+  @Column({ type: 'text' })
   DeltaLink: string;
 
-  @ManyToOne(() => Meeting, meeting => meeting.MicrosoftCalendarEvents, {onDelete: 'CASCADE'})
-  @CustomJoinColumn({name: 'MeetingID'})
+  @ManyToOne(() => Meeting, (meeting) => meeting.MicrosoftCalendarEvents, {
+    onDelete: 'CASCADE',
+  })
+  @CustomJoinColumn({ name: 'MeetingID' })
   Meeting: Meeting;
 
-  @ManyToOne(() => MicrosoftOAuth2, msftOAuth2 => msftOAuth2.Events, {onDelete: 'CASCADE'})
-  @CustomJoinColumn({name: 'UserID'})
+  @ManyToOne(() => MicrosoftOAuth2, (msftOAuth2) => msftOAuth2.Events, {
+    onDelete: 'CASCADE',
+  })
+  @CustomJoinColumn({ name: 'UserID' })
   MicrosoftOAuth2: MicrosoftOAuth2;
 }

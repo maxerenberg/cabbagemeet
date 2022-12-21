@@ -9,9 +9,9 @@ export default class CustomMigrationsService {
 
   constructor(
     configService: ConfigService<EnvironmentVariables, true>,
-    private readonly dataSource: DataSource
+    private readonly dataSource: DataSource,
   ) {
-    this.nodeEnv = configService.get('NODE_ENV', {infer: true});
+    this.nodeEnv = configService.get('NODE_ENV', { infer: true });
   }
 
   async onModuleInit() {

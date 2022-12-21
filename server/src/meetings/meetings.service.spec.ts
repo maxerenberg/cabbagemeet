@@ -1,7 +1,14 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import getCommonImports from '../common-imports';
+import { getCommonImports } from '../common-setup';
 import MeetingsService from './meetings.service';
-import { createMeeting, createRegisteredUser, deleteDatabase, dynamicTypeOrmModule, setDatabaseName, setJestTimeout } from '../testing-helpers';
+import {
+  createMeeting,
+  createRegisteredUser,
+  deleteDatabase,
+  dynamicTypeOrmModule,
+  setDatabaseName,
+  setJestTimeout,
+} from '../testing-helpers';
 import UsersService from '../users/users.service';
 import Meeting from './meeting.entity';
 
@@ -14,10 +21,7 @@ describe('MeetingsService', () => {
     setJestTimeout();
     setDatabaseName(databaseName);
     const module: TestingModule = await Test.createTestingModule({
-      imports: [
-        ...getCommonImports(),
-        dynamicTypeOrmModule(),
-      ],
+      imports: [...getCommonImports(), dynamicTypeOrmModule()],
       providers: [MeetingsService, UsersService],
     }).compile();
 
@@ -39,7 +43,7 @@ describe('MeetingsService', () => {
 
   it('should allow meetings to be created by registered users', async () => {
     const user = await createRegisteredUser(usersService);
-    const meeting = await createMeeting(service, {CreatorID: user.ID});
+    const meeting = await createMeeting(service, { CreatorID: user.ID });
     const createdMeetings = await service.getMeetingsCreatedBy(user.ID);
     expect(createdMeetings).toHaveLength(1);
     expect(createdMeetings[0].ID).toBe(meeting.ID);
@@ -57,7 +61,10 @@ describe('MeetingsService', () => {
       MinStartHour: 14.5,
       MaxEndHour: 15,
     };
-    const newMeeting = await service.updateMeeting(meeting.ID, partialNewMeeting);
+    const newMeeting = await service.updateMeeting(
+      meeting.ID,
+      partialNewMeeting,
+    );
     expect(newMeeting.Name).toBe(partialNewMeeting.Name);
     expect(newMeeting.About).toBe(partialNewMeeting.About);
     expect(newMeeting.MinStartHour).toBe(partialNewMeeting.MinStartHour);
@@ -96,7 +103,11 @@ describe('MeetingsService', () => {
 
   it('should allow updating availabilities', async () => {
     let meeting = await createMeeting(service);
-    const respondent = await service.addRespondent(meeting.ID, ['2022-10-27'], 'Bob');
+    const respondent = await service.addRespondent(
+      meeting.ID,
+      ['2022-10-27'],
+      'Bob',
+    );
     meeting = await service.getMeeting(meeting.ID);
     await service.updateRespondent(respondent.RespondentID, ['2022-10-28']);
     meeting = await service.getMeeting(meeting.ID);
@@ -105,7 +116,11 @@ describe('MeetingsService', () => {
 
   it('should allow deleting respondents', async () => {
     let meeting = await createMeeting(service);
-    const respondent = await service.addRespondent(meeting.ID, ['2022-10-27'], 'Bob');
+    const respondent = await service.addRespondent(
+      meeting.ID,
+      ['2022-10-27'],
+      'Bob',
+    );
     meeting = await service.getMeeting(meeting.ID);
     expect(meeting.Respondents).toHaveLength(1);
     await service.deleteRespondent(respondent.RespondentID);

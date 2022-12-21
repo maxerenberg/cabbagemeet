@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+const { decode: quotedPrintableDecode } = require('quoted-printable');
 const { SMTPServer } = require('smtp-server');
 
 const HOST = 'localhost';
@@ -18,9 +19,15 @@ const server = new SMTPServer({
     return callback();
   },
   onData(stream, session, callback) {
-    console.log('DATA:');
-    stream.pipe(process.stdout);
-    stream.on('end', callback);
+    const chunks = [];
+    stream.on('data', data => {
+      chunks.push(data);
+    });
+    stream.on('end', () => {
+      console.log('DATA:');
+      console.log(chunks.map(chunk => quotedPrintableDecode(chunk.toString())).join(''));
+      callback();
+    });
   },
   onClose() {
     console.log('CLOSE');

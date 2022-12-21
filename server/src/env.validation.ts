@@ -6,12 +6,12 @@ import {
   IsEmail,
   IsIn,
   IsInt,
-  IsNumber,
   IsOptional,
   IsPort,
-  IsPositive,
   IsString,
   IsUrl,
+  Max,
+  Min,
   validateSync,
 } from 'class-validator';
 import { stripTrailingSlash } from './misc.utils';
@@ -41,22 +41,23 @@ export class EnvironmentVariables {
 
   // The public-facing URL of this server.
   // Will be used when creating Google calendar events and sending emails.
-  @IsUrl({require_tld: false})
+  @IsUrl({ require_tld: false })
   PUBLIC_URL: string;
 
   @IsOptional()
   @IsString()
   JWT_SIGNING_KEY?: string;
 
+  // Set to 0 for no limit
   @IsOptional()
   @IsInt()
-  @IsPositive()
+  @Min(0)
   HOURLY_MEETING_CREATION_LIMIT_PER_IP?: number = 100;
 
   // Set to 0 to disable automatic deletions
   @IsOptional()
   @IsInt()
-  @IsPositive()
+  @Min(0)
   DELETE_MEETINGS_OLDER_THAN_NUM_DAYS?: number = 60;
 
   @IsIn(databaseTypes)
@@ -165,7 +166,7 @@ export class EnvironmentVariables {
   SMTP_PORT?: string;
 
   @IsOptional()
-  @IsEmail({allow_display_name: false, require_tld: false})
+  @IsEmail({ allow_display_name: false, require_tld: false })
   SMTP_FROM?: string;
 
   @IsOptional()
@@ -176,9 +177,10 @@ export class EnvironmentVariables {
   @IsString()
   SMTP_PASSWORD?: string;
 
+  // Set to 0 for no limit
   @IsOptional()
-  @IsNumber()
-  @IsPositive()
+  @IsInt()
+  @Min(0)
   EMAIL_DAILY_LIMIT?: number = 100;
 
   @IsOptional()
@@ -194,7 +196,9 @@ export class EnvironmentVariables {
   REDIS_PORT?: string = '6379';
 
   @IsOptional()
-  @IsNumber()
+  @IsInt()
+  @Min(0)
+  @Max(15)
   REDIS_DATABASE?: number = 0;
 }
 

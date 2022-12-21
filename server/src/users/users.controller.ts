@@ -1,6 +1,26 @@
-import { BadRequestException, Body, Controller, Delete, Get, HttpCode, HttpStatus, NotFoundException, ParseIntPipe, Patch, Post, Query, Redirect, UseGuards } from '@nestjs/common';
+import {
+  BadRequestException,
+  Body,
+  Controller,
+  Delete,
+  Get,
+  HttpCode,
+  HttpStatus,
+  NotFoundException,
+  ParseIntPipe,
+  Patch,
+  Post,
+  Query,
+  UseGuards,
+} from '@nestjs/common';
 import { ModuleRef } from '@nestjs/core';
-import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags, ApiUnauthorizedResponse } from '@nestjs/swagger';
+import {
+  ApiBearerAuth,
+  ApiOperation,
+  ApiResponse,
+  ApiTags,
+  ApiUnauthorizedResponse,
+} from '@nestjs/swagger';
 import type { OAuth2CalendarEvent } from '../oauth2/oauth2-common';
 import { AuthUser } from '../auth/auth-user.decorator';
 import JwtAuthGuard from '../auth/jwt-auth.guard';
@@ -10,9 +30,14 @@ import {
   CustomRedirectResponse,
 } from '../common-responses';
 import { meetingToMeetingShortResponse } from '../meetings/meetings.controller';
-import MeetingsService, { NoSuchMeetingError } from '../meetings/meetings.service';
+import MeetingsService, {
+  NoSuchMeetingError,
+} from '../meetings/meetings.service';
 import OAuth2Service from '../oauth2/oauth2.service';
-import { OAuth2ProviderType, OAuth2NotConfiguredError } from '../oauth2/oauth2-common';
+import {
+  OAuth2ProviderType,
+  OAuth2NotConfiguredError,
+} from '../oauth2/oauth2-common';
 import EditUserDto from './edit-user.dto';
 import OAuth2CalendarEventsResponse from './oauth2-calendar-events.response';
 import LinkExternalCalendarDto from './link-external-calendar.dto';
@@ -34,7 +59,7 @@ export function UserToUserResponse(user: User): UserResponse {
 
 @ApiTags('me')
 @ApiBearerAuth()
-@ApiUnauthorizedResponse({type: UnauthorizedResponse})
+@ApiUnauthorizedResponse({ type: UnauthorizedResponse })
 @Controller('me')
 @UseGuards(JwtAuthGuard)
 export class UsersController {
@@ -48,7 +73,7 @@ export class UsersController {
 
   onModuleInit() {
     // circular dependency
-    this.oauth2Service = this.moduleRef.get(OAuth2Service, {strict: false});
+    this.oauth2Service = this.moduleRef.get(OAuth2Service, { strict: false });
   }
 
   @ApiOperation({
@@ -72,12 +97,13 @@ export class UsersController {
   @Patch()
   async updateUserInfo(
     @AuthUser() user: User,
-    @Body() body: EditUserDto
+    @Body() body: EditUserDto,
   ): Promise<UserResponse> {
     const updateInfo: Partial<User> = {};
     if (body.name) updateInfo.Name = body.name;
     if (body.email) updateInfo.Email = body.email;
-    if (body.hasOwnProperty('subscribe_to_notifications')) updateInfo.IsSubscribedToNotifications = body.subscribe_to_notifications;
+    if (body.hasOwnProperty('subscribe_to_notifications'))
+      updateInfo.IsSubscribedToNotifications = body.subscribe_to_notifications;
     if (Object.keys(updateInfo).length === 0) {
       throw new BadRequestException('at least one property must be present');
     }
@@ -102,30 +128,37 @@ export class UsersController {
     operationId: 'getCreatedMeetings',
   })
   @Get('created-meetings')
-  async getCreatedMeetings(@AuthUser() user: User): Promise<MeetingsShortResponse> {
+  async getCreatedMeetings(
+    @AuthUser() user: User,
+  ): Promise<MeetingsShortResponse> {
     const meetings = await this.meetingsService.getMeetingsCreatedBy(user.ID);
     return {
-      meetings: meetings.map(meetingToMeetingShortResponse)
+      meetings: meetings.map(meetingToMeetingShortResponse),
     };
   }
 
   @ApiOperation({
     summary: 'Get responded meetings',
-    description: 'Get meetings to which the user who is currently logged in has responded',
+    description:
+      'Get meetings to which the user who is currently logged in has responded',
     operationId: 'getRespondedMeetings',
   })
   @Get('responded-meetings')
-  async getRespondedMeetings(@AuthUser() user: User): Promise<MeetingsShortResponse> {
-    const meetings = await this.meetingsService.getMeetingsRespondedToBy(user.ID);
+  async getRespondedMeetings(
+    @AuthUser() user: User,
+  ): Promise<MeetingsShortResponse> {
+    const meetings = await this.meetingsService.getMeetingsRespondedToBy(
+      user.ID,
+    );
     return {
-      meetings: meetings.map(meetingToMeetingShortResponse)
+      meetings: meetings.map(meetingToMeetingShortResponse),
     };
   }
 
   private async linkCalendar(
     providerType: OAuth2ProviderType,
     user: User,
-    body: LinkExternalCalendarDto
+    body: LinkExternalCalendarDto,
   ): Promise<CustomRedirectResponse> {
     // TODO: if the user already has a linked calendar, ignore
     // TODO: if the user already has OAuth2 creds, just set the linked calendar
@@ -133,10 +166,10 @@ export class UsersController {
     try {
       const redirectURL = await this.oauth2Service.getRequestURL(
         providerType,
-        {reason: 'link', postRedirect: body.post_redirect, userID: user.ID},
-        true
+        { reason: 'link', postRedirect: body.post_redirect, userID: user.ID },
+        true,
       );
-      return {redirect: redirectURL};
+      return { redirect: redirectURL };
     } catch (err: any) {
       if (err instanceof OAuth2NotConfiguredError) {
         throw new NotFoundException();
@@ -147,13 +180,12 @@ export class UsersController {
 
   @ApiOperation({
     summary: 'Link Google calendar',
-    description: (
-      'Link Google calendar events to the account of the user who is logged in.'
-      + ' The client should navigate to the returned OAuth2 consent page URL.'
-    ),
+    description:
+      'Link Google calendar events to the account of the user who is logged in.' +
+      ' The client should navigate to the returned OAuth2 consent page URL.',
     operationId: 'linkGoogleCalendar',
   })
-  @ApiResponse({type: NotFoundResponse})
+  @ApiResponse({ type: NotFoundResponse })
   @Post('link-google-calendar')
   @HttpCode(HttpStatus.OK)
   linkGoogleCalendar(
@@ -165,13 +197,12 @@ export class UsersController {
 
   @ApiOperation({
     summary: 'Link Outlook calendar',
-    description: (
-      'Link Outlook calendar events to the account of the user who is logged in.'
-      + ' The client should navigate to the returned OAuth2 consent page URL.'
-    ),
+    description:
+      'Link Outlook calendar events to the account of the user who is logged in.' +
+      ' The client should navigate to the returned OAuth2 consent page URL.',
     operationId: 'linkMicrosoftCalendar',
   })
-  @ApiResponse({type: NotFoundResponse})
+  @ApiResponse({ type: NotFoundResponse })
   @Post('link-microsoft-calendar')
   @HttpCode(HttpStatus.OK)
   linkMicrosoftCalendar(
@@ -181,7 +212,10 @@ export class UsersController {
     return this.linkCalendar(OAuth2ProviderType.MICROSOFT, user, body);
   }
 
-  private async unlinkCalendar(providerType: OAuth2ProviderType, user: User): Promise<UserResponse> {
+  private async unlinkCalendar(
+    providerType: OAuth2ProviderType,
+    user: User,
+  ): Promise<UserResponse> {
     await this.oauth2Service.unlinkAccount(providerType, user.ID);
     const updatedUser = await this.usersService.findOneByID(user.ID);
     return UserToUserResponse(updatedUser);
@@ -189,10 +223,9 @@ export class UsersController {
 
   @ApiOperation({
     summary: 'Unlink Google calendar',
-    description: (
-      'Unlink the Google account which is linked to the account of the user who is logged in.'
-      + ' The OAuth2 access token will be revoked.'
-    ),
+    description:
+      'Unlink the Google account which is linked to the account of the user who is logged in.' +
+      ' The OAuth2 access token will be revoked.',
     operationId: 'unlinkGoogleCalendar',
   })
   @Delete('link-google-calendar')
@@ -203,10 +236,9 @@ export class UsersController {
 
   @ApiOperation({
     summary: 'Unlink Outlook calendar',
-    description: (
-      'Unlink the Microsoft account which is linked to the account of the user who is logged in.'
-      + ' The OAuth2 access token will be revoked.'
-    ),
+    description:
+      'Unlink the Microsoft account which is linked to the account of the user who is logged in.' +
+      ' The OAuth2 access token will be revoked.',
     operationId: 'unlinkMicrosoftCalendar',
   })
   @Delete('link-microsoft-calendar')
@@ -222,7 +254,11 @@ export class UsersController {
   ): Promise<OAuth2CalendarEventsResponse> {
     let events: OAuth2CalendarEvent[];
     try {
-      events = await this.oauth2Service.getEventsForMeeting(providerType, user.ID, meetingID);
+      events = await this.oauth2Service.getEventsForMeeting(
+        providerType,
+        user.ID,
+        meetingID,
+      );
     } catch (err: any) {
       if (err instanceof NoSuchMeetingError) {
         throw new NotFoundException();
@@ -230,20 +266,19 @@ export class UsersController {
       throw err;
     }
     return {
-      events: events.map(event => ({
+      events: events.map((event) => ({
         summary: event.summary,
         startDateTime: event.start,
         endDateTime: event.end,
-      }))
+      })),
     };
   }
 
   @ApiOperation({
     summary: 'Get Google calendar events',
-    description: (
-      'Get a list of Google calendar events whose dates overlap with'
-      + ' the tentative dates of a meeting'
-    ),
+    description:
+      'Get a list of Google calendar events whose dates overlap with' +
+      ' the tentative dates of a meeting',
     operationId: 'getGoogleCalendarEvents',
   })
   @Get('google-calendar-events')
@@ -251,15 +286,18 @@ export class UsersController {
     @AuthUser() user: User,
     @Query('meetingID', ParseIntPipe) meetingID: number,
   ): Promise<OAuth2CalendarEventsResponse> {
-    return this.getOAuth2CalendarEvents(OAuth2ProviderType.GOOGLE, user, meetingID);
+    return this.getOAuth2CalendarEvents(
+      OAuth2ProviderType.GOOGLE,
+      user,
+      meetingID,
+    );
   }
 
   @ApiOperation({
     summary: 'Get Microsoft calendar events',
-    description: (
-      'Get a list of Outlook calendar events whose dates overlap with'
-      + ' the tentative dates of a meeting'
-    ),
+    description:
+      'Get a list of Outlook calendar events whose dates overlap with' +
+      ' the tentative dates of a meeting',
     operationId: 'getMicrosoftCalendarEvents',
   })
   @Get('microsoft-calendar-events')
@@ -267,6 +305,10 @@ export class UsersController {
     @AuthUser() user: User,
     @Query('meetingID', ParseIntPipe) meetingID: number,
   ): Promise<OAuth2CalendarEventsResponse> {
-    return this.getOAuth2CalendarEvents(OAuth2ProviderType.MICROSOFT, user, meetingID);
+    return this.getOAuth2CalendarEvents(
+      OAuth2ProviderType.MICROSOFT,
+      user,
+      meetingID,
+    );
   }
 }

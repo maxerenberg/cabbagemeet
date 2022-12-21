@@ -1,17 +1,14 @@
-import { Injectable, Logger } from "@nestjs/common";
-import { ConfigService } from "@nestjs/config";
-import { InjectRepository } from "@nestjs/typeorm";
-import type { Repository } from "typeorm";
-import CustomMigrationsService from "../custom-migrations/custom-migrations.service";
-import { getUTCDateString } from "../dates.utils";
-import type { EnvironmentVariables } from "../env.validation";
-import { latestTentativeOrScheduledDateExpr as postgres_latestTentativeOrScheduledDateExpr } from "../custom-migrations/postgres/postgres-migration-constants";
-import { latestTentativeOrScheduledDateExpr as sqlite_latestTentativeOrScheduledDateExpr } from "../custom-migrations/sqlite/sqlite-migration-constants";
+import { Injectable, Logger } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
+import { InjectRepository } from '@nestjs/typeorm';
+import type { Repository } from 'typeorm';
+import CustomMigrationsService from '../custom-migrations/custom-migrations.service';
+import { getUTCDateString } from '../dates.utils';
+import type { EnvironmentVariables } from '../env.validation';
+import { latestTentativeOrScheduledDateExpr as postgres_latestTentativeOrScheduledDateExpr } from '../custom-migrations/postgres/postgres-migration-constants';
+import { latestTentativeOrScheduledDateExpr as sqlite_latestTentativeOrScheduledDateExpr } from '../custom-migrations/sqlite/sqlite-migration-constants';
 import { assertIsNever, sleep } from '../misc.utils';
-import Meeting from "./meeting.entity";
-
-// TODO: add extra column to store latest tentative date / scheduled date
-// to avoid a SCAN when deleting rows (or INDEX on expression)
+import Meeting from './meeting.entity';
 
 @Injectable()
 export default class MeetingDeleterService {
@@ -24,17 +21,22 @@ export default class MeetingDeleterService {
     configService: ConfigService<EnvironmentVariables, true>,
     _customMigrationsService: CustomMigrationsService,
   ) {
-    this.ttlDays = configService.get('DELETE_MEETINGS_OLDER_THAN_NUM_DAYS', {infer: true});
-    const dbType = configService.get('DATABASE_TYPE', {infer: true});
+    this.ttlDays = configService.get('DELETE_MEETINGS_OLDER_THAN_NUM_DAYS', {
+      infer: true,
+    });
+    const dbType = configService.get('DATABASE_TYPE', { infer: true });
     if (dbType === 'sqlite') {
       // index on expression (requires custom migration)
-      this.latestTentativeOrScheduledDateExpr = sqlite_latestTentativeOrScheduledDateExpr;
+      this.latestTentativeOrScheduledDateExpr =
+        sqlite_latestTentativeOrScheduledDateExpr;
     } else if (dbType === 'mariadb') {
       // generated virtual column
-      this.latestTentativeOrScheduledDateExpr = 'LatestTentativeOrScheduledDate';
+      this.latestTentativeOrScheduledDateExpr =
+        'LatestTentativeOrScheduledDate';
     } else if (dbType === 'postgres') {
       // index on expression (requires custom migration)
-      this.latestTentativeOrScheduledDateExpr = postgres_latestTentativeOrScheduledDateExpr;
+      this.latestTentativeOrScheduledDateExpr =
+        postgres_latestTentativeOrScheduledDateExpr;
     } else {
       assertIsNever(dbType);
     }
@@ -70,12 +72,12 @@ export default class MeetingDeleterService {
     cutoffDate.setDate(cutoffDate.getDate() - this.ttlDays);
     const cutoffDateStr = getUTCDateString(cutoffDate);
 
-    const result = await this.meetingsRepository.createQueryBuilder()
+    const result = await this.meetingsRepository
+      .createQueryBuilder()
       .delete()
-      .where(
-        `${this.latestTentativeOrScheduledDateExpr} < :cutoff`,
-        {cutoff: cutoffDateStr}
-      )
+      .where(`${this.latestTentativeOrScheduledDateExpr} < :cutoff`, {
+        cutoff: cutoffDateStr,
+      })
       .execute();
     if (result.affected) {
       this.logger.log(`Deleted ${result.affected} old meetings`);

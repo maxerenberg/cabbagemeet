@@ -18,11 +18,15 @@ export default class GoogleCalendarCreatedEvent {
   @Column()
   CreatedGoogleMeetingID: string;
 
-  @ManyToOne(() => Meeting, meeting => meeting.GoogleCalendarCreatedEvents, {onDelete: 'CASCADE'})
-  @CustomJoinColumn({name: 'MeetingID'})
+  @ManyToOne(() => Meeting, (meeting) => meeting.GoogleCalendarCreatedEvents, {
+    onDelete: 'CASCADE',
+  })
+  @CustomJoinColumn({ name: 'MeetingID' })
   Meeting: Meeting;
 
-  @ManyToOne(() => GoogleOAuth2, googleOAuth2 => googleOAuth2.CreatedEvents, {onDelete: 'CASCADE'})
-  @CustomJoinColumn({name: 'UserID'})
+  @ManyToOne(() => GoogleOAuth2, (googleOAuth2) => googleOAuth2.CreatedEvents, {
+    onDelete: 'CASCADE',
+  })
+  @CustomJoinColumn({ name: 'UserID' })
   GoogleOAuth2: GoogleOAuth2;
 }

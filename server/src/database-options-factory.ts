@@ -5,16 +5,21 @@ import type { DataSourceOptions } from 'typeorm';
 import type { BetterSqlite3ConnectionOptions } from 'typeorm/driver/better-sqlite3/BetterSqlite3ConnectionOptions';
 import { registerJoinColumns } from './custom-columns/custom-join-column';
 import { injectTypeOrmColumns as mysql_injectTypeOrmColumns } from './custom-columns/mysql-inject-columns';
-import type { DatabaseType, Environment, EnvironmentVariables } from './env.validation';
+import type {
+  DatabaseType,
+  Environment,
+  EnvironmentVariables,
+} from './env.validation';
 import LowerCaseNamingStrategy from './lower-case-naming-strategy';
-
-// TODO: if using Postgres, make sure to use REPEATABLE READ
 
 type Writable<T> = {
   -readonly [P in keyof T]: T[P];
 };
 
-function checkEnvVarsExist(vars: (keyof EnvironmentVariables)[], getEnv: (key: keyof EnvironmentVariables) => string) {
+function checkEnvVarsExist(
+  vars: (keyof EnvironmentVariables)[],
+  getEnv: (key: keyof EnvironmentVariables) => string | undefined,
+) {
   for (const varname of vars) {
     if (!getEnv(varname)) {
       throw new Error('Please set the environment variable ' + varname);
@@ -23,7 +28,7 @@ function checkEnvVarsExist(vars: (keyof EnvironmentVariables)[], getEnv: (key: k
 }
 
 export function createDataSourceOptions(
-  getEnv: (key: keyof EnvironmentVariables) => string,
+  getEnv: (key: keyof EnvironmentVariables) => string | undefined,
   cli: boolean,
 ): DataSourceOptions {
   const nodeEnv = getEnv('NODE_ENV') as Environment;
@@ -33,6 +38,9 @@ export function createDataSourceOptions(
   > = {};
   if (cli || nodeEnv === 'development') {
     commonOptions.logging = true;
+  }
+  if (nodeEnv === 'test') {
+    commonOptions.retryAttempts = 0;
   }
   const customMigrationsGlobPath = `dist/src/custom-migrations/${dbType}/*-Migration.js`;
   if (cli) {
@@ -47,7 +55,10 @@ export function createDataSourceOptions(
       // first. So we need to explicitly run them later, in the CustomMigrationsService.
       commonOptions.migrationsRun = false;
     } else {
-      commonOptions.migrations = [`migrations/${dbType}/*.js`, customMigrationsGlobPath];
+      commonOptions.migrations = [
+        `migrations/${dbType}/*.js`,
+        customMigrationsGlobPath,
+      ];
       commonOptions.migrationsRun = true;
     }
   }
@@ -61,11 +72,19 @@ export function createDataSourceOptions(
     };
   } else if (dbType === 'mariadb') {
     mysql_injectTypeOrmColumns();
-    checkEnvVarsExist(['MYSQL_HOST', 'MYSQL_PORT', 'MYSQL_USER', 'MYSQL_PASSWORD', 'MYSQL_DATABASE'], getEnv);
+    checkEnvVarsExist(
+      [
+        'MYSQL_HOST',
+        'MYSQL_USER',
+        'MYSQL_PASSWORD',
+        'MYSQL_DATABASE',
+      ],
+      getEnv,
+    );
     return {
       type: 'mariadb',
       host: getEnv('MYSQL_HOST'),
-      port: +getEnv('MYSQL_PORT'),
+      port: +(getEnv('MYSQL_PORT') || 3306),
       username: getEnv('MYSQL_USER'),
       password: getEnv('MYSQL_PASSWORD'),
       database: getEnv('MYSQL_DATABASE'),
@@ -73,11 +92,19 @@ export function createDataSourceOptions(
       ...commonOptions,
     };
   } else if (dbType === 'postgres') {
-    checkEnvVarsExist(['POSTGRES_HOST', 'POSTGRES_PORT', 'POSTGRES_USER', 'POSTGRES_PASSWORD', 'POSTGRES_DATABASE'], getEnv);
+    checkEnvVarsExist(
+      [
+        'POSTGRES_HOST',
+        'POSTGRES_USER',
+        'POSTGRES_PASSWORD',
+        'POSTGRES_DATABASE',
+      ],
+      getEnv,
+    );
     return {
       type: 'postgres',
       host: getEnv('POSTGRES_HOST'),
-      port: +getEnv('POSTGRES_PORT'),
+      port: +(getEnv('POSTGRES_PORT') || 5432),
       username: getEnv('POSTGRES_USER'),
       password: getEnv('POSTGRES_PASSWORD'),
       database: getEnv('POSTGRES_DATABASE'),
@@ -96,9 +123,14 @@ export default (
   configService: ConfigService<EnvironmentVariables, true>,
 ): TypeOrmModuleOptions => {
   const nodeEnv = configService.get('NODE_ENV', { infer: true });
-  const options = createDataSourceOptions((key: keyof EnvironmentVariables) => configService.get(key), false);
+  const options = createDataSourceOptions(
+    (key: keyof EnvironmentVariables) => configService.get(key),
+    false,
+  );
   if (options.type === 'better-sqlite3') {
-    (options as Writable<BetterSqlite3ConnectionOptions>).prepareDatabase = (db: Database) => {
+    (options as Writable<BetterSqlite3ConnectionOptions>).prepareDatabase = (
+      db: Database,
+    ) => {
       if (nodeEnv === 'test') {
         db.pragma('journal_mode = MEMORY');
       } else {

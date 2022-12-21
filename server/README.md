@@ -16,6 +16,13 @@ This requires no setup. To use a different database, follow the instructions bel
 docker run -d --name cabbagemeet-mariadb -e MARIADB_USER=cabbagemeet -e MARIADB_PASSWORD=cabbagemeet -e MARIADB_DATABASE=cabbagemeet -e MARIADB_ALLOW_EMPTY_ROOT_PASSWORD=yes -p 127.0.0.1:3306:3306 mariadb
 ```
 
+To store the data files in memory (Linux only), create a folder under `/run`
+and mount it with the `-v` flag:
+```bash
+mkdir -p ${XDG_RUNTIME_DIR:-/run/user/$UID}/cabbagemeet/mariadb
+docker run ... -v ${XDG_RUNTIME_DIR:-/run/user/$UID}/cabbagemeet/mariadb:/var/lib/mysql:z mariadb
+```
+
 Now open development.env and modify/set the following variables:
 ```
 DATABASE_TYPE=mariadb
@@ -150,12 +157,18 @@ npx @rtk-query/codegen-openapi openapi-config.ts
 If you add/remove/modify any of the entity classes, you will need to create a new database migration.
 To do this, you need to first run the existing migrations on a new empty database, then generate a new migration from that one using the entity classes.
 
-For example, for SQLite:
+First, create a timestamp which we will use as the migration name for each database type:
+```bash
+# use gdate on MacOS (brew install coreutils)
+timestamp=$(date +%s)
+```
+
+### SQLite
 ```bash
 # Assuming temp.db does not exist
 export SQLITE_PATH=temp.db
 npm run migration:run:sqlite
-npm run migration:generate:sqlite
+npm run migration:generate:sqlite -- -t $timestamp
 # Cleanup
 rm temp.db
 ```
@@ -170,7 +183,11 @@ export MYSQL_PASSWORD=cabbagemeet
 export MYSQL_HOST=127.0.0.1
 export MYSQL_PORT=3306
 npm run migration:run:mariadb
-npm run migration:generate:mariadb
+npm run migration:generate:mariadb -- -t $timestamp
+# Remove or replace instances of "temp" from the generated migration script
+sed -i 's/\\`temp\\`\.//g' migrations/mariadb/$timestamp-Migration.js
+sed -i '/^ *async \(up\|down\)(queryRunner) {$/a const { dbname } = (await queryRunner.query("SELECT DATABASE() AS `dbname`"))[0];' migrations/mariadb/$timestamp-Migration.js
+sed -i 's/"temp"/dbname/g' migrations/mariadb/$timestamp-Migration.js
 # Cleanup
 docker exec -it cabbagemeet-mariadb mariadb -uroot -e "DROP DATABASE temp"
 ```
@@ -185,7 +202,7 @@ export POSTGRES_PASSWORD=cabbagemeet
 export POSTGRES_HOST=127.0.0.1
 export POSTGRES_PORT=5432
 npm run migration:run:postgres
-npm run migration:generate:postgres
+npm run migration:generate:postgres -- -t $timestamp
 # Cleanup
 echo 'DROP DATABASE temp; \q' | docker exec -it cabbagemeet-postgres psql -U cabbagemeet postgres
 ```

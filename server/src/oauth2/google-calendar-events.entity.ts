@@ -13,7 +13,7 @@ export default class GoogleCalendarEvents {
   @PrimaryColumn()
   UserID: number;
 
-  @Column({type: 'simple-json'})
+  @Column({ type: 'simple-json' })
   Events: OAuth2CalendarEvent[];
 
   // The timeMin parameter used in the previous API request
@@ -27,14 +27,18 @@ export default class GoogleCalendarEvents {
   PrevTimeMax: string;
 
   // See https://developers.google.com/calendar/api/guides/sync
-  @Column({type: 'text'})
+  @Column({ type: 'text' })
   SyncToken: string;
 
-  @ManyToOne(() => Meeting, meeting => meeting.GoogleCalendarEvents, {onDelete: 'CASCADE'})
-  @CustomJoinColumn({name: 'MeetingID'})
+  @ManyToOne(() => Meeting, (meeting) => meeting.GoogleCalendarEvents, {
+    onDelete: 'CASCADE',
+  })
+  @CustomJoinColumn({ name: 'MeetingID' })
   Meeting: Meeting;
 
-  @ManyToOne(() => GoogleOAuth2, googleOAuth2 => googleOAuth2.Events, {onDelete: 'CASCADE'})
-  @CustomJoinColumn({name: 'UserID'})
+  @ManyToOne(() => GoogleOAuth2, (googleOAuth2) => googleOAuth2.Events, {
+    onDelete: 'CASCADE',
+  })
+  @CustomJoinColumn({ name: 'UserID' })
   GoogleOAuth2: GoogleOAuth2;
 }

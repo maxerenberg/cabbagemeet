@@ -17,13 +17,13 @@ export default class GoogleOAuth2 extends AbstractOAuth2 {
   // !!!!!!!!!!!!!!
 
   //@OneToOne(() => User, user => user.GoogleOAuth2, {onDelete: 'CASCADE'})
-  @ManyToOne(() => User, user => user.GoogleOAuth2, {onDelete: 'CASCADE'})
-  @CustomJoinColumn({name: 'UserID'})
+  @ManyToOne(() => User, (user) => user.GoogleOAuth2, { onDelete: 'CASCADE' })
+  @CustomJoinColumn({ name: 'UserID' })
   User: User;
 
-  @OneToMany(() => GoogleCalendarEvents, event => event.GoogleOAuth2)
+  @OneToMany(() => GoogleCalendarEvents, (event) => event.GoogleOAuth2)
   Events: GoogleCalendarEvents[];
 
-  @OneToMany(() => GoogleCalendarCreatedEvent, event => event.GoogleOAuth2)
+  @OneToMany(() => GoogleCalendarCreatedEvent, (event) => event.GoogleOAuth2)
   CreatedEvents: GoogleCalendarCreatedEvent[];
 }

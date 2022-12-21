@@ -13,13 +13,18 @@ export default class MicrosoftOAuth2 extends AbstractOAuth2 {
   // !!!!!!!!!!!!!!
 
   //@OneToOne(() => User, user => user.MicrosoftOAuth2, {onDelete: 'CASCADE'})
-  @ManyToOne(() => User, user => user.MicrosoftOAuth2, {onDelete: 'CASCADE'})
-  @CustomJoinColumn({name: 'UserID'})
+  @ManyToOne(() => User, (user) => user.MicrosoftOAuth2, {
+    onDelete: 'CASCADE',
+  })
+  @CustomJoinColumn({ name: 'UserID' })
   User: User;
 
-  @OneToMany(() => MicrosoftCalendarEvents, event => event.MicrosoftOAuth2)
+  @OneToMany(() => MicrosoftCalendarEvents, (event) => event.MicrosoftOAuth2)
   Events: MicrosoftCalendarEvents[];
 
-  @OneToMany(() => MicrosoftCalendarCreatedEvent, event => event.MicrosoftOAuth2)
+  @OneToMany(
+    () => MicrosoftCalendarCreatedEvent,
+    (event) => event.MicrosoftOAuth2,
+  )
   CreatedEvents: MicrosoftCalendarCreatedEvent[];
 }

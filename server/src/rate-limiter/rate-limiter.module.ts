@@ -1,5 +1,5 @@
 import { Module } from '@nestjs/common';
-import { RedisClientModule } from 'src/cacher/cacher.module';
+import { RedisClientModule } from '../cacher/cacher.module';
 import RateLimiterService from './rate-limiter.service';
 
 @Module({
