@@ -3,7 +3,7 @@ This directory contains the source code for the server component of CabbageMeet.
 
 ## Installation
 ```bash
-$ npm install
+npm install
 ```
 
 ## Database setup

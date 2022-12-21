@@ -2,7 +2,7 @@
 
 import { plainToInstance } from 'class-transformer';
 import {
-  IsBoolean,
+  IsBooleanString,
   IsEmail,
   IsIn,
   IsInt,
@@ -14,7 +14,7 @@ import {
   Min,
   validateSync,
 } from 'class-validator';
-import { stripTrailingSlash } from './misc.utils';
+import { stripTrailingSlash } from '../misc.utils';
 
 // Adapted from https://stackoverflow.com/a/68800520
 const environments = ['development', 'production', 'test'] as const;
@@ -24,6 +24,15 @@ export type Environment = typeof environments[number];
 const databaseTypes = ['sqlite', 'mariadb', 'postgres'] as const;
 export type DatabaseType = typeof databaseTypes[number];
 
+// See https://github.com/validatorjs/validator.js/blob/master/src/lib/isBoolean.js
+const booleanTrueStrings = ['true', '1', 'yes'];
+export function isBooleanStringTrue(s: string) {
+  return booleanTrueStrings.includes(s.toLowerCase());
+}
+
+// WARNING: do not use the boolean type; boolean strings are not actually
+// converted into booleans.
+// See https://github.com/typestack/class-transformer/issues/626.
 export class EnvironmentVariables {
   @IsIn(environments)
   NODE_ENV: Environment;
@@ -147,12 +156,12 @@ export class EnvironmentVariables {
   // Should be set to true if this app is behind a reverse proxy AND the proxy
   // has been configured to set the X-Forwarded-For header
   @IsOptional()
-  @IsBoolean()
-  TRUST_PROXY?: boolean = false;
+  @IsBooleanString()
+  TRUST_PROXY?: string = 'false';
 
   @IsOptional()
-  @IsBoolean()
-  VERIFY_SIGNUP_EMAIL_ADDRESS?: boolean = true;
+  @IsBooleanString()
+  VERIFY_SIGNUP_EMAIL_ADDRESS?: string = 'true';
 
   // Make sure that this is an IP address if it is not resolvable via
   // an external resolver (e.g. something in /etc/hosts).
@@ -182,10 +191,6 @@ export class EnvironmentVariables {
   @IsInt()
   @Min(0)
   EMAIL_DAILY_LIMIT?: number = 100;
-
-  @IsOptional()
-  @IsBoolean()
-  SIGNUP_REQUIRES_EMAIL_VALIDATION?: boolean = true;
 
   @IsOptional()
   @IsString()

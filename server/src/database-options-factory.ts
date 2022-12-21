@@ -1,15 +1,11 @@
-import { ConfigService } from '@nestjs/config';
 import type { TypeOrmModuleOptions } from '@nestjs/typeorm';
 import type { Database } from 'better-sqlite3';
 import type { DataSourceOptions } from 'typeorm';
 import type { BetterSqlite3ConnectionOptions } from 'typeorm/driver/better-sqlite3/BetterSqlite3ConnectionOptions';
+import ConfigService from './config/config.service';
 import { registerJoinColumns } from './custom-columns/custom-join-column';
 import { injectTypeOrmColumns as mysql_injectTypeOrmColumns } from './custom-columns/mysql-inject-columns';
-import type {
-  DatabaseType,
-  Environment,
-  EnvironmentVariables,
-} from './env.validation';
+import type { EnvironmentVariables } from './config/env.validation';
 import LowerCaseNamingStrategy from './lower-case-naming-strategy';
 
 type Writable<T> = {
@@ -18,7 +14,7 @@ type Writable<T> = {
 
 function checkEnvVarsExist(
   vars: (keyof EnvironmentVariables)[],
-  getEnv: (key: keyof EnvironmentVariables) => string | undefined,
+  getEnv: InstanceType<typeof ConfigService>['get'],
 ) {
   for (const varname of vars) {
     if (!getEnv(varname)) {
@@ -28,11 +24,11 @@ function checkEnvVarsExist(
 }
 
 export function createDataSourceOptions(
-  getEnv: (key: keyof EnvironmentVariables) => string | undefined,
+  getEnv: InstanceType<typeof ConfigService>['get'],
   cli: boolean,
 ): DataSourceOptions {
-  const nodeEnv = getEnv('NODE_ENV') as Environment;
-  const dbType = getEnv('DATABASE_TYPE') as DatabaseType;
+  const nodeEnv = getEnv('NODE_ENV');
+  const dbType = getEnv('DATABASE_TYPE');
   const commonOptions: Writable<
     Omit<TypeOrmModuleOptions, 'type' | 'database' | 'poolSize'>
   > = {};
@@ -119,12 +115,10 @@ export function createDataSourceOptions(
   }
 }
 
-export default (
-  configService: ConfigService<EnvironmentVariables, true>,
-): TypeOrmModuleOptions => {
-  const nodeEnv = configService.get('NODE_ENV', { infer: true });
+export default function (configService: ConfigService): TypeOrmModuleOptions {
+  const nodeEnv = configService.get('NODE_ENV');
   const options = createDataSourceOptions(
-    (key: keyof EnvironmentVariables) => configService.get(key),
+    configService.get.bind(configService),
     false,
   );
   if (options.type === 'better-sqlite3') {

@@ -1,10 +1,9 @@
 import { Module } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
 import { JwtModule } from '@nestjs/jwt';
-import CustomJwtService from './custom-jwt.service';
+import ConfigService from '../config/config.service';
 import DbconfigModule from '../dbconfig/dbconfig.module';
 import { DbconfigService } from '../dbconfig/dbconfig.service';
-import { EnvironmentVariables } from '../env.validation';
+import CustomJwtService from './custom-jwt.service';
 import JwtStrategy, { getJWTSigningKey } from './jwt.strategy';
 import UsersModule from '../users/users.module';
 import CacherModule from '../cacher/cacher.module';
@@ -15,7 +14,7 @@ import CacherModule from '../cacher/cacher.module';
     {
       provide: 'JWT_SIGNING_KEY',
       useFactory: (
-        configService: ConfigService<EnvironmentVariables, true>,
+        configService: ConfigService,
         dbconfigService: DbconfigService,
       ): Promise<string> => {
         return getJWTSigningKey(configService, dbconfigService);

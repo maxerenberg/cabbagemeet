@@ -1,8 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
+import ConfigService from '../config/config.service';
 import { SECONDS_PER_DAY, SECONDS_PER_MINUTE } from '../dates.utils';
 import { sleep } from '../misc.utils';
-import { EnvironmentVariables } from '../env.validation';
 import RateLimiterService, {
   IRateLimiter,
 } from '../rate-limiter/rate-limiter.service';
@@ -27,10 +26,10 @@ export default class MailService {
   private readonly rateLimiter: IRateLimiter | undefined;
 
   constructor(
-    configService: ConfigService<EnvironmentVariables, true>,
+    configService: ConfigService,
     rateLimiterService: RateLimiterService,
   ) {
-    const dailyLimit = configService.get('EMAIL_DAILY_LIMIT', { infer: true });
+    const dailyLimit = configService.get('EMAIL_DAILY_LIMIT');
     if (dailyLimit) {
       this.rateLimiter = rateLimiterService.factory(SECONDS_PER_DAY, dailyLimit);
     }

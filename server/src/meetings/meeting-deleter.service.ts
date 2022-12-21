@@ -1,10 +1,9 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
+import ConfigService from '../config/config.service';
 import { InjectRepository } from '@nestjs/typeorm';
 import type { Repository } from 'typeorm';
 import CustomMigrationsService from '../custom-migrations/custom-migrations.service';
 import { getUTCDateString } from '../dates.utils';
-import type { EnvironmentVariables } from '../env.validation';
 import { latestTentativeOrScheduledDateExpr as postgres_latestTentativeOrScheduledDateExpr } from '../custom-migrations/postgres/postgres-migration-constants';
 import { latestTentativeOrScheduledDateExpr as sqlite_latestTentativeOrScheduledDateExpr } from '../custom-migrations/sqlite/sqlite-migration-constants';
 import { assertIsNever, sleep } from '../misc.utils';
@@ -18,13 +17,11 @@ export default class MeetingDeleterService {
 
   constructor(
     @InjectRepository(Meeting) private meetingsRepository: Repository<Meeting>,
-    configService: ConfigService<EnvironmentVariables, true>,
+    configService: ConfigService,
     _customMigrationsService: CustomMigrationsService,
   ) {
-    this.ttlDays = configService.get('DELETE_MEETINGS_OLDER_THAN_NUM_DAYS', {
-      infer: true,
-    });
-    const dbType = configService.get('DATABASE_TYPE', { infer: true });
+    this.ttlDays = configService.get('DELETE_MEETINGS_OLDER_THAN_NUM_DAYS');
+    const dbType = configService.get('DATABASE_TYPE');
     if (dbType === 'sqlite') {
       // index on expression (requires custom migration)
       this.latestTentativeOrScheduledDateExpr =

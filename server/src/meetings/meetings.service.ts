@@ -1,9 +1,8 @@
 import { Injectable } from '@nestjs/common';
 import { ModuleRef } from '@nestjs/core';
-import { ConfigService } from '@nestjs/config';
+import ConfigService from '../config/config.service';
 import { InjectRepository } from '@nestjs/typeorm';
 import { DateTime } from 'luxon';
-import { EnvironmentVariables } from '../env.validation';
 import MailService from '../mail/mail.service';
 import OAuth2Service from '../oauth2/oauth2.service';
 import User from '../users/user.entity';
@@ -42,9 +41,9 @@ export default class MeetingsService {
     private respondentsRepository: Repository<MeetingRespondent>,
     private readonly mailService: MailService,
     private moduleRef: ModuleRef,
-    configService: ConfigService<EnvironmentVariables, true>,
+    configService: ConfigService,
   ) {
-    this.publicURL = configService.get('PUBLIC_URL', { infer: true });
+    this.publicURL = configService.get('PUBLIC_URL');
   }
 
   onModuleInit() {

@@ -1,5 +1,5 @@
 import { JoinColumn } from 'typeorm';
-import type { DatabaseType } from '../env.validation';
+import type { DatabaseType } from '../config/env.validation';
 
 // e.g. {klass: Meeting, propertyName: 'Creator', joinColumnName: 'CreatorID'}
 const joinColumns: {

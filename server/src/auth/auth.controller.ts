@@ -15,7 +15,6 @@ import {
   ServiceUnavailableException,
   ConflictException,
 } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
 import {
   ApiBadRequestResponse,
   ApiOperation,
@@ -35,9 +34,10 @@ import {
   NotFoundResponse,
   CustomRedirectResponse,
 } from '../common-responses';
+import ConfigService from '../config/config.service';
+import { isBooleanStringTrue } from '../config/env.validation';
 import CustomJwtService from '../custom-jwt/custom-jwt.service';
 import { SECONDS_PER_MINUTE } from '../dates.utils';
-import { EnvironmentVariables } from '../env.validation';
 import OAuth2Service, { OAuth2Reason } from '../oauth2/oauth2.service';
 import {
   OAuth2ProviderType,
@@ -82,7 +82,7 @@ export class AuthController {
     private jwtService: CustomJwtService,
     private oauth2Service: OAuth2Service,
     private usersService: UsersService,
-    configService: ConfigService<EnvironmentVariables, true>,
+    configService: ConfigService,
     rateLimiterService: RateLimiterService,
   ) {
     // A user can reset their password at most once every 5 minutes
@@ -94,9 +94,8 @@ export class AuthController {
     this.signupRateLimiter = rateLimiterService.factory(SECONDS_PER_MINUTE, 3);
     // A user can try to login at most 10 times per minute
     this.loginRateLimiter = rateLimiterService.factory(SECONDS_PER_MINUTE, 10);
-    this.verifySignupEmailAddress = configService.get(
-      'VERIFY_SIGNUP_EMAIL_ADDRESS',
-      { infer: true },
+    this.verifySignupEmailAddress = isBooleanStringTrue(
+      configService.get('VERIFY_SIGNUP_EMAIL_ADDRESS')
     );
   }
 

@@ -1,4 +1,4 @@
-import { ConfigService } from '@nestjs/config';
+import ConfigService from '../config/config.service';
 import { Repository } from 'typeorm';
 import type { Dispatcher } from 'undici';
 import {
@@ -6,7 +6,6 @@ import {
   toISOStringUTC,
   toISOStringUTCFromDateTimeStr,
 } from '../dates.utils';
-import type { EnvironmentVariables } from '../env.validation';
 import type Meeting from '../meetings/meeting.entity';
 import { encodeQueryParams } from '../misc.utils';
 import User from '../users/user.entity';
@@ -101,24 +100,18 @@ export default class GoogleOAuth2Provider implements IOAuth2Provider {
   private readonly publicURL: string;
 
   constructor(
-    configService: ConfigService<EnvironmentVariables, true>,
+    configService: ConfigService,
     private readonly oauth2Service: OAuth2Service,
     private readonly calendarEventsRepository: Repository<GoogleCalendarEvents>,
     private readonly calendarCreatedEventsRepository: Repository<GoogleCalendarCreatedEvent>,
   ) {
-    const client_id = configService.get('OAUTH2_GOOGLE_CLIENT_ID', {
-      infer: true,
-    });
-    const secret = configService.get('OAUTH2_GOOGLE_CLIENT_SECRET', {
-      infer: true,
-    });
-    const redirect_uri = configService.get('OAUTH2_GOOGLE_REDIRECT_URI', {
-      infer: true,
-    });
+    const client_id = configService.get('OAUTH2_GOOGLE_CLIENT_ID');
+    const secret = configService.get('OAUTH2_GOOGLE_CLIENT_SECRET');
+    const redirect_uri = configService.get('OAUTH2_GOOGLE_REDIRECT_URI');
     if (client_id && secret && redirect_uri) {
       this.envConfig = { client_id, secret, redirect_uri };
     }
-    this.publicURL = configService.get('PUBLIC_URL', { infer: true });
+    this.publicURL = configService.get('PUBLIC_URL');
   }
 
   isConfigured(): boolean {

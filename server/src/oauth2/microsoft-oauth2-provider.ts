@@ -7,7 +7,7 @@ import {
 } from 'crypto';
 import { promisify } from 'util';
 import { Logger } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
+import ConfigService from '../config/config.service';
 import { sign as jwtSignCb } from 'jsonwebtoken';
 import { Repository } from 'typeorm';
 import type { Dispatcher } from 'undici';
@@ -17,7 +17,6 @@ import {
   toISOStringUTCFromDateTimeStrAndTz,
   toISOStringUTCFromDateStrAndHourAndTz,
 } from '../dates.utils';
-import type { EnvironmentVariables } from '../env.validation';
 import type Meeting from '../meetings/meeting.entity';
 import { encodeQueryParams } from '../misc.utils';
 import User from '../users/user.entity';
@@ -138,30 +137,22 @@ export default class MicrosoftOAuth2Provider implements IOAuth2Provider {
   private readonly codeVerifierCache: CacherService;
 
   constructor(
-    configService: ConfigService<EnvironmentVariables, true>,
+    configService: ConfigService,
     cacherService: CacherService,
     private readonly oauth2Service: OAuth2Service,
     private readonly calendarEventsRepository: Repository<MicrosoftCalendarEvents>,
     private readonly calendarCreatedEventsRepository: Repository<MicrosoftCalendarCreatedEvent>,
   ) {
-    const tenantID = configService.get('OAUTH2_MICROSOFT_TENANT_ID', {
-      infer: true,
-    });
+    const tenantID = configService.get('OAUTH2_MICROSOFT_TENANT_ID');
     this.oauth2Config = createOAuth2Config(tenantID);
-    const client_id = configService.get('OAUTH2_MICROSOFT_CLIENT_ID', {
-      infer: true,
-    });
+    const client_id = configService.get('OAUTH2_MICROSOFT_CLIENT_ID');
     const certificate_path = configService.get(
-      'OAUTH2_MICROSOFT_CERTIFICATE_PATH',
-      { infer: true },
+      'OAUTH2_MICROSOFT_CERTIFICATE_PATH'
     );
     const private_key_path = configService.get(
-      'OAUTH2_MICROSOFT_PRIVATE_KEY_PATH',
-      { infer: true },
+      'OAUTH2_MICROSOFT_PRIVATE_KEY_PATH'
     );
-    const redirect_uri = configService.get('OAUTH2_MICROSOFT_REDIRECT_URI', {
-      infer: true,
-    });
+    const redirect_uri = configService.get('OAUTH2_MICROSOFT_REDIRECT_URI');
     if (client_id && private_key_path && redirect_uri && certificate_path) {
       const certificate = fs.readFileSync(certificate_path, {
         encoding: 'utf8',
@@ -170,7 +161,7 @@ export default class MicrosoftOAuth2Provider implements IOAuth2Provider {
       const private_key = fs.readFileSync(private_key_path);
       this.envConfig = { client_id, redirect_uri, private_key };
     }
-    this.publicURL = configService.get('PUBLIC_URL', { infer: true });
+    this.publicURL = configService.get('PUBLIC_URL');
     this.codeVerifierCache = cacherService;
   }
 

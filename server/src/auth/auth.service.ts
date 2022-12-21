@@ -1,7 +1,6 @@
 import { BadRequestException, Injectable, Logger } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
 import * as bcrypt from 'bcrypt';
-import { EnvironmentVariables } from '../env.validation';
+import ConfigService from '../config/config.service';
 import User from '../users/user.entity';
 import UsersService from '../users/users.service';
 import LocalSignupDto from './local-signup.dto';
@@ -24,9 +23,9 @@ export default class AuthService {
     private usersService: UsersService,
     private mailService: MailService,
     private jwtService: CustomJwtService,
-    configService: ConfigService<EnvironmentVariables, true>,
+    configService: ConfigService,
   ) {
-    this.publicURL = configService.get('PUBLIC_URL', { infer: true });
+    this.publicURL = configService.get('PUBLIC_URL');
   }
 
   async validateUser(email: string, password: string): Promise<User | null> {

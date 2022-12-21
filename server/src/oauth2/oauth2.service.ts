@@ -1,9 +1,8 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
+import ConfigService from '../config/config.service';
 import { InjectRepository } from '@nestjs/typeorm';
 import * as jwt from 'jsonwebtoken';
 import { request } from 'undici';
-import { EnvironmentVariables } from '../env.validation';
 import GoogleOAuth2 from './google-oauth2.entity';
 import { DataSource, Repository } from 'typeorm';
 import CacherService from '../cacher/cacher.service';
@@ -171,7 +170,7 @@ export default class OAuth2Service {
   >;
 
   constructor(
-    configService: ConfigService<EnvironmentVariables, true>,
+    configService: ConfigService,
     cacherService: CacherService,
     private meetingsService: MeetingsService,
     private dataSource: DataSource,

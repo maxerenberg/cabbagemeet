@@ -2,10 +2,9 @@ import * as crypto from 'crypto';
 import { ExtractJwt, Strategy } from 'passport-jwt';
 import { PassportStrategy } from '@nestjs/passport';
 import { Inject, Injectable, Logger } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
+import ConfigService from '../config/config.service';
 import { DbconfigService } from '../dbconfig/dbconfig.service';
-import { EnvironmentVariables } from '../env.validation';
 import User from '../users/user.entity';
 import UsersService from '../users/users.service';
 import { getSecondsSinceUnixEpoch } from '../dates.utils';
@@ -13,11 +12,11 @@ import { Request } from 'express';
 import CacherService from '../cacher/cacher.service';
 
 export async function getJWTSigningKey(
-  configService: ConfigService<EnvironmentVariables, true>,
+  configService: ConfigService,
   dbconfigService: DbconfigService,
 ): Promise<string> {
   const keyName = 'JWT_SIGNING_KEY';
-  const keyFromEnv = configService.get(keyName, { infer: true });
+  const keyFromEnv = configService.get(keyName);
   if (keyFromEnv) {
     return keyFromEnv;
   }

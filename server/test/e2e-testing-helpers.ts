@@ -1,4 +1,5 @@
-import type { INestApplication } from '@nestjs/common';
+import { expect } from '@jest/globals';
+import { HttpStatus, INestApplication } from '@nestjs/common';
 import type { NestExpressApplication } from '@nestjs/platform-express';
 import { Test, TestingModule } from '@nestjs/testing';
 import * as dotenv from 'dotenv';
@@ -9,13 +10,17 @@ import { DataSource } from 'typeorm';
 import { AppModule } from '../src/app.module';
 import { commonAppBootstrap } from '../src/common-setup';
 import { assert } from '../src/misc.utils';
+import type { UserResponseWithToken } from '../src/users/user-response';
 
-export async function commonBeforeAll(): Promise<NestExpressApplication> {
+export async function commonBeforeAll(envOverride?: Record<string, string>): Promise<NestExpressApplication> {
   // TODO: save and restore env vars before/after tests
+  if (envOverride) {
+    Object.assign(process.env, envOverride);
+  }
 
   // This is necessary because we need to know which database we're using
   // *before* creating the module fixture. Once the module fixture is
-  // created, we can't change any of the values in the ConfigService.
+  // created, all of the providers will already have been instantiated.
   dotenv.config({path: process.env.DOTENV_PATH});
 
   await createDB();
@@ -42,16 +47,13 @@ export async function commonAfterAll(app: INestApplication | undefined) {
   await stopMockSmtpServer();
 }
 
-async function deleteAllDataFromDB(app: INestApplication) {
-  const datasource = app.get(DataSource);
-  // All other tables have foreign key constraints to these two with
-  // ON DELETE CASCADE
-  await datasource.query('DELETE FROM User');
-  await datasource.query('DELETE FROM Meeting');
-}
-
 function getDatasourceForSuperuser() {
-  if (process.env.DATABASE_TYPE === 'postgres') {
+  if (process.env.DATABASE_TYPE === 'sqlite') {
+    return new DataSource({
+      type: 'better-sqlite3',
+      database: process.env.SQLITE_PATH,
+    });
+  } else if (process.env.DATABASE_TYPE === 'postgres') {
     return new DataSource({
       type: 'postgres',
       host: process.env.POSTGRES_HOST,
@@ -70,11 +72,14 @@ function getDatasourceForSuperuser() {
       database: process.env.MYSQL_SUPERDATABASE,
     });
   }
+  throw new Error('Unrecognized database type "' + process.env.DATABASE_TYPE + '"');
 }
 
 async function createDB() {
+  if (process.env.DATABASE_TYPE === 'sqlite') {
+    return;
+  }
   const datasource = getDatasourceForSuperuser();
-  if (!datasource) return;
   await datasource.initialize();
   const databaseName = 'test' + process.env.JEST_WORKER_ID;
   try {
@@ -91,18 +96,29 @@ async function createDB() {
   }
 }
 
+// async function deleteAllDataFromDB(datasource: DataSource) {
+//   // All other tables have foreign key constraints to these two with
+//   // ON DELETE CASCADE
+//   await datasource.query('DELETE FROM User');
+//   await datasource.query('DELETE FROM Meeting');
+// }
+
 async function dropDB() {
   const datasource = getDatasourceForSuperuser();
-  if (!datasource) return;
   await datasource.initialize();
-  let databaseName: string | undefined;
-  if (process.env.DATABASE_TYPE === 'postgres') {
-    databaseName = process.env.POSTGRES_DATABASE;
-  } else if (process.env.DATABASE_TYPE === 'mariadb') {
-    databaseName = process.env.MYSQL_DATABASE;
+  if (process.env.DATABASE_TYPE === 'sqlite') {
+    // Looks like the tables disappear on their own when using :memory:?
+    //await deleteAllDataFromDB(datasource);
+  } else {
+    let databaseName: string | undefined;
+    if (process.env.DATABASE_TYPE === 'postgres') {
+      databaseName = process.env.POSTGRES_DATABASE;
+    } else if (process.env.DATABASE_TYPE === 'mariadb') {
+      databaseName = process.env.MYSQL_DATABASE;
+    }
+    assert(databaseName !== undefined);
+    await datasource.query(`DROP DATABASE ${databaseName}`);
   }
-  assert(databaseName !== undefined);
-  await datasource.query(`DROP DATABASE ${databaseName}`);
   await datasource.destroy();
 }
 
@@ -176,7 +192,7 @@ function stopMockSmtpServer() {
   });
 }
 
-function makeRequest(method: 'get' | 'post', apiPath: string, app: INestApplication, token?: string) {
+function makeRequest(method: 'get' | 'post' | 'patch' | 'delete', apiPath: string, app: INestApplication, token?: string) {
   let req = request(app.getHttpServer())[method](apiPath);
   if (token) {
     req = req.set('Authorization', `Bearer ${token}`);
@@ -184,10 +200,29 @@ function makeRequest(method: 'get' | 'post', apiPath: string, app: INestApplicat
   return req;
 }
 
+export function GET(apiPath: string, app: INestApplication, token?: string) {
+  return makeRequest('get', apiPath, app, token);
+}
 export function POST(apiPath: string, app: INestApplication, token?: string) {
   return makeRequest('post', apiPath, app, token);
 }
+export function PATCH(apiPath: string, app: INestApplication, token?: string) {
+  return makeRequest('patch', apiPath, app, token);
+}
+export function DELETE(apiPath: string, app: INestApplication, token?: string) {
+  return makeRequest('delete', apiPath, app, token);
+}
 
-export function GET(apiPath: string, app: INestApplication, token?: string) {
-  return makeRequest('get', apiPath, app, token);
+let userCounter = 1;
+// VERIFY_SIGNUP_EMAIL_ADDRESS must be set to false to use this function
+export async function createUser(app: INestApplication): Promise<UserResponseWithToken> {
+  const name = 'Test ' + userCounter;
+  const email = 'test' + userCounter + '@example.com';
+  const password = 'abcdef';
+  userCounter++;
+  const {body} = await POST('/api/signup', app)
+    .send({name, email, password})
+    .expect(HttpStatus.CREATED);
+  expect(body.userID).toBeDefined();
+  return body;
 }

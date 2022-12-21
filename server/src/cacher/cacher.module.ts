@@ -1,16 +1,13 @@
 import { Module } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
 import { createClient } from 'redis';
-import { EnvironmentVariables } from '../env.validation';
+import ConfigService from '../config/config.service';
 import { luaScriptConfig as rateLimiterLuaScript } from '../rate-limiter/redis-rate-limiter-lua-script';
 import CacherService from './cacher.service';
 
-function redisClientFactory(
-  configService: ConfigService<EnvironmentVariables, true>,
-) {
-  const host = configService.get('REDIS_HOST', { infer: true });
-  const port = configService.get('REDIS_PORT', { infer: true });
-  const database = configService.get('REDIS_DATABASE', { infer: true });
+function redisClientFactory(configService: ConfigService) {
+  const host = configService.get('REDIS_HOST');
+  const port = configService.get('REDIS_PORT');
+  const database = configService.get('REDIS_DATABASE');
   if (!host || !port) {
     return null;
   }
@@ -32,7 +29,7 @@ export type CustomRedisClientType = Exclude<
     {
       provide: 'REDIS_CLIENT',
       useFactory: async (
-        configService: ConfigService<EnvironmentVariables, true>,
+        configService: ConfigService,
       ): Promise<CustomRedisClientType | null> => {
         const client = redisClientFactory(configService);
         if (client) {

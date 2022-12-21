@@ -1,5 +1,4 @@
 import { INestApplication } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
 import { NestFactory } from '@nestjs/core';
 import type { NestExpressApplication } from '@nestjs/platform-express';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
@@ -7,7 +6,8 @@ import helmet from 'helmet';
 import * as morgan from 'morgan';
 import { AppModule } from './app.module';
 import { commonAppBootstrap } from './common-setup';
-import { EnvironmentVariables } from './env.validation';
+import ConfigService from './config/config.service';
+import { isBooleanStringTrue } from './config/env.validation';
 
 function setupSwagger(app: INestApplication) {
   const config = new DocumentBuilder()
@@ -24,9 +24,9 @@ async function bootstrap() {
   app.enableShutdownHooks();
   commonAppBootstrap(app);
   setupSwagger(app);
-  const configService = app.get(ConfigService<EnvironmentVariables, true>);
-  const nodeEnv = configService.get('NODE_ENV', { infer: true });
-  const trustProxy = configService.get('TRUST_PROXY', { infer: true });
+  const configService = app.get(ConfigService);
+  const nodeEnv = configService.get('NODE_ENV');
+  const trustProxy = isBooleanStringTrue(configService.get('TRUST_PROXY'));
   if (trustProxy) {
     app.set('trust proxy', true);
   }
@@ -41,8 +41,8 @@ async function bootstrap() {
       hsts: nodeEnv !== 'development' && nodeEnv !== 'test',
     }),
   );
-  const port = configService.get('PORT', { infer: true });
-  const host = configService.get('HOST', { infer: true });
+  const port = configService.get('PORT');
+  const host = configService.get('HOST');
   await app.listen(port, host);
 }
 bootstrap();

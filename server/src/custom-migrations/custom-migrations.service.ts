@@ -1,17 +1,17 @@
 import { Injectable } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
 import { DataSource } from 'typeorm';
-import { EnvironmentVariables } from '../env.validation';
+import ConfigService from '../config/config.service';
+import { Environment } from '../config/env.validation';
 
 @Injectable()
 export default class CustomMigrationsService {
-  private readonly nodeEnv: string;
+  private readonly nodeEnv: Environment;
 
   constructor(
-    configService: ConfigService<EnvironmentVariables, true>,
+    configService: ConfigService,
     private readonly dataSource: DataSource,
   ) {
-    this.nodeEnv = configService.get('NODE_ENV', { infer: true });
+    this.nodeEnv = configService.get('NODE_ENV');
   }
 
   async onModuleInit() {

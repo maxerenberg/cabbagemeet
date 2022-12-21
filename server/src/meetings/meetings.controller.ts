@@ -17,7 +17,7 @@ import {
   Put,
   UseGuards,
 } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
+import ConfigService from '../config/config.service';
 import { AuthUser, MaybeAuthUser } from '../auth/auth-user.decorator';
 import JwtAuthGuard from '../auth/jwt-auth.guard';
 import OptionalJwtAuthGuard from '../auth/optional-jwt-auth.guard';
@@ -48,7 +48,6 @@ import type MeetingShortResponse from './meeting-short-response';
 import RateLimiterService, {
   IRateLimiter,
 } from '../rate-limiter/rate-limiter.service';
-import { EnvironmentVariables } from '../env.validation';
 import {
   oneYearAgoDateString,
   oneYearFromNowDateString,
@@ -142,12 +141,11 @@ export class MeetingsController {
 
   constructor(
     private meetingsService: MeetingsService,
-    configService: ConfigService<EnvironmentVariables, true>,
+    configService: ConfigService,
     rateLimiterService: RateLimiterService,
   ) {
     const meetingCreationLimit = configService.get(
-      'HOURLY_MEETING_CREATION_LIMIT_PER_IP',
-      { infer: true },
+      'HOURLY_MEETING_CREATION_LIMIT_PER_IP'
     );
     if (meetingCreationLimit !== 0) {
       this.meetingCreationRateLimiter = rateLimiterService.factory(
