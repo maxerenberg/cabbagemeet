@@ -16,10 +16,12 @@ import { addMinutesToDateTimeString, daysOfWeek, months, to12HourClock } from 'u
 import ButtonWithSpinner from 'components/ButtonWithSpinner';
 import { useGetCurrentMeetingWithSelector } from 'utils/meetings.hooks';
 import { selectTokenIsPresent } from 'slices/authentication';
-import { usePutSelfRespondentMutation, useDeleteRespondentMutation, useScheduleMeetingMutation, useUnscheduleMeetingMutation, useUpdateAvailabilitiesMutation } from 'slices/api';
+import { usePutSelfRespondentMutation, useScheduleMeetingMutation, useUnscheduleMeetingMutation, useUpdateAvailabilitiesMutation } from 'slices/api';
 import { getReqErrorMessage } from 'utils/requests.utils';
 import { selectCurrentMeetingID } from 'slices/currentMeeting';
 import InfoModal from 'components/InfoModal';
+import NonFocusButton from 'components/NonFocusButton';
+import DeleteRespondentModal from './DeleteRespondentModal';
 
 function AvailabilitiesRow({
   moreDaysToRight,
@@ -65,10 +67,7 @@ function AvailabilitiesRow({
     updateRespondent,
     {isSuccess: updateRespondent_isSuccess, isLoading: updateRespondent_isLoading, error: updateRespondent_error, reset: updateRespondent_reset}
   ] = useUpdateAvailabilitiesMutation();
-  const [
-    deleteRespondent,
-    {isSuccess: deleteRespondent_isSuccess, isLoading: deleteRespondent_isLoading, error: deleteRespondent_error, reset: deleteRespondent_reset}
-  ] = useDeleteRespondentMutation();
+
   const [
     schedule,
     {isSuccess: schedule_isSuccess, isLoading: schedule_isLoading, error: schedule_error, reset: schedule_reset}
@@ -81,6 +80,7 @@ function AvailabilitiesRow({
   const { showToast } = useToast();
   const [showGuestModal, setShowGuestModal] = useState(false);
   const [showInfoModal, setShowInfoModal] = useState(false);
+  const [showDeleteRespondentModal, setShowDeleteRespondentModal] = useState(false);
   const errorMessageElemRef = useRef<HTMLParagraphElement>(null);
   let title = 'Availabilities';
   const [selectedUserName, setSelectedUserName] = useState<string | null>(null);
@@ -121,17 +121,6 @@ function AvailabilitiesRow({
   }, [updateRespondent_isSuccess, showToast, dispatch])
 
   useEffect(() => {
-    if (deleteRespondent_isSuccess) {
-      showToast({
-        msg: `Successfully deleted respondent`,
-        msgType: 'success',
-        autoClose: true,
-      });
-      dispatch(resetSelection());
-    }
-  }, [deleteRespondent_isSuccess, showToast, dispatch]);
-
-  useEffect(() => {
     if (schedule_isSuccess) {
       showToast({
         msg: 'Successfully scheduled meeting',
@@ -168,11 +157,10 @@ function AvailabilitiesRow({
   const clearErrors = () => {
     if (submitSelf_error) submitSelf_reset();
     if (updateRespondent_error) updateRespondent_reset();
-    if (deleteRespondent_error) deleteRespondent_reset();
     if (schedule_error) schedule_reset();
     if (unschedule_error) unschedule_reset();
   };
-  const error = submitSelf_error || updateRespondent_error || deleteRespondent_error || schedule_error || unschedule_error;
+  const error = submitSelf_error || updateRespondent_error || schedule_error || unschedule_error;
 
   useEffect(() => {
     if (error) {
@@ -180,7 +168,7 @@ function AvailabilitiesRow({
     }
   }, [error]);
 
-  const btnDisabled = submitSelf_isLoading || updateRespondent_isLoading || deleteRespondent_isLoading || schedule_isLoading || unschedule_isLoading;
+  const btnDisabled = submitSelf_isLoading || updateRespondent_isLoading || schedule_isLoading || unschedule_isLoading;
   let rightBtnText: string | undefined;
   let onRightBtnClick: React.MouseEventHandler<HTMLButtonElement> | undefined;
   let rightBtn_isLoading = false;
@@ -288,16 +276,10 @@ function AvailabilitiesRow({
     };
   }
 
-  let onDeleteBtnClick: React.MouseEventHandler<HTMLButtonElement> | undefined;
-  // TODO: show confirmation modal
-  if (selMode.type === 'editingRespondent') {
-    onDeleteBtnClick = () => {
-      deleteRespondent({
-        id: meetingID,
-        respondentId: selMode.respondentID,
-      });
-    };
-  }
+  const onDeleteBtnClick =
+    selMode.type === 'editingRespondent'
+    ? () => setShowDeleteRespondentModal(true)
+    : undefined;
 
   return (
     <>
@@ -305,15 +287,13 @@ function AvailabilitiesRow({
         <div style={{fontSize: '1.3em'}}>{title}</div>
         <div className="d-none d-md-flex">
           {onDeleteBtnClick && (
-            <ButtonWithSpinner
-              as="NonFocusButton"
+            <NonFocusButton
               className="btn btn-outline-danger me-4 meeting-avl-button"
               onClick={onDeleteBtnClick}
               disabled={btnDisabled}
-              isLoading={deleteRespondent_isLoading}
             >
               Delete
-            </ButtonWithSpinner>
+            </NonFocusButton>
           )}
           {onLeftBtnClick && (
             <ButtonWithSpinner
@@ -339,15 +319,13 @@ function AvailabilitiesRow({
       </div>
       <BottomOverlay>
         {onDeleteBtnClick && (
-          <ButtonWithSpinner
-            as="NonFocusButton"
+          <NonFocusButton
             className="btn btn-outline-light me-2 meeting-avl-button"
             onClick={onDeleteBtnClick}
             disabled={btnDisabled}
-            isLoading={deleteRespondent_isLoading}
           >
             Delete
-          </ButtonWithSpinner>
+          </NonFocusButton>
         )}
         {leftBtnText && (
           <ButtonWithSpinner
@@ -382,6 +360,11 @@ function AvailabilitiesRow({
       <InfoModal show={showInfoModal} setShow={setShowInfoModal}>
         <p className="text-center my-3">At least one time needs to be selected.</p>
       </InfoModal>
+      <DeleteRespondentModal
+        show={showDeleteRespondentModal}
+        setShow={setShowDeleteRespondentModal}
+        respondentID={selMode.type === 'editingRespondent' ? selMode.respondentID : 0}
+      />
     </>
   );
 }
