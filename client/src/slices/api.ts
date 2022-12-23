@@ -285,7 +285,7 @@ export type SignupApiResponse = /** status 200  */
   | VerifyEmailAddressResponse
   | /** status 201  */ UserResponseWithToken;
 export type SignupApiArg = LocalSignupDto;
-export type VerifyEmailApiResponse = unknown;
+export type VerifyEmailApiResponse = /** status 204  */ undefined;
 export type VerifyEmailApiArg = VerifyEmailAddressDto;
 export type LoginApiResponse = /** status 200  */ UserResponseWithToken;
 export type LoginApiArg = LocalLoginDto;
@@ -397,7 +397,7 @@ export type UserResponseWithToken = {
   hasLinkedMicrosoftAccount: boolean;
   token: string;
 };
-export type BadRequestResponse = {
+export type ConflictResponse = {
   statusCode: number;
   message: string;
   error: string;
@@ -413,6 +413,11 @@ export type VerifyEmailAddressDto = {
   iv: string;
   salt: string;
   tag: string;
+};
+export type BadRequestResponse = {
+  statusCode: number;
+  message: string;
+  error: string;
 };
 export type UnauthorizedResponse = {
   statusCode: number;
@@ -502,7 +507,7 @@ export type MeetingResponse = {
 };
 export type CreateMeetingDto = {
   name: string;
-  about: string;
+  about?: string;
   timezone: string;
   minStartHour: number;
   maxEndHour: number;

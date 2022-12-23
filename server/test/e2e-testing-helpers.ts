@@ -9,7 +9,14 @@ import * as request from 'supertest';
 import { DataSource } from 'typeorm';
 import { AppModule } from '../src/app.module';
 import { commonAppBootstrap } from '../src/common-setup';
-import { assert } from '../src/misc.utils';
+import type AddGuestRespondentDto from '../src/meetings/add-guest-respondent.dto';
+import type PutRespondentDto from '../src/meetings/put-respondent.dto';
+import type CreateMeetingDto from '../src/meetings/create-meeting.dto';
+import type MeetingResponse from '../src/meetings/meeting-response';
+import type ScheduleMeetingDto from '../src/meetings/schedule-meeting.dto';
+import { assert, sleep } from '../src/misc.utils';
+import type EditUserDto from '../src/users/edit-user.dto';
+import type UserResponse from '../src/users/user-response';
 import type { UserResponseWithToken } from '../src/users/user-response';
 
 export async function commonBeforeAll(envOverride?: Record<string, string>): Promise<NestExpressApplication> {
@@ -125,6 +132,7 @@ async function dropDB() {
 type SmtpMessage = {
   from: string;
   to: string;
+  subject: string;
   body: string;
 };
 export const smtpMessages: SmtpMessage[] = [];
@@ -152,20 +160,24 @@ const mockSmtpServer = new SMTPServer({
         .map(chunk => quotedPrintableDecode(chunk.toString()))
         .join('')
         .split('\r\n');
+      const message = smtpMessagesBySessionId[session.id];
       // There is an empty line between the headers and the body
       for (let i = 0; i < lines.length; i++) {
-        if (lines[i].length === 0) {
-          smtpMessagesBySessionId[session.id].body = lines.slice(i + 1).join('\n');
+        if (lines[i].startsWith('Subject: ')) {
+          message.subject = lines[i].slice('Subject: '.length);
+        } else if (lines[i].length === 0) {
+          message.body = lines.slice(i + 1).join('\n');
           break;
         }
       }
-      if (smtpMessagesBySessionId[session.id].body) {
-        smtpMessages.push(smtpMessagesBySessionId[session.id]);
-      } else {
-        delete smtpMessagesBySessionId[session.id];
+      if (message.subject && message.body) {
+        smtpMessages.push(message);
       }
       callback();
     });
+  },
+  onClose(session) {
+    delete smtpMessagesBySessionId[session.id];
   },
 });
 
@@ -192,7 +204,21 @@ function stopMockSmtpServer() {
   });
 }
 
-function makeRequest(method: 'get' | 'post' | 'patch' | 'delete', apiPath: string, app: INestApplication, token?: string) {
+export function sortEmailMessagesByRecipient(messages: SmtpMessage[]) {
+  messages.sort((m1, m2) => m1.to.localeCompare(m2.to));
+}
+
+export async function waitForEmailMessages(delayMs = 200) {
+  for (;;) {
+    const oldLength = smtpMessages.length;
+    await sleep(delayMs);
+    if (smtpMessages.length === oldLength) {
+      break;
+    }
+  }
+}
+
+function makeRequest(method: 'get' | 'post' | 'patch' | 'delete' | 'put', apiPath: string, app: INestApplication, token?: string) {
   let req = request(app.getHttpServer())[method](apiPath);
   if (token) {
     req = req.set('Authorization', `Bearer ${token}`);
@@ -212,6 +238,9 @@ export function PATCH(apiPath: string, app: INestApplication, token?: string) {
 export function DELETE(apiPath: string, app: INestApplication, token?: string) {
   return makeRequest('delete', apiPath, app, token);
 }
+export function PUT(apiPath: string, app: INestApplication, token?: string) {
+  return makeRequest('put', apiPath, app, token);
+}
 
 let userCounter = 1;
 // VERIFY_SIGNUP_EMAIL_ADDRESS must be set to false to use this function
@@ -224,5 +253,75 @@ export async function createUser(app: INestApplication): Promise<UserResponseWit
     .send({name, email, password})
     .expect(HttpStatus.CREATED);
   expect(body.userID).toBeDefined();
+  return body;
+}
+
+export async function editUser(editUserDto: EditUserDto, app: INestApplication, token: string): Promise<UserResponse> {
+  const {body} = await PATCH('/api/me', app, token)
+    .send(editUserDto)
+    .expect(HttpStatus.OK);
+  return body;
+}
+
+export async function createMeeting(meetingDto: CreateMeetingDto, app: INestApplication, token?: string): Promise<MeetingResponse> {
+  const {body} = await POST('/api/meetings', app, token)
+    .send(meetingDto)
+    .expect(HttpStatus.CREATED);
+  return body;
+}
+
+export async function getMeeting(meetingID: number, app: INestApplication, token?: string): Promise<MeetingResponse> {
+  const {body} = await GET('/api/meetings/' + meetingID, app, token)
+    .expect(HttpStatus.OK);
+  return body;
+}
+
+function sortRespondentsInResponse({body}: {body: MeetingResponse}) {
+  body.respondents.sort((r1, r2) => r1.respondentID - r2.respondentID);
+}
+
+export async function addGuestRespondent(guestRespondentDto: AddGuestRespondentDto, meetingID: number, app: INestApplication): Promise<MeetingResponse> {
+  const {body} = await POST(`/api/meetings/${meetingID}/respondents/guest`, app)
+    .send(guestRespondentDto)
+    .expect(HttpStatus.CREATED)
+    .expect(sortRespondentsInResponse);
+  return body;
+}
+
+export async function putSelfRespondent(putRespondentDto: PutRespondentDto, meetingID: number, app: INestApplication, token: string): Promise<MeetingResponse> {
+  const {body} = await PUT(`/api/meetings/${meetingID}/respondents/me`, app, token)
+    .send(putRespondentDto)
+    .expect(HttpStatus.OK)
+    .expect(sortRespondentsInResponse);
+  return body;
+}
+
+export async function updateRespondent(respondentID: number, putRespondentDto: PutRespondentDto, meetingID: number, app: INestApplication, token?: string): Promise<MeetingResponse> {
+  const {body} = await PUT(`/api/meetings/${meetingID}/respondents/${respondentID}`, app, token)
+    .send(putRespondentDto)
+    .expect(HttpStatus.OK)
+    .expect(sortRespondentsInResponse);
+  return body;
+}
+
+export async function deleteRespondent(respondentID: number, meetingID: number, app: INestApplication, token?: string): Promise<MeetingResponse> {
+  const {body} = await DELETE(`/api/meetings/${meetingID}/respondents/${respondentID}`, app, token)
+    .expect(HttpStatus.OK)
+    .expect(sortRespondentsInResponse);
+  return body;
+}
+
+export async function scheduleMeeting(meetingID: number, scheduleDto: ScheduleMeetingDto, app: INestApplication, token?: string): Promise<MeetingResponse> {
+  const {body} = await PUT(`/api/meetings/${meetingID}/schedule`, app, token)
+    .send(scheduleDto)
+    .expect(HttpStatus.OK)
+    .expect(sortRespondentsInResponse);
+  return body;
+}
+
+export async function unscheduleMeeting(meetingID: number, app: INestApplication, token?: string): Promise<MeetingResponse> {
+  const {body} = await DELETE(`/api/meetings/${meetingID}/schedule`, app, token)
+    .expect(HttpStatus.OK)
+    .expect(sortRespondentsInResponse);
   return body;
 }

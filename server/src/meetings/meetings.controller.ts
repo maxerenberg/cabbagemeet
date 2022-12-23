@@ -15,6 +15,7 @@ import {
   Patch,
   Post,
   Put,
+  UnauthorizedException,
   UseGuards,
 } from '@nestjs/common';
 import ConfigService from '../config/config.service';
@@ -165,13 +166,13 @@ export class MeetingsController {
     if (!existingRespondent) {
       throw new NotFoundException();
     }
-    if (
-      existingRespondent.UserID &&
-      (!maybeUser || maybeUser.ID !== existingRespondent.UserID)
-    ) {
-      throw new ForbiddenException(
-        'You must be logged in as this user to modify their availabilities',
-      );
+    if (existingRespondent.UserID) {
+      const errorMessage = 'You must be logged in as this user to modify their availabilities';
+      if (!maybeUser) {
+        throw new UnauthorizedException(errorMessage);
+      } else if (maybeUser.ID !== existingRespondent.UserID) {
+        throw new ForbiddenException(errorMessage);
+      }
     }
     return existingRespondent;
   }
@@ -179,6 +180,7 @@ export class MeetingsController {
   private async checkIfMeetingExistsAndClientIsAllowedToModifyIt(
     meetingID: number,
     maybeUser: User | null,
+    allowIfCreatedByGuest = false,
   ) {
     const meeting = await this.meetingsService.getMeetingWithRespondents(
       meetingID,
@@ -186,13 +188,14 @@ export class MeetingsController {
     if (!meeting) {
       throw new NotFoundException();
     }
-    if (
-      meeting.CreatorID &&
-      (!maybeUser || maybeUser.ID !== meeting.CreatorID)
-    ) {
-      throw new ForbiddenException(
-        'You must be logged in as the creator of this meeting.',
-      );
+    if (allowIfCreatedByGuest && !meeting.CreatorID) {
+      return meeting;
+    }
+    if (!maybeUser) {
+      throw new UnauthorizedException('You must be logged in to edit this meeting');
+    }
+    if (meeting.CreatorID && maybeUser.ID !== meeting.CreatorID) {
+      throw new ForbiddenException('You must be logged in as the creator of this meeting.');
     }
     return meeting;
   }
@@ -229,6 +232,7 @@ export class MeetingsController {
     if (maybeUser) {
       partialMeeting.CreatorID = maybeUser.ID;
     }
+    partialMeeting.About ??= '';
     const meeting = await this.meetingsService.createMeeting(partialMeeting);
     // Normally we would do a left join to get the respondents
     // Since we just created the meeting, this field will be undefined
@@ -304,8 +308,7 @@ export class MeetingsController {
       throw new BadRequestException('end time must be greater than start time');
     }
     const meeting = await this.checkIfMeetingExistsAndClientIsAllowedToModifyIt(
-      meetingID,
-      maybeUser,
+      meetingID, maybeUser, true,
     );
     await this.meetingsService.scheduleMeeting(
       maybeUser,
@@ -330,8 +333,7 @@ export class MeetingsController {
     @MaybeAuthUser() maybeUser: User | null,
   ): Promise<MeetingResponse> {
     const meeting = await this.checkIfMeetingExistsAndClientIsAllowedToModifyIt(
-      meetingID,
-      maybeUser,
+      meetingID, maybeUser, true,
     );
     await this.meetingsService.unscheduleMeeting(meeting);
     return meetingToMeetingResponse(meeting, maybeUser);
@@ -364,7 +366,6 @@ export class MeetingsController {
     operationId: 'addGuestRespondent',
   })
   @Post(':id/respondents/guest')
-  @HttpCode(HttpStatus.OK)
   async addGuestRespondent(
     @Param('id', ParseIntPipe) meetingID: number,
     @Body() body: AddGuestRespondentDto,

@@ -27,4 +27,12 @@ export default abstract class AbstractOAuth2 {
 
   // Exact type depends on implementation
   CreatedEvents: AbstractOAuth2CalendarCreatedEvent[];
+
+  static getColumnNames(): string[] {
+    // Needed for building a raw SQL query
+    return [
+      'UserID', 'LinkedCalendar', 'Sub', 'AccessToken',
+      'AccessTokenExpiresAt', 'RefreshToken',
+    ];
+  }
 }

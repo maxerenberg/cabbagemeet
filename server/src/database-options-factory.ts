@@ -50,13 +50,14 @@ export function createDataSourceOptions(
       // BEFORE the synchronize step, but our migrations need the tables to be created
       // first. So we need to explicitly run them later, in the CustomMigrationsService.
       commonOptions.migrationsRun = false;
-    } else {
-      commonOptions.migrations = [
-        `migrations/${dbType}/*.js`,
-        customMigrationsGlobPath,
-      ];
-      commonOptions.migrationsRun = true;
     }
+  }
+  if (cli || nodeEnv !== 'development') {
+    commonOptions.migrations = [
+      `migrations/${dbType}/*.js`,
+      customMigrationsGlobPath,
+    ];
+    commonOptions.migrationsRun = true;
   }
   registerJoinColumns(dbType);
   if (dbType === 'sqlite') {

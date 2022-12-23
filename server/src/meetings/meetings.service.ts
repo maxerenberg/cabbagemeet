@@ -16,18 +16,26 @@ function formatScheduledTimeRange(
   startDateTime: string,
   endDateTime: string,
   tz: string,
-): string {
+): {
+  dayString: string;
+  timeRangeString: string;
+} {
+  const startDate = DateTime.fromISO(startDateTime).setZone(tz);
   // remove space so that e.g. "8:00 AM" becomes "8:00AM"
-  const start = DateTime.fromISO(startDateTime)
+  const startTime = startDate
+    .toLocaleString(DateTime.TIME_SIMPLE)
+    .replace(' ', '');
+  const endTime = DateTime.fromISO(endDateTime)
     .setZone(tz)
     .toLocaleString(DateTime.TIME_SIMPLE)
     .replace(' ', '');
-  const end = DateTime.fromISO(endDateTime)
-    .setZone(tz)
-    .toLocaleString(DateTime.TIME_SIMPLE)
-    .replace(' ', '');
-  const tzShort = DateTime.fromISO(startDateTime).setZone(tz).offsetNameShort;
-  return `${start} to ${end} ${tzShort}`;
+  const tzShort = startDate.offsetNameShort;
+  return {
+    // See https://moment.github.io/luxon/#/formatting?id=presets
+    // Looks like e.g. "Wednesday, December 21, 2022"
+    dayString: startDate.toLocaleString(DateTime.DATE_HUGE),
+    timeRangeString: `${startTime} to ${endTime} ${tzShort}`,
+  };
 }
 
 @Injectable()
@@ -80,14 +88,23 @@ export default class MeetingsService {
       .createQueryBuilder()
       .leftJoin('MeetingRespondent.User', 'User')
       .select([
+        // !!!!!!!!!!
+        // There appears to be a bug in TypeORM where non-guest respondents
+        // get dropped from the result if the MeetingID column is not selected.
+        // They show up in the "raw" results, but not in the list of entities
+        // returned from getMany().
+        // So we need to select the MeetingID even though it's redundant.
+        // !!!!!!!!!!
+        'MeetingRespondent.MeetingID',
         'MeetingRespondent.GuestName',
         'MeetingRespondent.GuestEmail',
+        'User.ID',
         'User.Name',
         'User.Email',
       ])
       .where('MeetingRespondent.MeetingID = :meetingID', { meetingID })
-      .where(
-        'MeetingRespondent.GuestEmail IS NOT NULL OR User.IsSubscribedToNotifications',
+      .andWhere(
+        '(MeetingRespondent.GuestEmail IS NOT NULL OR User.IsSubscribedToNotifications)',
       )
       .getMany();
   }
@@ -121,7 +138,7 @@ export default class MeetingsService {
     meeting: Meeting,
     name: string,
   ): string {
-    const scheduledTimeRange = formatScheduledTimeRange(
+    const {dayString, timeRangeString} = formatScheduledTimeRange(
       meeting.ScheduledStartDateTime,
       meeting.ScheduledEndDateTime,
       meeting.Timezone,
@@ -129,14 +146,15 @@ export default class MeetingsService {
     return (
       `Hello ${name},\n` +
       '\n' +
-      `${meeting.Name} has been scheduled:\n` +
+      `The meeting "${meeting.Name}" has been scheduled:\n` +
       '\n' +
-      `${scheduledTimeRange}\n` +
+      `  ${dayString}\n` +
+      `  ${timeRangeString}\n` +
       '\n' +
       `View details here: ${this.publicURL}/m/${meeting.ID}\n` +
       '\n' +
       '-- \n' +
-      `CabbageMeet | ${this.publicURL}`
+      `CabbageMeet | ${this.publicURL}\n`
     );
   }
 

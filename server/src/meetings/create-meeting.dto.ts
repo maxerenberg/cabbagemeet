@@ -5,10 +5,16 @@ import {
   MaxLength,
   ArrayNotEmpty,
   ArrayMaxSize,
+  IsOptional,
+  IsInt,
+  Min,
+  Max,
 } from 'class-validator';
 import IsOnlyDateString from './date-string-validator.decorator';
-import IsStartOfQuarterHourInterval from './quarter-hour-validator.decorator';
 import IsTzDatabaseTimezone from './timezone-validator.decorator';
+
+// Do not use default initializers on any fields because the EditMeetingDto
+// extends this class
 
 export default class CreateMeetingDto {
   @ApiProperty({ example: 'Some meeting' })
@@ -18,9 +24,10 @@ export default class CreateMeetingDto {
   name: string;
 
   @ApiProperty({ example: 'Some meeting description' })
+  @IsOptional()
   @IsString()
   @MaxLength(256)
-  about: string;
+  about?: string;
 
   @ApiProperty({
     description: "The client's timezone (IANA tz database format)",
@@ -31,20 +38,22 @@ export default class CreateMeetingDto {
 
   @ApiProperty({
     description:
-      "The earliest time, in the client's timezone, at which the meeting may start (24h clock)." +
-      ' Must be a multiple of 0.25.',
-    example: 10.5,
+      "The earliest time, in the client's timezone, at which the meeting may start (24h clock).",
+    example: 10,
   })
-  @IsStartOfQuarterHourInterval()
+  @IsInt()
+  @Min(0)
+  @Max(23)
   minStartHour: number;
 
   @ApiProperty({
     description:
-      "The latest time, in the client's timezone, at which the meeting may end (24h clock)." +
-      ' Must be a multiple of 0.25.',
-    example: 13.5,
+      "The latest time, in the client's timezone, at which the meeting may end (24h clock).",
+    example: 13,
   })
-  @IsStartOfQuarterHourInterval()
+  @IsInt()
+  @Min(0)
+  @Max(23)
   maxEndHour: number;
 
   @ApiProperty({ example: ['2022-10-23', '2022-10-24'] })

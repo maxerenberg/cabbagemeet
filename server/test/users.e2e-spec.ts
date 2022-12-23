@@ -3,7 +3,7 @@ import type { NestExpressApplication } from '@nestjs/platform-express';
 import type EditUserDto from '../src/users/edit-user.dto';
 import { commonAfterAll, commonBeforeAll, commonBeforeEach, createUser, DELETE, GET, PATCH } from './e2e-testing-helpers';
 
-describe('AuthController (e2e)', () => {
+describe('UsersController (e2e)', () => {
   let app: NestExpressApplication;
 
   beforeAll(async () => {
