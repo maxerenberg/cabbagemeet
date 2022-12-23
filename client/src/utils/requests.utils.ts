@@ -36,13 +36,11 @@ export function getReqErrorMessage(error: FetchBaseQueryError | SerializedError)
 export function useMutationWithPersistentError<T>(mutationHook: () => T): T {
   const [mutation, {error, ...rest}] = mutationHook() as any;
   const [lastError, setLastError] = useState<any>(undefined);
-  const {isSuccess} = rest;
+  const {isLoading} = rest;
   useEffect(() => {
-    if (error) {
+    if (!isLoading) {
       setLastError(error);
-    } else if (isSuccess) {
-      setLastError(undefined);
     }
-  }, [error, isSuccess]);
+  }, [error, isLoading]);
   return [mutation, {...rest, error: lastError}] as unknown as T;
 }

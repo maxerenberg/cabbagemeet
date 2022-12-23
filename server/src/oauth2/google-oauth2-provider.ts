@@ -88,8 +88,12 @@ function filterOutEventsWhichAreOutOfRange(
 ): GoogleListEventsResponseItem[] {
   return events.filter(
     ({ start, end }) =>
-      toISOStringUTCFromDateTimeStr(end.dateTime) > timeMin &&
-      toISOStringUTCFromDateTimeStr(start.dateTime) < timeMax,
+      // If an event doesn't have start/end info, then it's a deleted
+      // event, so we need to keep it in our list
+      start === undefined || end === undefined || (
+        toISOStringUTCFromDateTimeStr(end.dateTime) > timeMin &&
+        toISOStringUTCFromDateTimeStr(start.dateTime) < timeMax
+      )
   );
 }
 

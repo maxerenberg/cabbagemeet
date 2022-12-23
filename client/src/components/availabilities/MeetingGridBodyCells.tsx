@@ -188,7 +188,6 @@ function MeetingGridBodyCells({
   const meetingID = useAppSelector(selectCurrentMeetingID);
   assert(meetingID !== undefined);
   const externalEvents = useGetExternalCalendarEventsIfTokenIsPresent(meetingID);
-  // FIXME: show overlapping events side-by-side
   const dateTimesToExternalEventInfo = useMemo(
     () => {
       if (minStartHour === undefined || maxEndHour === undefined) {
@@ -273,6 +272,9 @@ const Cell = React.memo(function Cell({
   totalPeople: number,
 }) {
   const selMode = useAppSelector(selectSelMode);
+  const {selfRespondentID} = useGetCurrentMeetingWithSelector(
+    ({data}) => ({selfRespondentID: data?.selfRespondentID})
+  );
   const isSelected = useAppSelector(state => !!selectSelectedTimes(state)[dateTime]);
   // const {meetingIsScheduled} = useGetCurrentMeetingWithSelector(
   //   ({data: meeting}) => ({meetingIsScheduled: meeting?.scheduledDateTimes !== undefined})
@@ -340,10 +342,10 @@ const Cell = React.memo(function Cell({
 
   let externalEventBoxes: ReactElement<HTMLDivElement>[] | undefined;
   if (
-    // FIXME: don't show external events if editing someone else
-    (selMode.type === 'addingRespondent' || selMode.type === 'editingRespondent')
+    (selMode.type === 'addingRespondent' || (
+      selMode.type === 'editingRespondent' && selMode.respondentID === selfRespondentID
+    ))
     && externalEvents.events.length > 0
-    //&& !meetingIsScheduled
   ) {
     classNames.push('position-relative', 'd-grid');
     style.gridTemplateColumns = `repeat(${externalEvents.numCols}, 1fr)`;

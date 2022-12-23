@@ -13,6 +13,7 @@ export default function ConfirmationModal({
   confirmationButtonText,
   isLoading,
   error,
+  reset,
 }: {
   show: boolean,
   setShow: (val: boolean) => void,
@@ -22,9 +23,11 @@ export default function ConfirmationModal({
   confirmationButtonText: string,
   isLoading: boolean,
   error: FetchBaseQueryError | SerializedError | undefined,
+  reset: () => void,
 }) {
   const onClose = () => {
     if (isLoading) return;
+    reset();
     setShow(false);
   };
 

@@ -15,7 +15,7 @@ export default function DeleteMeetingModal({
 }) {
   const meetingID = useAppSelector(selectCurrentMeetingID);
   assert(meetingID !== undefined);
-  const [deleteMeeting, {isLoading, isSuccess, error}] = useMutationWithPersistentError(useDeleteMeetingMutation);
+  const [deleteMeeting, {isLoading, isSuccess, error, reset}] = useMutationWithPersistentError(useDeleteMeetingMutation);
   const navigate = useNavigate();
   const {showToast} = useToast();
   const onDeleteClick = () => deleteMeeting(meetingID);
@@ -41,6 +41,7 @@ export default function DeleteMeetingModal({
       confirmationButtonText="Delete"
       isLoading={isLoading}
       error={error}
+      reset={reset}
     />
   );
 };

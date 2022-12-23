@@ -10,7 +10,7 @@ export default function DeleteAccountModal({
 }: {
   show: boolean, setShow: (val: boolean) => void
 }) {
-  const [deleteAccount, {isSuccess, isLoading, error}] = useMutationWithPersistentError(useDeleteUserMutation);
+  const [deleteAccount, {isSuccess, isLoading, error, reset}] = useMutationWithPersistentError(useDeleteUserMutation);
   const dispatch = useAppDispatch();
   const {showToast} = useToast();
   const onDeleteClick = () => deleteAccount();
@@ -37,6 +37,7 @@ export default function DeleteAccountModal({
       confirmationButtonText="Delete"
       isLoading={isLoading}
       error={error}
+      reset={reset}
     />
   );
 };

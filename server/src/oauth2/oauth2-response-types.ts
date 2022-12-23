@@ -47,11 +47,12 @@ export interface GoogleListEventsResponseItem {
   // fields in which we are not interested have been omitted
   id: string;
   status: string;
-  summary: string;
-  start: {
+  // The fields below may not be present if the event was deleted
+  summary?: string;
+  start?: {
     dateTime: string;
   };
-  end: {
+  end?: {
     dateTime: string;
   };
 }

@@ -6,6 +6,7 @@ import { useDeleteRespondentMutation } from "slices/api";
 import { resetSelection } from "slices/availabilitiesSelection";
 import { selectCurrentMeetingID } from "slices/currentMeeting";
 import { assert } from "utils/misc.utils";
+import { useMutationWithPersistentError } from "utils/requests.utils";
 
 export default function DeleteRespondentModal({
   show, setShow, respondentID,
@@ -16,7 +17,7 @@ export default function DeleteRespondentModal({
   const meetingID = useAppSelector(selectCurrentMeetingID);
   assert(meetingID !== undefined);
   const dispatch = useAppDispatch();
-  const [deleteRespondent, {isSuccess, isLoading, error, reset}] = useDeleteRespondentMutation();
+  const [deleteRespondent, {isSuccess, isLoading, error, reset}] = useMutationWithPersistentError(useDeleteRespondentMutation);
   const { showToast } = useToast();
 
   useEffect(() => {
@@ -38,23 +39,17 @@ export default function DeleteRespondentModal({
     });
   }, [meetingID, respondentID]);
 
-  const setShowWrapper = useCallback((val: boolean) => {
-    if (!val) {
-      reset();
-    }
-    setShow(val);
-  }, [setShow, reset]);
-
   return (
     <ConfirmationModal
       show={show}
-      setShow={setShowWrapper}
+      setShow={setShow}
       onConfirm={onDeleteClick}
       title="Delete meeting?"
       bodyText="Are you sure you want to delete this respondent? This action is irreversible."
       confirmationButtonText="Delete"
       isLoading={isLoading}
       error={error}
+      reset={reset}
     />
   );
 }
