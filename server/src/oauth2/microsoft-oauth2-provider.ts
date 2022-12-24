@@ -8,7 +8,6 @@ import {
 import { promisify } from 'util';
 import { Logger } from '@nestjs/common';
 import ConfigService from '../config/config.service';
-import { sign as jwtSignCb } from 'jsonwebtoken';
 import { Repository } from 'typeorm';
 import type { Dispatcher } from 'undici';
 import {
@@ -18,7 +17,7 @@ import {
   toISOStringUTCFromDateStrAndHourAndTz,
 } from '../dates.utils';
 import type Meeting from '../meetings/meeting.entity';
-import { encodeQueryParams } from '../misc.utils';
+import { encodeQueryParams, jwtSign } from '../misc.utils';
 import User from '../users/user.entity';
 import MicrosoftOAuth2 from './microsoft-oauth2.entity';
 import MicrosoftCalendarEvents from './microsoft-calendar-events.entity';
@@ -49,19 +48,6 @@ import CacherService from '../cacher/cacher.service';
 
 const randomBytes: (size: number) => Promise<Buffer> = promisify(randomBytesCb);
 const randomInt: (max: number) => Promise<number> = promisify(randomIntCb);
-
-function jwtSign(
-  payload: Parameters<typeof jwtSignCb>[0],
-  secretOrPrivateKey: Parameters<typeof jwtSignCb>[1],
-  options?: Parameters<typeof jwtSignCb>[2],
-): Promise<string> {
-  return new Promise((resolve, reject) => {
-    jwtSignCb(payload, secretOrPrivateKey, options, (err, token) => {
-      if (err) reject(err);
-      resolve(token);
-    });
-  });
-}
 
 // See https://learn.microsoft.com/en-us/graph/api/resources/calendar?view=graph-rest-1.0&preserve-view=true
 const microsoftCalendarScopes = [

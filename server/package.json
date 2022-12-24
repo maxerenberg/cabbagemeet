@@ -22,6 +22,7 @@
     "test:e2e": "DOTENV_PATH=test/.test-sqlite.env jest --config ./test/jest-e2e.json",
     "test:e2e:mariadb": "DOTENV_PATH=test/.test-mariadb.env jest --config ./test/jest-e2e.json",
     "test:e2e:postgres": "DOTENV_PATH=test/.test-postgres.env jest --config ./test/jest-e2e.json",
+    "test:e2e:debug": "DOTENV_PATH=test/.test-sqlite.env node --inspect-brk -r tsconfig-paths/register -r ts-node/register node_modules/.bin/jest --runInBand --config ./test/jest-e2e.json",
     "migration:generate:sqlite": "DATABASE_TYPE=sqlite typeorm-ts-node-esm migration:generate -d datasource.ts --outputJs ./migrations/sqlite/Migration",
     "migration:run:sqlite": "DATABASE_TYPE=sqlite typeorm-ts-node-esm migration:run -d datasource.ts",
     "migration:generate:mariadb": "DATABASE_TYPE=mariadb typeorm-ts-node-esm migration:generate -d datasource.ts --outputJs ./migrations/mariadb/Migration",

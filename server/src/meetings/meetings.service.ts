@@ -332,6 +332,7 @@ export default class MeetingsService {
       .createQueryBuilder()
       .select(['Meeting'])
       .where('CreatorID = :userID', { userID })
+      .orderBy('ID', 'DESC')
       .limit(100)
       .getMany();
   }
@@ -343,6 +344,7 @@ export default class MeetingsService {
       .innerJoin('Meeting.Respondents', 'MeetingRespondent')
       .select(['Meeting'])
       .where('MeetingRespondent.UserID = :userID', { userID })
+      .orderBy('ID', 'DESC')
       .limit(100)
       .getMany();
   }

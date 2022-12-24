@@ -10,6 +10,7 @@ describe('UsersController (e2e)', () => {
     app = await commonBeforeAll({VERIFY_SIGNUP_EMAIL_ADDRESS: 'false'});
   });
   beforeEach(commonBeforeEach);
+  afterAll(() => commonAfterAll(app));
 
   it('/api/me (GET)', async () => {
     const {token, ...user} = await createUser(app);
@@ -48,6 +49,4 @@ describe('UsersController (e2e)', () => {
     await GET('/api/me', app, token)
       .expect(HttpStatus.UNAUTHORIZED);
   });
-
-  afterAll(() => commonAfterAll(app));
 });

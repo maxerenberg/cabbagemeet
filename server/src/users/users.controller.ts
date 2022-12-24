@@ -39,8 +39,8 @@ import {
   OAuth2NotConfiguredError,
 } from '../oauth2/oauth2-common';
 import EditUserDto from './edit-user.dto';
+import LinkExternalCalendarDto from './link-external-calendar.dto'
 import OAuth2CalendarEventsResponse from './oauth2-calendar-events.response';
-import LinkExternalCalendarDto from './link-external-calendar.dto';
 import { MeetingsShortResponse } from '../meetings/meeting-short-response';
 import UserResponse from './user-response';
 import User from './user.entity';
@@ -119,7 +119,7 @@ export class UsersController {
   @Delete()
   @HttpCode(HttpStatus.NO_CONTENT)
   async deleteUser(@AuthUser() user: User) {
-    await this.usersService.deleteUser(user.ID);
+    await this.usersService.deleteUser(user);
   }
 
   @ApiOperation({
@@ -166,7 +166,11 @@ export class UsersController {
     try {
       const redirectURL = await this.oauth2Service.getRequestURL(
         providerType,
-        { reason: 'link', postRedirect: body.post_redirect, userID: user.ID },
+        {
+          reason: 'link',
+          postRedirect: body.post_redirect,
+          userID: user.ID,
+        },
         true,
       );
       return { redirect: redirectURL };
@@ -216,7 +220,8 @@ export class UsersController {
     providerType: OAuth2ProviderType,
     user: User,
   ): Promise<UserResponse> {
-    await this.oauth2Service.unlinkAccount(providerType, user.ID);
+    await this.oauth2Service.unlinkAccount(providerType, user);
+    // TODO: avoid extra DB lookup
     const updatedUser = await this.usersService.findOneByID(user.ID);
     return UserToUserResponse(updatedUser);
   }

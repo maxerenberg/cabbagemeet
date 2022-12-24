@@ -9,6 +9,7 @@ describe('AuthController (e2e)', () => {
 
   beforeAll(async () => { app = await commonBeforeAll(); });
   beforeEach(commonBeforeEach);
+  afterAll(() => commonAfterAll(app));
 
   it('/api/signup (POST)', async () => {
     await POST('/api/signup', app)
@@ -105,5 +106,14 @@ http://cabbagemeet.internal/confirm-password-reset?pwresetToken=`
       .expect(HttpStatus.OK);
   });
 
-  afterAll(() => commonAfterAll(app));
+  it.each([
+    {signupOrLogin: 'signup', provider: 'google'},
+    {signupOrLogin: 'signup', provider: 'microsoft'},
+    {signupOrLogin: 'login', provider: 'google'},
+    {signupOrLogin: 'login', provider: 'microsoft'},
+  ])('/api/(signup|login)-with-(google|microsoft) (POST)', ({signupOrLogin, provider}) => {
+    return POST(`/api/${signupOrLogin}-with-${provider}`, app)
+      .send({post_redirect: '/', nonce: 'abcdef'})
+      .expect(HttpStatus.SERVICE_UNAVAILABLE);
+  });
 });

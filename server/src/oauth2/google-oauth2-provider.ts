@@ -42,7 +42,7 @@ const googleOidcScopes = [
   'https://www.googleapis.com/auth/userinfo.email',
 ];
 const googleCalendarScopes = [
-  'https://www.googleapis.com/auth/calendar.readonly',
+  // See https://developers.google.com/identity/protocols/oauth2/scopes#calendar
   'https://www.googleapis.com/auth/calendar.events.owned',
 ];
 const oauth2Config: OAuth2Config = {

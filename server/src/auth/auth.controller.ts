@@ -3,7 +3,6 @@ import {
   Post,
   Body,
   UnauthorizedException,
-  NotFoundException,
   HttpCode,
   HttpException,
   HttpStatus,
@@ -302,8 +301,9 @@ export class AuthController {
     } catch (err: any) {
       if (err instanceof OAuth2NotConfiguredError) {
         const providerName = oauth2ProviderNamesMap[providerType];
-        throw new NotFoundException(
-          `${providerName} OAuth2 is not configured on this server`,
+        throw new HttpException(
+          `${providerName} OAuth2 is not available on this server`,
+          HttpStatus.SERVICE_UNAVAILABLE,
         );
       }
       throw err;

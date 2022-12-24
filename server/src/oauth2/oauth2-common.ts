@@ -49,19 +49,18 @@ export type AbstractOAuth2CalendarCreatedEvent =
   | MicrosoftCalendarCreatedEvent;
 export const oauth2Reasons = ['link', 'signup', 'login'] as const;
 
-export class OAuth2NotConfiguredError extends Error {}
+export class OAuth2NotConfiguredError extends Error { constructor() { super('OAuth2 not configured'); } }
 export class OAuth2ErrorResponseError extends Error {
   constructor(public statusCode: number, public errorCode?: string) {
     super();
   }
 }
 // TODO: replace these with a single class and an enum argument
-export class OAuth2InvalidStateError extends Error {}
-export class OAuth2InvalidOrExpiredNonceError extends Error {}
-export class OAuth2NoRefreshTokenError extends Error {}
-export class OAuth2NotAllScopesGrantedError extends Error {}
-export class OAuth2AccountAlreadyLinkedError extends Error {}
-export class OAuth2AccountNotLinkedError extends Error {}
+export class OAuth2InvalidStateError extends Error { constructor() { super('OAuth2 invalid state'); } }
+export class OAuth2InvalidOrExpiredNonceError extends Error { constructor() { super('OAuth2 invalid or expired nonce'); } }
+export class OAuth2NoRefreshTokenError extends Error { constructor() { super('OAuth2 no refresh token'); } }
+export class OAuth2NotAllScopesGrantedError extends Error { constructor() { super('OAuth2 not all scopes granted'); } }
+export class OAuth2AccountAlreadyLinkedError extends Error { constructor() { super('OAuth2 account already linked'); } }
 
 export type OAuth2CalendarEvent = {
   ID: string;

@@ -1,3 +1,5 @@
+import { sign as jwtSignCb } from 'jsonwebtoken';
+
 export function assert(condition: any, message?: string): asserts condition {
   if (!condition) {
     throw new Error(message ?? 'Assertion failed');
@@ -32,4 +34,20 @@ export function sleep(millis: number): Promise<void> {
 export function capitalize(s: string): string {
   s = s.toLowerCase();
   return s.charAt(0).toUpperCase() + s.slice(1);
+}
+
+export function jwtSign(
+  payload: Parameters<typeof jwtSignCb>[0],
+  secretOrPrivateKey: Parameters<typeof jwtSignCb>[1],
+  options?: Parameters<typeof jwtSignCb>[2],
+): Promise<string> {
+  return new Promise((resolve, reject) => {
+    jwtSignCb(payload, secretOrPrivateKey, options, (err, token) => {
+      if (err) {
+        reject(err);
+      } else {
+        resolve(token);
+      }
+    });
+  });
 }

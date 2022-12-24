@@ -361,7 +361,7 @@ export type ScheduleMeetingApiArg = {
 };
 export type UnscheduleMeetingApiResponse = /** status 200  */ MeetingResponse;
 export type UnscheduleMeetingApiArg = number;
-export type AddGuestRespondentApiResponse = /** status 200  */ MeetingResponse;
+export type AddGuestRespondentApiResponse = /** status 201  */ MeetingResponse;
 export type AddGuestRespondentApiArg = {
   id: number;
   addGuestRespondentDto: AddGuestRespondentDto;

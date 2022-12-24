@@ -36,6 +36,7 @@ describe('MeetingsController (e2e)', () => {
     app = await commonBeforeAll({VERIFY_SIGNUP_EMAIL_ADDRESS: 'false'});
   });
   beforeEach(commonBeforeEach);
+  afterAll(() => commonAfterAll(app));
 
   const sampleCreateMeetingDto: CreateMeetingDto = {
     name: 'My meeting',
@@ -49,6 +50,7 @@ describe('MeetingsController (e2e)', () => {
     startDateTime: '2022-12-22T02:00:00Z',
     endDateTime: '2022-12-22T05:00:00Z',
   };
+  Object.freeze(sampleSchedule);
 
   it('/api/meetings (POST) (guest)', async () => {
     const reqBody = sampleCreateMeetingDto;
@@ -437,7 +439,72 @@ CabbageMeet | http://cabbagemeet.internal
     await waitForEmailMessages(emailDelayMs);
     // If a meeting is scheduled a second time, no new notifications should be sent
     expect(smtpMessages).toHaveLength(1);
-  })
+  });
 
-  afterAll(() => commonAfterAll(app));
+  it('/api/me/(created|responded)-meetings (GET)', async () => {
+    const {token: token1} = await createUser(app);
+    const {token: token2} = await createUser(app);
+    const createMeetingDto = {...sampleCreateMeetingDto, about: ''};
+    const {meetingID: meetingID1} = await createMeeting(createMeetingDto, app, token1);
+    const {meetingID: meetingID2} = await createMeeting(createMeetingDto, app, token1);
+    await putSelfRespondent({availabilities: []}, meetingID2, app, token1);
+    await putSelfRespondent({availabilities: []}, meetingID1, app, token2);
+    await scheduleMeeting(meetingID2, sampleSchedule, app, token1);
+    const {meetingID: meetingID3} = await createMeeting(createMeetingDto, app, token2);
+    const {meetingID: meetingID4} = await createMeeting(createMeetingDto, app, token2);
+    await putSelfRespondent({availabilities: []}, meetingID3, app, token1);
+    await putSelfRespondent({availabilities: []}, meetingID4, app, token1);
+    await scheduleMeeting(meetingID4, sampleSchedule, app, token2);
+    await GET('/api/me/created-meetings', app, token1)
+      .expect(HttpStatus.OK)
+      .expect({
+        // Order should be by descending ID (= descending creation date)
+        meetings: [
+          {
+            meetingID: meetingID2,
+            scheduledStartDateTime: sampleSchedule.startDateTime,
+            scheduledEndDateTime: sampleSchedule.endDateTime,
+            ...createMeetingDto,
+          },
+          {
+            meetingID: meetingID1,
+            ...createMeetingDto,
+          },
+        ]
+      });
+    await GET('/api/me/responded-meetings', app, token1)
+      .expect(HttpStatus.OK)
+      .expect({
+        meetings: [
+          {
+            meetingID: meetingID4,
+            scheduledStartDateTime: sampleSchedule.startDateTime,
+            scheduledEndDateTime: sampleSchedule.endDateTime,
+            ...createMeetingDto,
+          },
+          {
+            meetingID: meetingID3,
+            ...createMeetingDto,
+          },
+          {
+            meetingID: meetingID2,
+            scheduledStartDateTime: sampleSchedule.startDateTime,
+            scheduledEndDateTime: sampleSchedule.endDateTime,
+            ...createMeetingDto,
+          },
+        ]
+      });
+  });
+
+  it('meetings and responses of deleted user also get deleted', async () => {
+    const {token} = await createUser(app);
+    const {meetingID: meetingID1} = await createMeeting(sampleCreateMeetingDto, app, token);
+    const {meetingID: meetingID2} = await createMeeting(sampleCreateMeetingDto, app);
+    await putSelfRespondent({availabilities: []}, meetingID2, app, token);
+    await DELETE('/api/me', app, token).expect(HttpStatus.NO_CONTENT);
+    await GET('/api/meetings/' + meetingID1, app).expect(HttpStatus.NOT_FOUND);
+    const {body: meeting2} = await GET('/api/meetings/' + meetingID2, app)
+      .expect(HttpStatus.OK);
+    expect(meeting2.respondents).toHaveLength(0);
+  });
 });

@@ -37,7 +37,7 @@ export default function DeleteRespondentModal({
       id: meetingID,
       respondentId: respondentID,
     });
-  }, [meetingID, respondentID]);
+  }, [deleteRespondent, meetingID, respondentID]);
 
   return (
     <ConfirmationModal

@@ -1,22 +1,24 @@
 import { Injectable, Logger } from '@nestjs/common';
-import ConfigService from '../config/config.service';
 import { InjectRepository } from '@nestjs/typeorm';
 import * as jwt from 'jsonwebtoken';
 import { request } from 'undici';
 import GoogleOAuth2 from './google-oauth2.entity';
 import { DataSource, Repository } from 'typeorm';
 import CacherService from '../cacher/cacher.service';
+import ConfigService from '../config/config.service';
+import type { DatabaseType } from '../config/env.validation';
 import { normalizeDBError, UniqueConstraintFailed } from '../database.utils';
-import User from '../users/user.entity';
+import { getSecondsSinceUnixEpoch } from '../dates.utils';
+import Meeting from '../meetings/meeting.entity';
+import MeetingsService from '../meetings/meetings.service';
 import { assert, encodeQueryParams } from '../misc.utils';
+import User from '../users/user.entity';
 import { selectUserLeftJoinOAuth2Tables } from '../users/users.service';
 import type {
   OIDCResponse,
   DecodedIDToken,
   RefreshTokenResponse,
 } from './oauth2-response-types';
-import { getSecondsSinceUnixEpoch } from '../dates.utils';
-import MeetingsService from '../meetings/meetings.service';
 import GoogleCalendarEvents from './google-calendar-events.entity';
 import {
   AbstractOAuth2CalendarCreatedEvent,
@@ -26,7 +28,6 @@ import {
   oauth2TableNamesMap,
 } from './oauth2-common';
 import GoogleCalendarCreatedEvent from './google-calendar-created-event.entity';
-import Meeting from '../meetings/meeting.entity';
 import {
   oauth2Reasons,
   OAuth2ProviderType,
@@ -164,6 +165,7 @@ export interface IOAuth2Provider {
 @Injectable()
 export default class OAuth2Service {
   private readonly logger = new Logger(OAuth2Service.name);
+  private readonly dbType: DatabaseType;
   private readonly oauth2Providers: Record<OAuth2ProviderType, IOAuth2Provider>;
   private readonly oauth2Repositories: Record<
     OAuth2ProviderType,
@@ -189,6 +191,7 @@ export default class OAuth2Service {
     @InjectRepository(MicrosoftCalendarCreatedEvent)
     microsoftCalendarCreatedEventsRepository: Repository<MicrosoftCalendarCreatedEvent>,
   ) {
+    this.dbType = configService.get('DATABASE_TYPE');
     this.oauth2Providers = {
       [OAuth2ProviderType.GOOGLE]: new GoogleOAuth2Provider(
         configService,
@@ -389,7 +392,7 @@ export default class OAuth2Service {
     code: string,
     state: OAuth2State,
   ): Promise<OIDCLoginResult> {
-    assert(state.reason === 'login');
+    assert(state.reason === 'login', `state.reason = '${state.reason}', expected 'login'`);
     const provider = this.getProvider(providerType);
     const oauth2ClassName = oauth2EntityClasses[providerType].name;
     const oauth2Repository = this.oauth2Repositories[providerType];
@@ -525,11 +528,11 @@ export default class OAuth2Service {
     data: OIDCResponse,
   ) {
     if (!data.refresh_token) {
-      this.logger.error('Refresh token was not present');
+      this.logger.log('Refresh token was not present');
       throw new OAuth2NoRefreshTokenError();
     }
     if (!this.allRequestedScopesArePresent(provider, data.scope)) {
-      this.logger.error('Not all requested scopes were present: ' + data.scope);
+      this.logger.log('Not all requested scopes were present: ' + data.scope);
       throw new OAuth2NotAllScopesGrantedError();
     }
   }
@@ -681,15 +684,14 @@ export default class OAuth2Service {
     }
   }
 
-  async unlinkAccount(providerType: OAuth2ProviderType, userID: number) {
+  async unlinkAccount(providerType: OAuth2ProviderType, user: User, deletingAccount = false) {
     const provider = this.getProvider(providerType);
     const oauth2Repository = this.oauth2Repositories[providerType];
-    const creds = await oauth2Repository.findOneBy({ UserID: userID });
+    const creds = await oauth2Repository.findOneBy({ UserID: user.ID });
     if (!creds) {
       return;
     }
-    const user = await this.usersRepository.findOneBy({ ID: userID })!;
-    if (!user.PasswordHash) {
+    if (!user.PasswordHash && !deletingAccount) {
       // We want to make sure that the user has at least one way to sign in.
       // If they originally signed up via an OAuth2 provider, then we'll delete
       // the calendar data, but keep the OAuth2 token so that they can still sign in.
@@ -699,10 +701,10 @@ export default class OAuth2Service {
       await this.dataSource.transaction(async (manager) => {
         await manager.update(
           oauth2EntityClass,
-          { UserID: userID },
+          { UserID: user.ID },
           { LinkedCalendar: false },
         );
-        await manager.delete(calendarEventsEntityClass, { UserID: userID });
+        await manager.delete(calendarEventsEntityClass, { UserID: user.ID });
       });
       return;
     }
@@ -716,13 +718,13 @@ export default class OAuth2Service {
         headers: { 'content-type': 'application/x-www-form-urlencoded' },
       });
     }
-    await oauth2Repository.delete(userID);
+    await oauth2Repository.delete(user.ID);
   }
 
-  async unlinkAllOAuth2Accounts(userID: number) {
+  async unlinkAllOAuth2AccountsForDeletion(user: User) {
     const results = await Promise.allSettled(
       this.getSupportedProviders().map((provider) =>
-        this.unlinkAccount(provider.type, userID),
+        this.unlinkAccount(provider.type, user, true),
       ),
     );
     for (const result of results) {
@@ -753,10 +755,8 @@ export default class OAuth2Service {
     provider: IOAuth2Provider,
     meetingID: number,
   ): Promise<AbstractOAuth2[]> {
-    // We could use a placeholder in our raw SQL query, but the syntax
-    // depends on the DB Type (e.g. '?' vs '$1'), and it's only a single
-    // number anyways
-    assert(typeof meetingID === 'number');
+    const [placeholder1, placeholder2] = this.dbType === 'postgres'
+      ? ['$1', '$2'] : ['?', '?'];
     const providerName = oauth2ProviderNamesMap[provider.type];
     const eventIDColumnName = `Created${providerName}MeetingID`;
     const oauth2TableName = oauth2TableNamesMap[provider.type];
@@ -776,12 +776,12 @@ export default class OAuth2Service {
       SELECT ${selectCols} FROM ${oauth2TableName}
       INNER JOIN MeetingRespondent
         ON ${oauth2TableName}.UserID = MeetingRespondent.UserID
-        AND MeetingRespondent.MeetingID = ${meetingID}
+        AND MeetingRespondent.MeetingID = ${placeholder1}
       LEFT JOIN ${createdEventTableName}
         ON ${oauth2TableName}.UserID = ${createdEventTableName}.UserID
-        AND ${createdEventTableName}.MeetingID = ${meetingID}
+        AND ${createdEventTableName}.MeetingID = ${placeholder2}
       WHERE ${oauth2TableName}.LinkedCalendar
-    `);
+    `, [meetingID, meetingID]);
     const result: any[] = [];
     for (const row of rows) {
       const {[eventIDColumnName]: eventID, ...entity} = row;

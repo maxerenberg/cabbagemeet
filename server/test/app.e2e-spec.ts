@@ -14,8 +14,8 @@ describe('AppController (e2e)', () => {
       .get('/api/server-info')
       .expect(HttpStatus.OK)
       .expect({
-        googleOAuth2IsSupported: !!process.env.OAUTH2_GOOGLE_CLIENT_ID,
-        microsoftOAuth2IsSupported: !!process.env.OAUTH2_MICROSOFT_CLIENT_ID,
+        googleOAuth2IsSupported: false,
+        microsoftOAuth2IsSupported: false,
       });
   });
 

@@ -18,8 +18,9 @@ import { assert, sleep } from '../src/misc.utils';
 import type EditUserDto from '../src/users/edit-user.dto';
 import type UserResponse from '../src/users/user-response';
 import type { UserResponseWithToken } from '../src/users/user-response';
+import type { EnvironmentVariables } from 'src/config/env.validation';
 
-export async function commonBeforeAll(envOverride?: Record<string, string>): Promise<NestExpressApplication> {
+export async function commonBeforeAll(envOverride?: Partial<EnvironmentVariables>): Promise<NestExpressApplication> {
   // TODO: save and restore env vars before/after tests
   if (envOverride) {
     Object.assign(process.env, envOverride);
@@ -244,9 +245,9 @@ export function PUT(apiPath: string, app: INestApplication, token?: string) {
 
 let userCounter = 1;
 // VERIFY_SIGNUP_EMAIL_ADDRESS must be set to false to use this function
-export async function createUser(app: INestApplication): Promise<UserResponseWithToken> {
-  const name = 'Test ' + userCounter;
-  const email = 'test' + userCounter + '@example.com';
+export async function createUser(app: INestApplication, options?: {name?: string, email?: string}): Promise<UserResponseWithToken> {
+  const name = options?.name ?? 'Test ' + userCounter;
+  const email = options?.email ?? 'test' + userCounter + '@example.com';
   const password = 'abcdef';
   userCounter++;
   const {body} = await POST('/api/signup', app)

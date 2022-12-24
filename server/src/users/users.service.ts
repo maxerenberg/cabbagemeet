@@ -83,10 +83,10 @@ export default class UsersService {
     }
   }
 
-  async deleteUser(userID: number): Promise<void> {
+  async deleteUser(user: User): Promise<void> {
     // Revoke and delete any OAuth2 credentials which we've stored for this user
-    await this.oauth2Service.unlinkAllOAuth2Accounts(userID);
-    await this.userRepository.delete(userID);
+    await this.oauth2Service.unlinkAllOAuth2AccountsForDeletion(user);
+    await this.userRepository.delete(user.ID);
   }
 
   async editUser(userID: number, userInfo: Partial<User>): Promise<User> {
