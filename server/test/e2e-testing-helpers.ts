@@ -104,30 +104,31 @@ async function createDB() {
   }
 }
 
-// async function deleteAllDataFromDB(datasource: DataSource) {
-//   // All other tables have foreign key constraints to these two with
-//   // ON DELETE CASCADE
-//   await datasource.query('DELETE FROM User');
-//   await datasource.query('DELETE FROM Meeting');
-// }
+export async function deleteAllDataFromDB(datasource: DataSource) {
+  // All other tables have foreign key constraints to these two with
+  // ON DELETE CASCADE
+  await datasource.query('DELETE FROM User');
+  await datasource.query('DELETE FROM Meeting');
+}
 
 async function dropDB() {
+  if (process.env.DATABASE_TYPE === 'sqlite') {
+    return;
+  }
   const datasource = getDatasourceForSuperuser();
   await datasource.initialize();
-  if (process.env.DATABASE_TYPE === 'sqlite') {
-    // Looks like the tables disappear on their own when using :memory:?
-    //await deleteAllDataFromDB(datasource);
-  } else {
-    let databaseName: string | undefined;
-    if (process.env.DATABASE_TYPE === 'postgres') {
-      databaseName = process.env.POSTGRES_DATABASE;
-    } else if (process.env.DATABASE_TYPE === 'mariadb') {
-      databaseName = process.env.MYSQL_DATABASE;
-    }
+  let databaseName: string | undefined;
+  if (process.env.DATABASE_TYPE === 'postgres') {
+    databaseName = process.env.POSTGRES_DATABASE;
+  } else if (process.env.DATABASE_TYPE === 'mariadb') {
+    databaseName = process.env.MYSQL_DATABASE;
+  }
+  try {
     assert(databaseName !== undefined);
     await datasource.query(`DROP DATABASE ${databaseName}`);
+  } finally {
+    await datasource.destroy();
   }
-  await datasource.destroy();
 }
 
 type SmtpMessage = {

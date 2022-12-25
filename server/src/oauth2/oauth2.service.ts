@@ -243,7 +243,7 @@ export default class OAuth2Service {
       ) {
         errorCodeStr = errorBody.error;
       }
-      this.logger.error(`statusCode=${statusCode} body=${errorText}`);
+      this.logger.log(`statusCode=${statusCode} body=${errorText}`);
       throw new OAuth2ErrorResponseError(statusCode, errorCodeStr);
     }
     return response;
@@ -562,7 +562,7 @@ export default class OAuth2Service {
       });
       return newUser;
     } catch (err: any) {
-      err = normalizeDBError(err as Error);
+      err = normalizeDBError(err as Error, this.dbType);
       if (err instanceof UniqueConstraintFailed) {
         throw new OAuth2AccountAlreadyLinkedError();
       }
@@ -584,7 +584,7 @@ export default class OAuth2Service {
         this.createPartialOAuth2Entity(userID, data, decodedIDToken),
       );
     } catch (err: any) {
-      err = normalizeDBError(err as Error);
+      err = normalizeDBError(err as Error, this.dbType);
       if (err instanceof UniqueConstraintFailed) {
         throw new OAuth2AccountAlreadyLinkedError();
       }
@@ -603,7 +603,7 @@ export default class OAuth2Service {
       await repository.insert(oauth2Entity);
       provider.setLinkedCalendarToTrue(user);
     } catch (err: any) {
-      err = normalizeDBError(err as Error);
+      err = normalizeDBError(err as Error, this.dbType);
       if (err instanceof UniqueConstraintFailed) {
         throw new OAuth2AccountAlreadyLinkedError();
       }

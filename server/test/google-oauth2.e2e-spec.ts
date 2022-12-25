@@ -2,7 +2,8 @@ import { URL } from 'url';
 import { jest } from '@jest/globals';
 import { HttpStatus, INestApplication } from '@nestjs/common';
 import type { NestExpressApplication } from '@nestjs/platform-express';
-import type { Dispatcher } from 'undici';
+import { MockAgent, getGlobalDispatcher, setGlobalDispatcher } from 'undici';
+import { MockInterceptor } from 'undici/types/mock-interceptor';
 import type { CustomRedirectResponse } from '../src/common-responses';
 import { getSecondsSinceUnixEpoch } from '../src/dates.utils';
 import type CreateMeetingDto from '../src/meetings/create-meeting.dto';
@@ -25,49 +26,37 @@ import {
   unscheduleMeeting,
 } from './e2e-testing-helpers';
 
-type MockRequestHandlerCoreReturnType = {
-  statusCode: number;
-  body: any;
-};
-type MockRequestHandlerType = (url: string, options?: Dispatcher.DispatchOptions) =>
-  MockRequestHandlerCoreReturnType | undefined | Promise<MockRequestHandlerCoreReturnType | undefined>;
-let mockRequestHandler: MockRequestHandlerType | undefined;
-function setMockRequestHandler(handler: MockRequestHandlerType) {
-  mockRequestHandler = handler;
+// WARNING: do not use jest.mock() because it loads some modules twice,
+// causing the `instanceof` operator to *occasionally* fail.
+// Also see https://github.com/facebook/jest/issues/9669.
+const originalGlobalDispatcher = getGlobalDispatcher();
+let mockAgent: MockAgent;
+
+function createMockJsonResponse(data: object): ReturnType<MockInterceptor.MockReplyOptionsCallback<object>> {
+  return {
+    statusCode: 200,
+    responseOptions: {
+      headers: {'content-type': 'application/json; charset=UTF-8'},
+    },
+    data,
+  };
 }
 
-// calling this inside the describe() block doesn't seem to work
-jest.mock('undici', () => ({
-  async request(...args: Parameters<MockRequestHandlerType>) {
-    let mockResult = mockRequestHandler(...args);
-    if (mockResult instanceof Promise) {
-      mockResult = await mockResult;
-    }
-    if (mockResult === undefined) {
-      console.error('Did not handle request: ', ...args);
-      throw new Error('Aborting...');
-    }
-    if (!mockResult.body) {
-      // e.g. NO_CONTENT response
-      return {
-        statusCode: mockResult.statusCode,
-        headers: {'content-type': 'text/plain'},
-        body: {
-          text: () => new Promise(resolve => resolve('')),
-          json: () => new Promise((resolve, reject) => reject('should not call .json() here')),
-        },
-      };
-    }
-    return {
-      statusCode: mockResult.statusCode,
-      headers: {'content-type': 'application/json; charset=UTF-8'},
-      body: {
-        text: () => new Promise(resolve => resolve(JSON.stringify((mockResult as MockRequestHandlerCoreReturnType).body))),
-        json: () => new Promise(resolve => resolve((mockResult as MockRequestHandlerCoreReturnType).body)),
-      },
-    };
-  }
-}));
+function interceptGetEventsApi(
+  cb: (req: {
+    params: Record<string, string>,
+    headers: Record<string, string>,
+  }) => ReturnType<MockInterceptor.MockReplyOptionsCallback<object>>,
+) {
+  return mockAgent.get(apiBaseUrl).intercept({
+    path: path => path.startsWith(eventsApiPath + '?'),
+    method: 'GET',
+  }).reply(({headers, path}) => {
+    // +1 is for the '?'
+    const params = decodeQueryParams(path.slice(eventsApiPath.length + 1));
+    return cb({params, headers: headers as Record<string, string>});
+  });
+}
 
 function decodeQueryParams(queryString: string): Record<string, string> {
   const result: Record<string, string> = {};
@@ -79,9 +68,9 @@ function decodeQueryParams(queryString: string): Record<string, string> {
 }
 
 const authzEndpointPrefix = 'https://accounts.google.com/o/oauth2/v2/auth?';
-const tokenEndpoint = 'https://oauth2.googleapis.com/token';
-const eventsApi = 'https://www.googleapis.com/calendar/v3/calendars/primary/events';
-const eventsApiPrefix = eventsApi + '?';
+const apiBaseUrl = 'https://www.googleapis.com';
+const eventsApiPath = '/calendar/v3/calendars/primary/events';
+const oauth2ApiBaseUrl = 'https://oauth2.googleapis.com';
 const allScopes = 'openid https://www.googleapis.com/auth/calendar.events.owned https://www.googleapis.com/auth/userinfo.profile https://www.googleapis.com/auth/userinfo.email';
 const nonce = 'abcdef';
 const mockClientId = 'google_client_id';
@@ -103,7 +92,7 @@ async function signupOrLoginOrLink(reason: 'signup' | 'login' | 'link', app: INe
   await POST(apiURL, app, token)
     .send(requestBody)
     .expect(HttpStatus.OK);
-  expect(redirect.startsWith(authzEndpointPrefix));
+  expect(redirect.startsWith(authzEndpointPrefix)).toBe(true);
   const params = Object.fromEntries(new URL(redirect).searchParams.entries());
   const expectedAuthzParams: Record<string, string> = {
     client_id: mockClientId,
@@ -168,7 +157,7 @@ async function createTokenResponse({
   return body;
 }
 
-function setMockHandlerForTokenEndpoint({
+async function setMockHandlerForTokenEndpoint({
   sub, name, email,
   access_token = 'google_access_token',
   refresh_token = 'google_refresh_token',
@@ -178,30 +167,26 @@ function setMockHandlerForTokenEndpoint({
   access_token?: string, refresh_token?: string | null,
   scope?: string,
 }) {
-  setMockRequestHandler(async (url, options) => {
-    if (url !== 'https://oauth2.googleapis.com/token') {
-      return undefined;
-    }
-    expect(options).toEqual({
-      method: 'POST',
-      body: options.body,
-      headers: {'content-type': 'application/x-www-form-urlencoded'},
-    });
-    expect(Object.fromEntries(new URLSearchParams(options.body as string))).toEqual({
-      client_id: mockClientId,
-      redirect_uri: mockRedirectUri,
-      client_secret: mockClientSecret,
-      code: mockAuthzCode,
-      grant_type: 'authorization_code',
-    });
-    const body = await createTokenResponse({
-      sub, name, email, access_token, refresh_token, scope
-    });
-    return {
-      statusCode: 200,
-      body,
-    };
+  const mockResponseBody = await createTokenResponse({
+    sub, name, email, access_token, refresh_token, scope
   });
+  mockAgent.get(oauth2ApiBaseUrl).intercept({
+    path: '/token',
+    method: 'POST',
+    headers: {'content-type': 'application/x-www-form-urlencoded'},
+    body: (body) => {
+      // Use `expect` instead of an actual matcher so that we get a nicer
+      // error message if a test fails
+      expect(Object.fromEntries(new URLSearchParams(body))).toEqual({
+        client_id: mockClientId,
+        redirect_uri: mockRedirectUri,
+        client_secret: mockClientSecret,
+        code: mockAuthzCode,
+        grant_type: 'authorization_code',
+      });
+      return true;
+    },
+  }).reply(200, mockResponseBody);
 }
 
 function setMockHandlerForRevokeEndpoint(
@@ -212,23 +197,19 @@ function setMockHandlerForRevokeEndpoint(
   },
   cb?: () => void,
 ) {
-  setMockRequestHandler(async (url, options) => {
-    if (url !== 'https://oauth2.googleapis.com/revoke') {
-      return undefined;
-    }
-    expect(options).toEqual({
-      method: 'POST',
-      body: options.body,
-      headers: {'content-type': 'application/x-www-form-urlencoded'},
-    });
-    expect(Object.fromEntries(new URLSearchParams(options.body as string))).toEqual({
-      token: refresh_token,
-    });
+  mockAgent.get(oauth2ApiBaseUrl).intercept({
+    path: '/revoke',
+    method: 'POST',
+    headers: {'content-type': 'application/x-www-form-urlencoded'},
+    body: (body) => {
+      expect(Object.fromEntries(new URLSearchParams(body))).toEqual({
+        token: refresh_token,
+      });
+      return true;
+    },
+  }).reply(204, () => {
     if (cb) cb();
-    return {
-      statusCode: 204,
-      body: undefined,
-    };
+    return '';
   });
 }
 
@@ -250,11 +231,11 @@ async function unlinkAccountAndExpectTokenToBeRevoked(app: INestApplication, tok
 
 async function signupNewUserWithGoogle({sub, name, email}: {sub: string, name: string, email: string}, app: INestApplication): Promise<string> {
   const redirect = await signupOrLoginOrLink('signup', app);
-  setMockHandlerForTokenEndpoint({sub, name, email});
+  await setMockHandlerForTokenEndpoint({sub, name, email});
   const redirect2 = (
     await GET(redirect, app).expect(HttpStatus.FOUND)
   ).headers.location as string;
-  expect(redirect2.startsWith('/?'));
+  expect(redirect2.startsWith('/?')).toBe(true);
   const redirect2Params = decodeQueryParams(redirect2.slice(2));
   expect(redirect2Params).toEqual({
     token: redirect2Params.token,
@@ -265,7 +246,7 @@ async function signupNewUserWithGoogle({sub, name, email}: {sub: string, name: s
 
 describe('OAuth2Controller (e2e)', () => {
   let app: NestExpressApplication;
-  let token1: string | undefined;
+  let token1: string;
   const mockSub1 = '000001';
   const mockEmail1 = 'test1@gmail.com';
   const mockName1 = 'Test 1';
@@ -299,7 +280,16 @@ describe('OAuth2Controller (e2e)', () => {
   afterAll(() => commonAfterAll(app));
 
   beforeEach(() => {
-    setMockRequestHandler(() => undefined);
+    // See https://undici.nodejs.org/#/docs/best-practices/mocking-request
+    mockAgent = new MockAgent();
+    mockAgent.disableNetConnect();
+    setGlobalDispatcher(mockAgent);
+  });
+  afterEach(async () => {
+    await mockAgent.close();
+  });
+  afterAll(() => {
+    setGlobalDispatcher(originalGlobalDispatcher);
   });
 
   it('/api/signup-with-google (POST)', async () => {
@@ -319,7 +309,7 @@ describe('OAuth2Controller (e2e)', () => {
   it('/api/signup-with-google (POST) (account already exists)', async () => {
     expect(token1).toBeDefined();
     const redirect = await signupOrLoginOrLink('signup', app);
-    setMockHandlerForTokenEndpoint({sub: mockSub1, name: mockName1, email: mockEmail1});
+    await setMockHandlerForTokenEndpoint({sub: mockSub1, name: mockName1, email: mockEmail1});
     const redirect2 = (
       await GET(redirect, app).expect(HttpStatus.FOUND)
     ).headers.location as string;
@@ -328,7 +318,7 @@ describe('OAuth2Controller (e2e)', () => {
 
   it('/api/signup-with-google (POST) (not all scopes granted)', async () => {
     const redirect = await signupOrLoginOrLink('signup', app);
-    setMockHandlerForTokenEndpoint({
+    await setMockHandlerForTokenEndpoint({
       sub: mockSub2, name: mockName2, email: mockEmail2,
       // missing Calendar API scope
       scope: 'openid https://www.googleapis.com/auth/userinfo.profile https://www.googleapis.com/auth/userinfo.email',
@@ -340,7 +330,7 @@ describe('OAuth2Controller (e2e)', () => {
 
   it('/api/login-with-google (POST) (user does not exist, no refresh token)', async () => {
     const redirect = await signupOrLoginOrLink('login', app);
-    setMockHandlerForTokenEndpoint({
+    await setMockHandlerForTokenEndpoint({
       sub: mockSub2, name: mockName2, email: mockEmail2,
       refresh_token: null,
     });
@@ -351,7 +341,7 @@ describe('OAuth2Controller (e2e)', () => {
     expect(redirect2.startsWith(authzEndpointPrefix)).toBe(true);
     const params = Object.fromEntries(new URL(redirect2).searchParams.entries());
     expect(params.prompt).toStrictEqual('consent');
-    setMockHandlerForTokenEndpoint({sub: mockSub2, name: mockName2, email: mockEmail2});
+    await setMockHandlerForTokenEndpoint({sub: mockSub2, name: mockName2, email: mockEmail2});
     const redirect3 = (
       await GET(`/redirect/google?code=${mockAuthzCode}&state=${params.state}`, app)
         .expect(HttpStatus.FOUND)
@@ -367,11 +357,11 @@ describe('OAuth2Controller (e2e)', () => {
 
   it('/api/login-with-google (POST) (user does not exist, refresh token is present)', async () => {
     const redirect = await signupOrLoginOrLink('login', app);
-    setMockHandlerForTokenEndpoint({sub: mockSub2, name: mockName2, email: mockEmail2});
+    await setMockHandlerForTokenEndpoint({sub: mockSub2, name: mockName2, email: mockEmail2});
     const redirect2 = (
       await GET(redirect, app).expect(HttpStatus.FOUND)
     ).headers.location as string;
-    expect(redirect2.startsWith('/?'));
+    expect(redirect2.startsWith('/?')).toBe(true);
     const redirect2Params = decodeQueryParams(redirect2.slice(2));
     expect(redirect2Params).toEqual({
       token: redirect2Params.token,
@@ -384,7 +374,7 @@ describe('OAuth2Controller (e2e)', () => {
     const email = 'userExistsButNotLinkedNoRefreshToken@gmail.com';
     const {token} = await createUser(app, {email});
     const redirect = await signupOrLoginOrLink('login', app);
-    setMockHandlerForTokenEndpoint({
+    await setMockHandlerForTokenEndpoint({
       sub: '000003', name: 'Test', email,
       refresh_token: null,
     });
@@ -403,7 +393,7 @@ describe('OAuth2Controller (e2e)', () => {
     const email = 'userExistsButNotLinked@gmail.com';
     await createUser(app, {name, email});
     const redirect = await signupOrLoginOrLink('login', app);
-    setMockHandlerForTokenEndpoint({sub: '456789', name: 'Pseudonym', email});
+    await setMockHandlerForTokenEndpoint({sub: '456789', name: 'Pseudonym', email});
     const redirect2 = (
       await GET(redirect, app).expect(HttpStatus.FOUND)
     ).headers.location as string;
@@ -444,7 +434,7 @@ describe('OAuth2Controller (e2e)', () => {
       {sub: mockSub2, name: mockName2, email: mockEmail2}, app
     );
     const redirect = await signupOrLoginOrLink('login', app);
-    setMockHandlerForTokenEndpoint({
+    await setMockHandlerForTokenEndpoint({
       sub: mockSub2, name: mockName2, email: mockEmail2,
       // refresh token is not present in Google OIDC responses if the user
       // already granted consent
@@ -465,7 +455,7 @@ describe('OAuth2Controller (e2e)', () => {
   it('/api/me/link-google-calendar (POST) (no refresh token)', async () => {
     const {token} = await createUser(app, {name: mockName2, email: mockEmail2});
     const redirect = await signupOrLoginOrLink('link', app, token);
-    setMockHandlerForTokenEndpoint({
+    await setMockHandlerForTokenEndpoint({
       sub: mockSub2, name: mockName2, email: mockEmail2,
       refresh_token: null,
     });
@@ -482,7 +472,7 @@ describe('OAuth2Controller (e2e)', () => {
   it('/api/me/link-google-calendar (POST) (refresh token is present)', async () => {
     const {token} = await createUser(app, {name: mockName2, email: mockEmail2});
     const redirect = await signupOrLoginOrLink('link', app, token);
-    setMockHandlerForTokenEndpoint({sub: mockSub2, name: mockName2, email: mockEmail2});
+    await setMockHandlerForTokenEndpoint({sub: mockSub2, name: mockName2, email: mockEmail2});
     const redirect2 = (
       await GET(redirect, app).expect(HttpStatus.FOUND)
     ).headers.location as string;
@@ -495,7 +485,7 @@ describe('OAuth2Controller (e2e)', () => {
   it('/api/me/link-google-calendar (DELETE) (signed up with email)', async () => {
     const {token} = await createUser(app, {name: mockName2, email: mockEmail2});
     const redirect = await signupOrLoginOrLink('link', app, token);
-    setMockHandlerForTokenEndpoint({sub: mockSub2, name: mockName2, email: mockEmail2});
+    await setMockHandlerForTokenEndpoint({sub: mockSub2, name: mockName2, email: mockEmail2});
     await GET(redirect, app).expect(HttpStatus.FOUND);
     await unlinkAccountAndExpectTokenToBeRevoked(app, token);
     await DELETE('/api/me', app, token).expect(HttpStatus.NO_CONTENT);
@@ -543,47 +533,39 @@ describe('OAuth2Controller (e2e)', () => {
       timeMax: '2022-12-24T21:00:00Z',
     };
     // Full sync, one page
-    setMockRequestHandler((url, options) => {
-      expect(url.startsWith(eventsApiPrefix)).toBe(true);
-      const params = decodeQueryParams(url.slice(eventsApiPrefix.length));
+    interceptGetEventsApi(({params}) => {
       expect(params).toEqual(fullSyncParams);
-      expect(options).toEqual({
-        headers: {authorization: 'Bearer google_access_token'}
-      });
-      return {
-        statusCode: 200,
-        body: {
-          nextSyncToken: 'google_sync_token',
-          items: [
-            {
-              id: 'google_event_1',
-              status: 'confirmed',
-              summary: 'Google Event 1',
-              start: {
-                dateTime: '2022-12-21T11:00:00-05:00',
-                timeZone: 'America/New_York',
-              },
-              end: {
-                dateTime: '2022-12-21T11:30:00-05:00',
-                timeZone: 'America/New_York',
-              },
+      return createMockJsonResponse({
+        nextSyncToken: 'google_sync_token',
+        items: [
+          {
+            id: 'google_event_1',
+            status: 'confirmed',
+            summary: 'Google Event 1',
+            start: {
+              dateTime: '2022-12-21T11:00:00-05:00',
+              timeZone: 'America/New_York',
             },
-            {
-              id: 'google_event_2',
-              status: 'confirmed',
-              summary: 'Google Event 2',
-              start: {
-                dateTime: '2022-12-25T04:30:00+08:00',
-                timeZone: 'Asia/Shanghai',
-              },
-              end: {
-                dateTime: '2022-12-25T05:30:00+08:00',
-                timeZone: 'Asia/Shanghai',
-              },
-            }
-          ],
-        },
-      };
+            end: {
+              dateTime: '2022-12-21T11:30:00-05:00',
+              timeZone: 'America/New_York',
+            },
+          },
+          {
+            id: 'google_event_2',
+            status: 'confirmed',
+            summary: 'Google Event 2',
+            start: {
+              dateTime: '2022-12-25T04:30:00+08:00',
+              timeZone: 'Asia/Shanghai',
+            },
+            end: {
+              dateTime: '2022-12-25T05:30:00+08:00',
+              timeZone: 'Asia/Shanghai',
+            },
+          }
+        ],
+      });
     });
     const expectedResponse = {
       events: [
@@ -603,67 +585,54 @@ describe('OAuth2Controller (e2e)', () => {
       .expect(HttpStatus.OK)
       .expect(expectedResponse);
     // Incremental sync, no changes
-    setMockRequestHandler((url, options) => {
-      expect(url.startsWith(eventsApiPrefix)).toBe(true);
-      const params = decodeQueryParams(url.slice(eventsApiPrefix.length));
+    interceptGetEventsApi(({params}) => {
       expect(params).toEqual({syncToken: 'google_sync_token'});
-      expect(options).toEqual({
-        headers: {authorization: 'Bearer google_access_token'}
+      return createMockJsonResponse({
+        nextSyncToken: 'google_sync_token',
+        items: [],
       });
-      return {
-        statusCode: 200,
-        body: {
-          nextSyncToken: 'google_sync_token',
-          items: [],
-        },
-      };
     });
     await GET(`/api/me/google-calendar-events?meetingID=${meetingID}`, app, token)
       .expect(HttpStatus.OK)
       .expect(expectedResponse);
     // Incremental sync, one event removed, one event modified, one event added
-    setMockRequestHandler((url, options) => {
-      expect(url.startsWith(eventsApiPrefix)).toBe(true);
-      const params = decodeQueryParams(url.slice(eventsApiPrefix.length));
+    interceptGetEventsApi(({params}) => {
       expect(params).toEqual({syncToken: 'google_sync_token'});
-      return {
-        statusCode: 200,
-        body: {
-          nextSyncToken: 'google_sync_token_2',
-          items: [
-            {
-              id: 'google_event_2',
-              status: 'cancelled',
+      return createMockJsonResponse({
+        nextSyncToken: 'google_sync_token_2',
+        items: [
+          {
+            id: 'google_event_2',
+            status: 'cancelled',
+          },
+          {
+            id: 'google_event_1',
+            status: 'confirmed',
+            summary: 'Google Event 1',
+            start: {
+              dateTime: '2022-12-21T13:00:00-05:00',
+              timeZone: 'America/New_York',
             },
-            {
-              id: 'google_event_1',
-              status: 'confirmed',
-              summary: 'Google Event 1',
-              start: {
-                dateTime: '2022-12-21T13:00:00-05:00',
-                timeZone: 'America/New_York',
-              },
-              end: {
-                dateTime: '2022-12-21T13:30:00-05:00',
-                timeZone: 'America/New_York',
-              },
+            end: {
+              dateTime: '2022-12-21T13:30:00-05:00',
+              timeZone: 'America/New_York',
             },
-            {
-              id: 'google_event_3',
-              status: 'confirmed',
-              summary: 'Google Event 3',
-              start: {
-                dateTime: '2022-12-21T09:40:00-05:00',
-                timeZone: 'America/New_York',
-              },
-              end: {
-                dateTime: '2022-12-21T10:20:00-05:00',
-                timeZone: 'America/New_York',
-              },
+          },
+          {
+            id: 'google_event_3',
+            status: 'confirmed',
+            summary: 'Google Event 3',
+            start: {
+              dateTime: '2022-12-21T09:40:00-05:00',
+              timeZone: 'America/New_York',
             },
-          ],
-        },
-      };
+            end: {
+              dateTime: '2022-12-21T10:20:00-05:00',
+              timeZone: 'America/New_York',
+            },
+          },
+        ],
+      });
     });
     expectedResponse.events = [
       // Must be sorted by start date
@@ -682,59 +651,51 @@ describe('OAuth2Controller (e2e)', () => {
       .expect(HttpStatus.OK)
       .expect(expectedResponse);
     // Incremental sync, two events deleted, one event added, split over multiple pages
-    setMockRequestHandler((url, options) => {
-      expect(url.startsWith(eventsApiPrefix)).toBe(true);
-      const params = decodeQueryParams(url.slice(eventsApiPrefix.length));
+    interceptGetEventsApi(({params}) => {
       if (!params.hasOwnProperty('pageToken')) {
         expect(params).toEqual({syncToken: 'google_sync_token_2'});
-        return {
-          statusCode: 200,
-          body: {
-            nextPageToken: 'google_page_token',
-            items: [
-              {
-                id: 'google_event_1',
-                status: 'cancelled',
-              },
-              {
-                id: 'google_event_3',
-                status: 'cancelled',
-              },
-              // Some random event which we're not interested in (can actually happen)
-              {
-                id: 'google_event_100',
-                status: 'cancelled',
-              },
-            ],
-          },
-        };
+        return createMockJsonResponse({
+          nextPageToken: 'google_page_token',
+          items: [
+            {
+              id: 'google_event_1',
+              status: 'cancelled',
+            },
+            {
+              id: 'google_event_3',
+              status: 'cancelled',
+            },
+            // Some random event which we're not interested in (can actually happen)
+            {
+              id: 'google_event_100',
+              status: 'cancelled',
+            },
+          ],
+        });
       }
       expect(params).toEqual({
         pageToken: 'google_page_token',
         syncToken: 'google_sync_token_2',
       });
-      return {
-        statusCode: 200,
-        body: {
-          nextSyncToken: 'google_sync_token_3',
-          items: [
-            {
-              id: 'google_event_4',
-              status: 'confirmed',
-              summary: 'Google Event 4',
-              start: {
-                dateTime: '2022-12-21T23:00:00-05:00',
-                timeZone: 'America/New_York',
-              },
-              end: {
-                dateTime: '2022-12-21T23:30:00-05:00',
-                timeZone: 'America/New_York',
-              },
+      return createMockJsonResponse({
+        nextSyncToken: 'google_sync_token_3',
+        items: [
+          {
+            id: 'google_event_4',
+            status: 'confirmed',
+            summary: 'Google Event 4',
+            start: {
+              dateTime: '2022-12-21T23:00:00-05:00',
+              timeZone: 'America/New_York',
             },
-          ],
-        },
-      };
-    });
+            end: {
+              dateTime: '2022-12-21T23:30:00-05:00',
+              timeZone: 'America/New_York',
+            },
+          },
+        ],
+      });
+    }).times(2);
     expectedResponse.events = [
       {
         summary: 'Google Event 4',
@@ -746,65 +707,57 @@ describe('OAuth2Controller (e2e)', () => {
       .expect(HttpStatus.OK)
       .expect(expectedResponse);
     // Force a full sync, split over multiple pages
-    setMockRequestHandler((url, options) => {
-      expect(url.startsWith(eventsApiPrefix)).toBe(true);
-      const params = decodeQueryParams(url.slice(eventsApiPrefix.length));
+    interceptGetEventsApi(({params}) => {
       if (params.syncToken === 'google_sync_token_3') {
         return {
           statusCode: 410,
-          body: undefined,
+          data: '',
         };
       }
       if (!params.hasOwnProperty('pageToken')) {
         expect(params).toEqual(fullSyncParams);
-        return {
-          statusCode: 200,
-          body: {
-            nextPageToken: 'google_page_token_2',
-            items: [
-              {
-                id: 'google_event_5',
-                status: 'confirmed',
-                summary: 'Google Event 5',
-                start: {
-                  dateTime: '2022-12-21T22:00:00-05:00',
-                  timeZone: 'America/New_York',
-                },
-                end: {
-                  dateTime: '2022-12-22T00:00:00-05:00',
-                  timeZone: 'America/New_York',
-                },
+        return createMockJsonResponse({
+          nextPageToken: 'google_page_token_2',
+          items: [
+            {
+              id: 'google_event_5',
+              status: 'confirmed',
+              summary: 'Google Event 5',
+              start: {
+                dateTime: '2022-12-21T22:00:00-05:00',
+                timeZone: 'America/New_York',
               },
-            ],
-          },
-        };
+              end: {
+                dateTime: '2022-12-22T00:00:00-05:00',
+                timeZone: 'America/New_York',
+              },
+            },
+          ],
+        });
       }
       expect(params).toEqual({
         ...fullSyncParams,
         pageToken: 'google_page_token_2',
       });
-      return {
-        statusCode: 200,
-        body: {
-          nextSyncToken: 'google_sync_token_4',
-          items: [
-            {
-              id: 'google_event_6',
-              status: 'confirmed',
-              summary: 'Google Event 6',
-              start: {
-                dateTime: '2022-12-21T22:30:00-05:00',
-                timeZone: 'America/New_York',
-              },
-              end: {
-                dateTime: '2022-12-21T23:00:00-05:00',
-                timeZone: 'America/New_York',
-              },
+      return createMockJsonResponse({
+        nextSyncToken: 'google_sync_token_4',
+        items: [
+          {
+            id: 'google_event_6',
+            status: 'confirmed',
+            summary: 'Google Event 6',
+            start: {
+              dateTime: '2022-12-21T22:30:00-05:00',
+              timeZone: 'America/New_York',
             },
-          ],
-        },
-      };
-    });
+            end: {
+              dateTime: '2022-12-21T23:00:00-05:00',
+              timeZone: 'America/New_York',
+            },
+          },
+        ],
+      });
+    }).times(3);
     expectedResponse.events = [
       // Event 4 should have been dropped
       {
@@ -822,17 +775,12 @@ describe('OAuth2Controller (e2e)', () => {
       .expect(HttpStatus.OK)
       .expect(expectedResponse);
     // Incremental sync, no changes
-    setMockRequestHandler((url, options) => {
-      expect(url.startsWith(eventsApiPrefix)).toBe(true);
-      const params = decodeQueryParams(url.slice(eventsApiPrefix.length));
+    interceptGetEventsApi(({params}) => {
       expect(params).toEqual({syncToken: 'google_sync_token_4'});
-      return {
-        statusCode: 200,
-        body: {
-          nextSyncToken: 'google_sync_token_4',
-          items: [],
-        },
-      };
+      return createMockJsonResponse({
+        nextSyncToken: 'google_sync_token_4',
+        items: [],
+      });
     });
     await GET(`/api/me/google-calendar-events?meetingID=${meetingID}`, app, token)
       .expect(HttpStatus.OK)
@@ -852,32 +800,27 @@ describe('OAuth2Controller (e2e)', () => {
       timeMax: '2022-12-24T21:00:00Z',
     };
     // Full sync, one page
-    setMockRequestHandler((url, options) => {
-      expect(url.startsWith(eventsApiPrefix)).toBe(true);
-      const params = decodeQueryParams(url.slice(eventsApiPrefix.length));
+    interceptGetEventsApi(({params}) => {
       expect(params).toEqual(fullSyncParams);
-      return {
-        statusCode: 200,
-        body: {
-          nextSyncToken: 'google_sync_token',
-          items: [
-            {
-              id: 'google_event_1',
-              status: 'confirmed',
-              summary: 'Google Event 1',
-              start: {
-                dateTime: '2022-12-21T12:00:00-05:00',
-                timeZone: 'America/New_York',
-              },
-              end: {
-                dateTime: '2022-12-21T12:30:00-05:00',
-                timeZone: 'America/New_York',
-              },
+      return createMockJsonResponse({
+        nextSyncToken: 'google_sync_token',
+        items: [
+          {
+            id: 'google_event_1',
+            status: 'confirmed',
+            summary: 'Google Event 1',
+            start: {
+              dateTime: '2022-12-21T12:00:00-05:00',
+              timeZone: 'America/New_York',
             },
-          ],
-        },
-      };
-    });
+            end: {
+              dateTime: '2022-12-21T12:30:00-05:00',
+              timeZone: 'America/New_York',
+            },
+          },
+        ],
+      });
+    }).persist();
     const expectedResponse = {
       events: [
         {
@@ -921,40 +864,32 @@ describe('OAuth2Controller (e2e)', () => {
       {sub: mockSub2, name: mockName2, email: mockEmail2}, app
     );
     const {meetingID} = await createMeeting(sampleCreateMeetingDto, app, token);
-    setMockRequestHandler(async (url, options) => {
-      if (url === tokenEndpoint) {
-        expect(options).toEqual({
-          method: 'POST',
-          body: options.body,
-          headers: { 'content-type': 'application/x-www-form-urlencoded' },
-        });
-        const params = Object.fromEntries(new URLSearchParams(options.body as string).entries());
-        expect(params).toEqual({
-          client_id: mockClientId,
-          client_secret: mockClientSecret,
-          grant_type: 'refresh_token',
-          refresh_token: 'google_refresh_token',
-        });
-        const body = await createTokenResponse({
-          sub: mockSub2, name: mockName2, email: mockEmail2,
-          access_token: 'google_access_token_2',
-        });
-        return {
-          statusCode: 200,
-          body,
-        };
-      }
-      expect(url.startsWith(eventsApiPrefix)).toBe(true);
-      expect(options.headers).toEqual({
+    const mockResponseBody = await createTokenResponse({
+      sub: mockSub2, name: mockName2, email: mockEmail2,
+      access_token: 'google_access_token_2',
+    });
+    mockAgent.get(oauth2ApiBaseUrl).intercept({
+      path: '/token',
+      method: 'POST',
+      headers: {'content-type': 'application/x-www-form-urlencoded'},
+    }).reply(({body}) => {
+      const params = Object.fromEntries(new URLSearchParams(body as string).entries());
+      expect(params).toEqual({
+        client_id: mockClientId,
+        client_secret: mockClientSecret,
+        grant_type: 'refresh_token',
+        refresh_token: 'google_refresh_token',
+      });
+      return createMockJsonResponse(mockResponseBody);
+    });
+    interceptGetEventsApi(({headers}) => {
+      expect(headers).toEqual({
         authorization: 'Bearer google_access_token_2',
       });
-      return {
-        statusCode: 200,
-        body: {
-          nextSyncToken: 'google_sync_token',
-          items: [],
-        },
-      };
+      return createMockJsonResponse({
+        nextSyncToken: 'google_sync_token',
+        items: [],
+      });
     });
     const now = Date.now();  // milliseconds
     const originalDateNow = Date.now;
@@ -986,20 +921,16 @@ describe('OAuth2Controller (e2e)', () => {
     const setMockHandlerForCreatingOrUpdatingEvent = (expectedTimes: number, isUpdate: boolean = false) => {
       const [createEventPromise, createEventResolve, createEventReject] = createPromiseCallbacks();
       let numEventsCreated = 0;
-      setMockRequestHandler((url, options) => {
-        const expectedUrl = isUpdate ? `${eventsApi}/google_event_1` : eventsApi;
+      mockAgent.get(apiBaseUrl).intercept({
+        path: isUpdate ? `${eventsApiPath}/google_event_1` : eventsApiPath,
+        method: isUpdate ? 'PUT' : 'POST',
+      }).reply(({headers, body}) => {
         try {
-          expect(numEventsCreated).toBeLessThan(expectedTimes);
-          expect(url).toStrictEqual(expectedUrl);
-          expect(options).toEqual({
-            method: isUpdate ? 'PUT' : 'POST',
-            headers: {
-              authorization: 'Bearer google_access_token',
-              'content-type': 'application/json',
-            },
-            body: options.body,
+          expect(headers).toEqual({
+            authorization: 'Bearer google_access_token',
+            'content-type': 'application/json',
           });
-          expect(JSON.parse(options.body as string)).toEqual({
+          expect(JSON.parse(body as string)).toEqual({
             start: {
               dateTime: schedule.startDateTime,
             },
@@ -1018,23 +949,20 @@ describe('OAuth2Controller (e2e)', () => {
         if (++numEventsCreated === expectedTimes) {
           createEventResolve(null);
         }
-        return {
-          statusCode: 200,
-          body: {
-            id: 'google_event_1',
-            status: 'confirmed',
-            summary: createMeetingDto.name,
-            start: {
-              dateTime: schedule.startDateTime,
-              timeZone: 'UTC',
-            },
-            end: {
-              dateTime: schedule.endDateTime,
-              timeZone: 'UTC',
-            },
+        return createMockJsonResponse({
+          id: 'google_event_1',
+          status: 'confirmed',
+          summary: createMeetingDto.name,
+          start: {
+            dateTime: schedule.startDateTime,
+            timeZone: 'UTC',
           },
-        };
-      });
+          end: {
+            dateTime: schedule.endDateTime,
+            timeZone: 'UTC',
+          },
+        });
+      }).times(expectedTimes);
       return createEventPromise;
     };
     let createEventPromise = setMockHandlerForCreatingOrUpdatingEvent(2);
@@ -1044,16 +972,13 @@ describe('OAuth2Controller (e2e)', () => {
     const setMockHandlerForDeletingEvent = (expectedTimes: number) => {
       const [deleteEventPromise, deleteEventResolve, deleteEventReject] = createPromiseCallbacks();
       let numEventsDeleted = 0;
-      setMockRequestHandler((url, options) => {
+      mockAgent.get(apiBaseUrl).intercept({
+        method: 'DELETE',
+        path: `${eventsApiPath}/google_event_1`,
+      }).reply(({headers}) => {
         try {
           expect(numEventsDeleted).toBeLessThan(expectedTimes);
-          expect(url).toStrictEqual(`${eventsApi}/google_event_1`);
-          expect(options).toEqual({
-            method: 'DELETE',
-            headers: {
-              authorization: 'Bearer google_access_token',
-            },
-          });
+          expect(headers).toEqual({authorization: 'Bearer google_access_token'})
         } catch (err) {
           deleteEventReject(err);
           return;
@@ -1063,9 +988,9 @@ describe('OAuth2Controller (e2e)', () => {
         }
         return {
           statusCode: 204,
-          body: undefined,
+          body: '',
         };
-      });
+      }).times(expectedTimes);
       return deleteEventPromise;
     };
 
@@ -1097,29 +1022,25 @@ describe('OAuth2Controller (e2e)', () => {
     await createEventPromise;
 
     // Created events should be filtered out
-    setMockRequestHandler((url, options) => {
-      expect(url.startsWith(eventsApiPrefix)).toBe(true);
-      return {
-        statusCode: 200,
-        body: {
-          nextSyncToken: 'google_sync_token',
-          items: [
-            {
-              id: 'google_event_1',
-              status: 'confirmed',
-              summary: 'Google Event 1',
-              start: {
-                dateTime: schedule.startDateTime,
-                timeZone: 'UTC',
-              },
-              end: {
-                dateTime: schedule.endDateTime,
-                timeZone: 'America/New_York',
-              },
+    interceptGetEventsApi(() => {
+      return createMockJsonResponse({
+        nextSyncToken: 'google_sync_token',
+        items: [
+          {
+            id: 'google_event_1',
+            status: 'confirmed',
+            summary: 'Google Event 1',
+            start: {
+              dateTime: schedule.startDateTime,
+              timeZone: 'UTC',
             },
-          ],
-        },
-      };
+            end: {
+              dateTime: schedule.endDateTime,
+              timeZone: 'America/New_York',
+            },
+          },
+        ],
+      });
     });
     await GET(`/api/me/google-calendar-events?meetingID=${meetingID}`, app, token1)
       .expect(HttpStatus.OK)
@@ -1152,35 +1073,28 @@ describe('OAuth2Controller (e2e)', () => {
     await putSelfRespondent({availabilities: []}, meetingID, app, token);
     const schedule = {...sampleSchedule};
 
-    const [createEventPromise, createEventResolve, createEventReject] = createPromiseCallbacks();
-    const eventCreationHandler = (url: string, options: Dispatcher.DispatchOptions, resolve: (val: unknown) => void, reject: (val: unknown) => void) => {
-      try {
-        expect(url).toStrictEqual(eventsApi);
-        expect(options.method).toStrictEqual('POST');
-      } catch (err) {
-        reject(err);
-        return;
-      }
+    const eventCreationHandler = (resolve: (val: unknown) => void, reject: (val: unknown) => void) => {
       resolve(null);
-      return {
-        statusCode: 200,
-        body: {
-          id: 'google_event_1',
-          status: 'confirmed',
-          summary: createMeetingDto.name,
-          start: {
-            dateTime: schedule.startDateTime,
-            timeZone: 'UTC',
-          },
-          end: {
-            dateTime: schedule.endDateTime,
-            timeZone: 'UTC',
-          },
+      return createMockJsonResponse({
+        id: 'google_event_1',
+        status: 'confirmed',
+        summary: createMeetingDto.name,
+        start: {
+          dateTime: schedule.startDateTime,
+          timeZone: 'UTC',
         },
-      };
+        end: {
+          dateTime: schedule.endDateTime,
+          timeZone: 'UTC',
+        },
+      });
     };
-    setMockRequestHandler((url, options) => {
-      return eventCreationHandler(url, options, createEventResolve, createEventReject);
+    const [createEventPromise, createEventResolve, createEventReject] = createPromiseCallbacks();
+    mockAgent.get(apiBaseUrl).intercept({
+      method: 'POST',
+      path: eventsApiPath,
+    }).reply(() => {
+      return eventCreationHandler(createEventResolve, createEventReject);
     });
     await scheduleMeeting(meetingID, schedule, app);
     await createEventPromise;
@@ -1199,14 +1113,20 @@ describe('OAuth2Controller (e2e)', () => {
         message: "Resource has been deleted",
       },
     };
-    setMockRequestHandler((url, options) => {
-      if (options.method === 'PUT') {
-        return {
-          statusCode: 410,
-          body: GONE_error,
-        };
-      }
-      return eventCreationHandler(url, options, updateEventResolve, updateEventReject);
+    mockAgent.get(apiBaseUrl).intercept({
+      method: 'PUT',
+      path: `${eventsApiPath}/google_event_1`,
+    }).reply(() => {
+      return {
+        statusCode: 410,
+        body: GONE_error,
+      };
+    });
+    mockAgent.get(apiBaseUrl).intercept({
+      method: 'POST',
+      path: eventsApiPath,
+    }).reply(() => {
+      return eventCreationHandler(updateEventResolve, updateEventReject);
     });
     createMeetingDto.about = 'Some new description';
     await PATCH('/api/meetings/' + meetingID, app, token)
@@ -1215,14 +1135,10 @@ describe('OAuth2Controller (e2e)', () => {
     await updateEventPromise;
 
     const [deleteEventPromise, deleteEventResolve, deleteEventReject] = createPromiseCallbacks();
-    setMockRequestHandler((url, options) => {
-      try {
-        expect(url).toStrictEqual(`${eventsApi}/google_event_1`);
-        expect(options.method).toStrictEqual('DELETE');
-      } catch (err) {
-        deleteEventReject(err);
-        return;
-      }
+    mockAgent.get(apiBaseUrl).intercept({
+      method: 'DELETE',
+      path: `${eventsApiPath}/google_event_1`,
+    }).reply(() => {
       deleteEventResolve(null);
       return {
         statusCode: 410,

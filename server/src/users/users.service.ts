@@ -1,10 +1,12 @@
 import { Injectable } from '@nestjs/common';
 import { ModuleRef } from '@nestjs/core';
 import { InjectRepository } from '@nestjs/typeorm';
+import { Repository } from 'typeorm';
+import ConfigService from '../config/config.service';
+import type { DatabaseType } from '../config/env.validation';
 import { normalizeDBError, UniqueConstraintFailed } from '../database.utils';
 import { oauth2ProviderNamesMap, oauth2TableNames } from '../oauth2/oauth2-common';
 import OAuth2Service from '../oauth2/oauth2.service';
-import { Repository } from 'typeorm';
 import User from './user.entity';
 
 export class UserAlreadyExistsError extends Error {}
@@ -28,11 +30,15 @@ export function selectUserLeftJoinOAuth2Tables(repository: Repository<User>) {
 @Injectable()
 export default class UsersService {
   private oauth2Service: OAuth2Service;
+  private readonly dbType: DatabaseType;
 
   constructor(
+    configService: ConfigService,
     @InjectRepository(User) private userRepository: Repository<User>,
     private moduleRef: ModuleRef,
-  ) {}
+  ) {
+    this.dbType = configService.get('DATABASE_TYPE');
+  }
 
   onModuleInit() {
     // circular dependency
@@ -75,7 +81,7 @@ export default class UsersService {
     try {
       return await this.userRepository.save(user);
     } catch (err: any) {
-      err = normalizeDBError(err as Error);
+      err = normalizeDBError(err as Error, this.dbType);
       if (err instanceof UniqueConstraintFailed) {
         throw new UserAlreadyExistsError();
       }

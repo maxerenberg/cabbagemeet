@@ -175,7 +175,8 @@ export class Oauth2Controller {
     // WARN: We MUST explicitly send a response back to the client (e.g. res.redirect)
     // or else the request will hang forever
     if (error) {
-      this.logger.error(error);
+      this.logger.log('Received error from OIDC server:');
+      this.logger.log(error);
       res.redirect('/error?e=E_INTERNAL_SERVER_ERROR');
       return;
     }
