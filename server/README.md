@@ -17,7 +17,7 @@ docker run -d --name cabbagemeet-mariadb -e MARIADB_USER=cabbagemeet -e MARIADB_
 ```
 
 To store the data files in memory (Linux only), create a folder under `/run`
-and mount it with the `-v` flag:
+and mount it with the `-v` flag, e.g.:
 ```bash
 mkdir -p ${XDG_RUNTIME_DIR:-/run/user/$UID}/cabbagemeet/mariadb
 docker run ... -v ${XDG_RUNTIME_DIR:-/run/user/$UID}/cabbagemeet/mariadb:/var/lib/mysql:z mariadb
@@ -51,6 +51,13 @@ docker exec -it cabbagemeet-mariadb mariadb -uroot -e "DROP DATABASE cabbagemeet
 ### Postgres
 ```bash
 docker run -d --name cabbagemeet-postgres -e POSTGRES_USER=cabbagemeet -e POSTGRES_PASSWORD=cabbagemeet -p 127.0.0.1:5432:5432 postgres
+```
+
+To store the data files in memory (Linux only), create a folder under `/run`
+and mount it with the `-v` flag, e.g.:
+```bash
+mkdir -p ${XDG_RUNTIME_DIR:-/run/user/$UID}/cabbagemeet/postgres
+docker run ... -v ${XDG_RUNTIME_DIR:-/run/user/$UID}/cabbagemeet/postgres:/var/lib/postgresql/data:z postgres
 ```
 
 Now open development.env and modify/set the following variables:

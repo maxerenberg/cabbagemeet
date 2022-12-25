@@ -21,7 +21,7 @@ export default function IsOnlyDateString(
           return (
             typeof value === 'string' &&
             pattern.test(value) &&
-            Date.parse(value) !== NaN
+            !Number.isNaN(Date.parse(value))
           );
         },
       },

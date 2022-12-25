@@ -26,7 +26,7 @@ export default function IsCustomISO8601String(
           return (
             typeof value === 'string' &&
             pattern.test(value) &&
-            Date.parse(value) !== NaN
+            !Number.isNaN(Date.parse(value))
           );
         },
       },
