@@ -73,6 +73,11 @@ function errorIsGoogleCalendarEventNoLongerExists(err: any): boolean {
 function GoogleListEventsResponseItem_to_OAuth2CalendarEvent(
   item: GoogleListEventsResponseItem,
 ): OAuth2CalendarEvent {
+  // Google API responses use RFC3339, which SHOULD include timezone
+  // information, so it should be safe to pass the dateTime field to
+  // the Date constructor.
+  // https://developers.google.com/calendar/api/v3/reference/events#resource
+  // https://www.rfc-editor.org/rfc/rfc3339#section-5.6
   return {
     ID: item.id,
     summary: item.summary,

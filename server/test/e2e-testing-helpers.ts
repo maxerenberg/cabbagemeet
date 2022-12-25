@@ -297,6 +297,12 @@ export async function putSelfRespondent(putRespondentDto: PutRespondentDto, meet
   return body;
 }
 
+export async function removeSelfRespondent(meetingID: number, app: INestApplication, token: string) {
+  const {body}: {body: MeetingResponse} = await GET('/api/meetings/' + meetingID, app, token)
+    .expect(HttpStatus.OK);
+  await deleteRespondent(body.selfRespondentID, meetingID, app, token);
+}
+
 export async function updateRespondent(respondentID: number, putRespondentDto: PutRespondentDto, meetingID: number, app: INestApplication, token?: string): Promise<MeetingResponse> {
   const {body} = await PUT(`/api/meetings/${meetingID}/respondents/${respondentID}`, app, token)
     .send(putRespondentDto)
@@ -325,4 +331,14 @@ export async function unscheduleMeeting(meetingID: number, app: INestApplication
     .expect(HttpStatus.OK)
     .expect(sortRespondentsInResponse);
   return body;
+}
+
+export function createPromiseCallbacks() {
+  let resolve: (val: unknown) => void;
+  let reject: (val: unknown) => void;
+  const promise = new Promise((resolve_, reject_) => {
+    resolve = resolve_;
+    reject = reject_;
+  });
+  return [promise, resolve, reject] as const;
 }

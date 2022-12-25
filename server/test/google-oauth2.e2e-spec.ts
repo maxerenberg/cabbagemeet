@@ -2,29 +2,27 @@ import { URL } from 'url';
 import { jest } from '@jest/globals';
 import { HttpStatus, INestApplication } from '@nestjs/common';
 import type { NestExpressApplication } from '@nestjs/platform-express';
-import { Dispatcher } from 'undici';
+import type { Dispatcher } from 'undici';
 import type { CustomRedirectResponse } from '../src/common-responses';
 import { getSecondsSinceUnixEpoch } from '../src/dates.utils';
-import { jwtSign } from '../src/misc.utils';
+import type CreateMeetingDto from '../src/meetings/create-meeting.dto';
+import type ScheduleMeetingDto from '../src/meetings/schedule-meeting.dto';
+import { jwtSign, sleep } from '../src/misc.utils';
 import {
-  addGuestRespondent,
   commonAfterAll,
   commonBeforeAll,
   commonBeforeEach,
   createMeeting,
+  createPromiseCallbacks,
   createUser,
   DELETE,
-  deleteRespondent,
-  editUser,
   GET,
-  getMeeting,
   PATCH,
   POST,
-  PUT,
   putSelfRespondent,
+  removeSelfRespondent,
   scheduleMeeting,
   unscheduleMeeting,
-  updateRespondent,
 } from './e2e-testing-helpers';
 
 type MockRequestHandlerCoreReturnType = {
@@ -81,6 +79,10 @@ function decodeQueryParams(queryString: string): Record<string, string> {
 }
 
 const authzEndpointPrefix = 'https://accounts.google.com/o/oauth2/v2/auth?';
+const tokenEndpoint = 'https://oauth2.googleapis.com/token';
+const eventsApi = 'https://www.googleapis.com/calendar/v3/calendars/primary/events';
+const eventsApiPrefix = eventsApi + '?';
+const allScopes = 'openid https://www.googleapis.com/auth/calendar.events.owned https://www.googleapis.com/auth/userinfo.profile https://www.googleapis.com/auth/userinfo.email';
 const nonce = 'abcdef';
 const mockClientId = 'google_client_id';
 const mockClientSecret = 'google_client_secret';
@@ -131,11 +133,46 @@ async function signupOrLoginOrLink(reason: 'signup' | 'login' | 'link', app: INe
   return `/redirect/google?code=${mockAuthzCode}&state=${params.state}`;
 }
 
+async function createTokenResponse({
+  sub, name, email, access_token,
+  refresh_token, scope = allScopes,
+}: {
+  sub: string, name: string, email: string, access_token: string,
+  refresh_token?: string | null, scope?: string,
+}) {
+  const now = getSecondsSinceUnixEpoch();
+  // Note: this will use HS256 for signing. Google/Microsoft use RS256.
+  // If we implement JWT verification in the server, we need to create
+  // a new keypair and use RS256 as well.
+  const id_token =  await jwtSign(
+    {
+      iss: 'https://accounts.google.com',
+      sub,
+      email,
+      name,
+      iat: now,
+      exp: now + 3600,
+    },
+    'secret',
+  );
+  const body: Record<string, any> = {
+    access_token,
+    expires_in: 3599,
+    scope,
+    token_type: 'Bearer',
+    id_token,
+  };
+  if (refresh_token) {
+    body.refresh_token = refresh_token;
+  }
+  return body;
+}
+
 function setMockHandlerForTokenEndpoint({
   sub, name, email,
   access_token = 'google_access_token',
   refresh_token = 'google_refresh_token',
-  scope = 'openid https://www.googleapis.com/auth/calendar.events.owned https://www.googleapis.com/auth/userinfo.profile https://www.googleapis.com/auth/userinfo.email',
+  scope = allScopes,
 }: {
   sub: string, name: string, email: string,
   access_token?: string, refresh_token?: string | null,
@@ -157,31 +194,9 @@ function setMockHandlerForTokenEndpoint({
       code: mockAuthzCode,
       grant_type: 'authorization_code',
     });
-    const now = getSecondsSinceUnixEpoch();
-    // Note: this will use HS256 for signing. Google/Microsoft use RS256.
-    // If we implement JWT verification in the server, we need to create
-    // a new keypair and use RS256 as well.
-    const id_token =  await jwtSign(
-      {
-        iss: 'https://accounts.google.com',
-        sub,
-        email,
-        name,
-        iat: now,
-        exp: now + 3600,
-      },
-      'secret',
-    );
-    const body: Record<string, any> = {
-      access_token,
-      expires_in: 3599,
-      scope,
-      token_type: 'Bearer',
-      id_token,
-    };
-    if (refresh_token !== null) {
-      body.refresh_token = refresh_token;
-    }
+    const body = await createTokenResponse({
+      sub, name, email, access_token, refresh_token, scope
+    });
     return {
       statusCode: 200,
       body,
@@ -251,12 +266,26 @@ async function signupNewUserWithGoogle({sub, name, email}: {sub: string, name: s
 describe('OAuth2Controller (e2e)', () => {
   let app: NestExpressApplication;
   let token1: string | undefined;
-  const mockSub1 = '1234567890';
+  const mockSub1 = '000001';
   const mockEmail1 = 'test1@gmail.com';
   const mockName1 = 'Test 1';
-  const mockSub2 = '2345678901';
+  const mockSub2 = '000002';
   const mockEmail2 = 'test2@gmail.com';
   const mockName2 = 'Test 2';
+
+  const sampleCreateMeetingDto: CreateMeetingDto = {
+    name: 'My meeting',
+    timezone: 'America/New_York',
+    minStartHour: 10,
+    maxEndHour: 16,
+    tentativeDates: ['2022-12-21', '2022-12-22', '2022-12-24'],
+  };
+  Object.freeze(sampleCreateMeetingDto);
+  const sampleSchedule: ScheduleMeetingDto = {
+    startDateTime: '2022-12-22T02:00:00Z',
+    endDateTime: '2022-12-22T05:00:00Z',
+  };
+  Object.freeze(sampleSchedule);
 
   beforeAll(async () => {
     app = await commonBeforeAll({
@@ -356,7 +385,7 @@ describe('OAuth2Controller (e2e)', () => {
     const {token} = await createUser(app, {email});
     const redirect = await signupOrLoginOrLink('login', app);
     setMockHandlerForTokenEndpoint({
-      sub: '345678', name: 'Test', email,
+      sub: '000003', name: 'Test', email,
       refresh_token: null,
     });
     const redirect2 = (
@@ -483,5 +512,757 @@ describe('OAuth2Controller (e2e)', () => {
     await deleteAccountAndExpectTokenToBeRevoked(app, token);
   });
 
-  // TODO: test syncing calendar events
+  it('/redirect/google (GET) (error or invalid)', async () => {
+    const expectBadRequest = async (url: string) => {
+      await GET(url, app).expect(HttpStatus.BAD_REQUEST);
+    };
+    await expectBadRequest('/redirect/google?code=google_code');
+    await expectBadRequest('/redirect/google?state=abc');
+    await expectBadRequest(`/redirect/google?state=${encodeURIComponent('{}')}`);
+    await expectBadRequest(`/redirect/google?state=${encodeURIComponent(JSON.stringify({
+      reason: 'signup',
+      postRedirect: '/',
+      clientNonce: nonce,
+    }))}`);
+    const redirect = (
+      await GET(`/redirect/google?error=${encodeURIComponent('some error')}`, app)
+        .expect(HttpStatus.FOUND)
+    ).headers.location;
+    expect(redirect).toStrictEqual('/error?e=E_INTERNAL_SERVER_ERROR');
+  });
+
+  it('/api/me/google-calendar-events (GET)', async () => {
+    const token = await signupNewUserWithGoogle(
+      {sub: mockSub2, name: mockName2, email: mockEmail2}, app
+    );
+    const {meetingID} = await createMeeting(sampleCreateMeetingDto, app);
+    const fullSyncParams = {
+      maxAttendees: '1',
+      singleEvents: 'true',
+      timeMin: '2022-12-21T15:00:00Z',
+      timeMax: '2022-12-24T21:00:00Z',
+    };
+    // Full sync, one page
+    setMockRequestHandler((url, options) => {
+      expect(url.startsWith(eventsApiPrefix)).toBe(true);
+      const params = decodeQueryParams(url.slice(eventsApiPrefix.length));
+      expect(params).toEqual(fullSyncParams);
+      expect(options).toEqual({
+        headers: {authorization: 'Bearer google_access_token'}
+      });
+      return {
+        statusCode: 200,
+        body: {
+          nextSyncToken: 'google_sync_token',
+          items: [
+            {
+              id: 'google_event_1',
+              status: 'confirmed',
+              summary: 'Google Event 1',
+              start: {
+                dateTime: '2022-12-21T11:00:00-05:00',
+                timeZone: 'America/New_York',
+              },
+              end: {
+                dateTime: '2022-12-21T11:30:00-05:00',
+                timeZone: 'America/New_York',
+              },
+            },
+            {
+              id: 'google_event_2',
+              status: 'confirmed',
+              summary: 'Google Event 2',
+              start: {
+                dateTime: '2022-12-25T04:30:00+08:00',
+                timeZone: 'Asia/Shanghai',
+              },
+              end: {
+                dateTime: '2022-12-25T05:30:00+08:00',
+                timeZone: 'Asia/Shanghai',
+              },
+            }
+          ],
+        },
+      };
+    });
+    const expectedResponse = {
+      events: [
+        {
+          summary: 'Google Event 1',
+          startDateTime: '2022-12-21T16:00:00Z',
+          endDateTime: '2022-12-21T16:30:00Z',
+        },
+        {
+          summary: 'Google Event 2',
+          startDateTime: '2022-12-24T20:30:00Z',
+          endDateTime: '2022-12-24T21:30:00Z',
+        },
+      ]
+    };
+    await GET(`/api/me/google-calendar-events?meetingID=${meetingID}`, app, token)
+      .expect(HttpStatus.OK)
+      .expect(expectedResponse);
+    // Incremental sync, no changes
+    setMockRequestHandler((url, options) => {
+      expect(url.startsWith(eventsApiPrefix)).toBe(true);
+      const params = decodeQueryParams(url.slice(eventsApiPrefix.length));
+      expect(params).toEqual({syncToken: 'google_sync_token'});
+      expect(options).toEqual({
+        headers: {authorization: 'Bearer google_access_token'}
+      });
+      return {
+        statusCode: 200,
+        body: {
+          nextSyncToken: 'google_sync_token',
+          items: [],
+        },
+      };
+    });
+    await GET(`/api/me/google-calendar-events?meetingID=${meetingID}`, app, token)
+      .expect(HttpStatus.OK)
+      .expect(expectedResponse);
+    // Incremental sync, one event removed, one event modified, one event added
+    setMockRequestHandler((url, options) => {
+      expect(url.startsWith(eventsApiPrefix)).toBe(true);
+      const params = decodeQueryParams(url.slice(eventsApiPrefix.length));
+      expect(params).toEqual({syncToken: 'google_sync_token'});
+      return {
+        statusCode: 200,
+        body: {
+          nextSyncToken: 'google_sync_token_2',
+          items: [
+            {
+              id: 'google_event_2',
+              status: 'cancelled',
+            },
+            {
+              id: 'google_event_1',
+              status: 'confirmed',
+              summary: 'Google Event 1',
+              start: {
+                dateTime: '2022-12-21T13:00:00-05:00',
+                timeZone: 'America/New_York',
+              },
+              end: {
+                dateTime: '2022-12-21T13:30:00-05:00',
+                timeZone: 'America/New_York',
+              },
+            },
+            {
+              id: 'google_event_3',
+              status: 'confirmed',
+              summary: 'Google Event 3',
+              start: {
+                dateTime: '2022-12-21T09:40:00-05:00',
+                timeZone: 'America/New_York',
+              },
+              end: {
+                dateTime: '2022-12-21T10:20:00-05:00',
+                timeZone: 'America/New_York',
+              },
+            },
+          ],
+        },
+      };
+    });
+    expectedResponse.events = [
+      // Must be sorted by start date
+      {
+        summary: 'Google Event 3',
+        startDateTime: '2022-12-21T14:40:00Z',
+        endDateTime: '2022-12-21T15:20:00Z',
+      },
+      {
+        summary: 'Google Event 1',
+        startDateTime: '2022-12-21T18:00:00Z',
+        endDateTime: '2022-12-21T18:30:00Z',
+      },
+    ];
+    await GET(`/api/me/google-calendar-events?meetingID=${meetingID}`, app, token)
+      .expect(HttpStatus.OK)
+      .expect(expectedResponse);
+    // Incremental sync, two events deleted, one event added, split over multiple pages
+    setMockRequestHandler((url, options) => {
+      expect(url.startsWith(eventsApiPrefix)).toBe(true);
+      const params = decodeQueryParams(url.slice(eventsApiPrefix.length));
+      if (!params.hasOwnProperty('pageToken')) {
+        expect(params).toEqual({syncToken: 'google_sync_token_2'});
+        return {
+          statusCode: 200,
+          body: {
+            nextPageToken: 'google_page_token',
+            items: [
+              {
+                id: 'google_event_1',
+                status: 'cancelled',
+              },
+              {
+                id: 'google_event_3',
+                status: 'cancelled',
+              },
+              // Some random event which we're not interested in (can actually happen)
+              {
+                id: 'google_event_100',
+                status: 'cancelled',
+              },
+            ],
+          },
+        };
+      }
+      expect(params).toEqual({
+        pageToken: 'google_page_token',
+        syncToken: 'google_sync_token_2',
+      });
+      return {
+        statusCode: 200,
+        body: {
+          nextSyncToken: 'google_sync_token_3',
+          items: [
+            {
+              id: 'google_event_4',
+              status: 'confirmed',
+              summary: 'Google Event 4',
+              start: {
+                dateTime: '2022-12-21T23:00:00-05:00',
+                timeZone: 'America/New_York',
+              },
+              end: {
+                dateTime: '2022-12-21T23:30:00-05:00',
+                timeZone: 'America/New_York',
+              },
+            },
+          ],
+        },
+      };
+    });
+    expectedResponse.events = [
+      {
+        summary: 'Google Event 4',
+        startDateTime: '2022-12-22T04:00:00Z',
+        endDateTime: '2022-12-22T04:30:00Z',
+      },
+    ];
+    await GET(`/api/me/google-calendar-events?meetingID=${meetingID}`, app, token)
+      .expect(HttpStatus.OK)
+      .expect(expectedResponse);
+    // Force a full sync, split over multiple pages
+    setMockRequestHandler((url, options) => {
+      expect(url.startsWith(eventsApiPrefix)).toBe(true);
+      const params = decodeQueryParams(url.slice(eventsApiPrefix.length));
+      if (params.syncToken === 'google_sync_token_3') {
+        return {
+          statusCode: 410,
+          body: undefined,
+        };
+      }
+      if (!params.hasOwnProperty('pageToken')) {
+        expect(params).toEqual(fullSyncParams);
+        return {
+          statusCode: 200,
+          body: {
+            nextPageToken: 'google_page_token_2',
+            items: [
+              {
+                id: 'google_event_5',
+                status: 'confirmed',
+                summary: 'Google Event 5',
+                start: {
+                  dateTime: '2022-12-21T22:00:00-05:00',
+                  timeZone: 'America/New_York',
+                },
+                end: {
+                  dateTime: '2022-12-22T00:00:00-05:00',
+                  timeZone: 'America/New_York',
+                },
+              },
+            ],
+          },
+        };
+      }
+      expect(params).toEqual({
+        ...fullSyncParams,
+        pageToken: 'google_page_token_2',
+      });
+      return {
+        statusCode: 200,
+        body: {
+          nextSyncToken: 'google_sync_token_4',
+          items: [
+            {
+              id: 'google_event_6',
+              status: 'confirmed',
+              summary: 'Google Event 6',
+              start: {
+                dateTime: '2022-12-21T22:30:00-05:00',
+                timeZone: 'America/New_York',
+              },
+              end: {
+                dateTime: '2022-12-21T23:00:00-05:00',
+                timeZone: 'America/New_York',
+              },
+            },
+          ],
+        },
+      };
+    });
+    expectedResponse.events = [
+      // Event 4 should have been dropped
+      {
+        summary: 'Google Event 5',
+        startDateTime: '2022-12-22T03:00:00Z',
+        endDateTime: '2022-12-22T05:00:00Z',
+      },
+      {
+        summary: 'Google Event 6',
+        startDateTime: '2022-12-22T03:30:00Z',
+        endDateTime: '2022-12-22T04:00:00Z',
+      },
+    ];
+    await GET(`/api/me/google-calendar-events?meetingID=${meetingID}`, app, token)
+      .expect(HttpStatus.OK)
+      .expect(expectedResponse);
+    // Incremental sync, no changes
+    setMockRequestHandler((url, options) => {
+      expect(url.startsWith(eventsApiPrefix)).toBe(true);
+      const params = decodeQueryParams(url.slice(eventsApiPrefix.length));
+      expect(params).toEqual({syncToken: 'google_sync_token_4'});
+      return {
+        statusCode: 200,
+        body: {
+          nextSyncToken: 'google_sync_token_4',
+          items: [],
+        },
+      };
+    });
+    await GET(`/api/me/google-calendar-events?meetingID=${meetingID}`, app, token)
+      .expect(HttpStatus.OK)
+      .expect(expectedResponse);
+    await deleteAccountAndExpectTokenToBeRevoked(app, token);
+  });
+
+  it('/api/me/google-calendar-events (GET) (meeting changes)', async () => {
+    const token = await signupNewUserWithGoogle(
+      {sub: mockSub2, name: mockName2, email: mockEmail2}, app
+    );
+    const {meetingID} = await createMeeting(sampleCreateMeetingDto, app, token);
+    const fullSyncParams = {
+      maxAttendees: '1',
+      singleEvents: 'true',
+      timeMin: '2022-12-21T15:00:00Z',
+      timeMax: '2022-12-24T21:00:00Z',
+    };
+    // Full sync, one page
+    setMockRequestHandler((url, options) => {
+      expect(url.startsWith(eventsApiPrefix)).toBe(true);
+      const params = decodeQueryParams(url.slice(eventsApiPrefix.length));
+      expect(params).toEqual(fullSyncParams);
+      return {
+        statusCode: 200,
+        body: {
+          nextSyncToken: 'google_sync_token',
+          items: [
+            {
+              id: 'google_event_1',
+              status: 'confirmed',
+              summary: 'Google Event 1',
+              start: {
+                dateTime: '2022-12-21T12:00:00-05:00',
+                timeZone: 'America/New_York',
+              },
+              end: {
+                dateTime: '2022-12-21T12:30:00-05:00',
+                timeZone: 'America/New_York',
+              },
+            },
+          ],
+        },
+      };
+    });
+    const expectedResponse = {
+      events: [
+        {
+          summary: 'Google Event 1',
+          startDateTime: '2022-12-21T17:00:00Z',
+          endDateTime: '2022-12-21T17:30:00Z',
+        },
+      ]
+    };
+    await GET(`/api/me/google-calendar-events?meetingID=${meetingID}`, app, token)
+      .expect(HttpStatus.OK)
+      .expect(expectedResponse);
+    // Changing the start hour, end hour or timezone should trigger a full sync
+    await PATCH('/api/meetings/' + meetingID, app, token)
+      .send({minStartHour: 9})
+      .expect(HttpStatus.OK);
+    fullSyncParams.timeMin = '2022-12-21T14:00:00Z';
+    await GET(`/api/me/google-calendar-events?meetingID=${meetingID}`, app, token)
+      .expect(HttpStatus.OK)
+      .expect(expectedResponse);
+    await PATCH('/api/meetings/' + meetingID, app, token)
+      .send({maxEndHour: 17})
+      .expect(HttpStatus.OK);
+    fullSyncParams.timeMax = '2022-12-24T22:00:00Z';
+    await GET(`/api/me/google-calendar-events?meetingID=${meetingID}`, app, token)
+      .expect(HttpStatus.OK)
+      .expect(expectedResponse);
+    await PATCH('/api/meetings/' + meetingID, app, token)
+      .send({timezone: 'America/Los_Angeles'})
+      .expect(HttpStatus.OK);
+    fullSyncParams.timeMin = '2022-12-21T17:00:00Z';
+    fullSyncParams.timeMax = '2022-12-25T01:00:00Z';
+    await GET(`/api/me/google-calendar-events?meetingID=${meetingID}`, app, token)
+      .expect(HttpStatus.OK)
+      .expect(expectedResponse);
+    await deleteAccountAndExpectTokenToBeRevoked(app, token);
+  });
+
+  it('/api/me/google-calendar-events (GET) (refresh token)', async () => {
+    const token = await signupNewUserWithGoogle(
+      {sub: mockSub2, name: mockName2, email: mockEmail2}, app
+    );
+    const {meetingID} = await createMeeting(sampleCreateMeetingDto, app, token);
+    setMockRequestHandler(async (url, options) => {
+      if (url === tokenEndpoint) {
+        expect(options).toEqual({
+          method: 'POST',
+          body: options.body,
+          headers: { 'content-type': 'application/x-www-form-urlencoded' },
+        });
+        const params = Object.fromEntries(new URLSearchParams(options.body as string).entries());
+        expect(params).toEqual({
+          client_id: mockClientId,
+          client_secret: mockClientSecret,
+          grant_type: 'refresh_token',
+          refresh_token: 'google_refresh_token',
+        });
+        const body = await createTokenResponse({
+          sub: mockSub2, name: mockName2, email: mockEmail2,
+          access_token: 'google_access_token_2',
+        });
+        return {
+          statusCode: 200,
+          body,
+        };
+      }
+      expect(url.startsWith(eventsApiPrefix)).toBe(true);
+      expect(options.headers).toEqual({
+        authorization: 'Bearer google_access_token_2',
+      });
+      return {
+        statusCode: 200,
+        body: {
+          nextSyncToken: 'google_sync_token',
+          items: [],
+        },
+      };
+    });
+    const now = Date.now();  // milliseconds
+    const originalDateNow = Date.now;
+    Date.now = jest.fn(() => now + 3_600_000);  // add 1 hour
+    try {
+      await GET(`/api/me/google-calendar-events?meetingID=${meetingID}`, app, token)
+        .expect(HttpStatus.OK)
+        .expect({events: []});
+    } finally {
+      Date.now = originalDateNow;
+    }
+    await deleteAccountAndExpectTokenToBeRevoked(app, token);
+  });
+
+  it('/api/meetings/:id/schedule (PUT|DELETE) (create/update/delete events)', async () => {
+    const token1 = await signupNewUserWithGoogle(
+      {sub: mockSub2, name: mockName2, email: mockEmail2}, app
+    );
+    const token2 = await signupNewUserWithGoogle(
+      {sub: '000004', name: 'Test', email: '000004@gmail.com'}, app
+    );
+    const createMeetingDto = {...sampleCreateMeetingDto};
+    const {meetingID} = await createMeeting(createMeetingDto, app);
+    await putSelfRespondent({availabilities: []}, meetingID, app, token1);
+    await putSelfRespondent({availabilities: []}, meetingID, app, token2);
+    const schedule = {...sampleSchedule};
+    // Scheduling a meeting should create an event for each respondent with
+    // a linked account
+    const setMockHandlerForCreatingOrUpdatingEvent = (expectedTimes: number, isUpdate: boolean = false) => {
+      const [createEventPromise, createEventResolve, createEventReject] = createPromiseCallbacks();
+      let numEventsCreated = 0;
+      setMockRequestHandler((url, options) => {
+        const expectedUrl = isUpdate ? `${eventsApi}/google_event_1` : eventsApi;
+        try {
+          expect(numEventsCreated).toBeLessThan(expectedTimes);
+          expect(url).toStrictEqual(expectedUrl);
+          expect(options).toEqual({
+            method: isUpdate ? 'PUT' : 'POST',
+            headers: {
+              authorization: 'Bearer google_access_token',
+              'content-type': 'application/json',
+            },
+            body: options.body,
+          });
+          expect(JSON.parse(options.body as string)).toEqual({
+            start: {
+              dateTime: schedule.startDateTime,
+            },
+            end: {
+              dateTime: schedule.endDateTime,
+            },
+            summary: createMeetingDto.name,
+            source: {
+              url: `http://cabbagemeet.internal/m/${meetingID}`,
+            },
+          });
+        } catch (err) {
+          createEventReject(err);
+          return;
+        }
+        if (++numEventsCreated === expectedTimes) {
+          createEventResolve(null);
+        }
+        return {
+          statusCode: 200,
+          body: {
+            id: 'google_event_1',
+            status: 'confirmed',
+            summary: createMeetingDto.name,
+            start: {
+              dateTime: schedule.startDateTime,
+              timeZone: 'UTC',
+            },
+            end: {
+              dateTime: schedule.endDateTime,
+              timeZone: 'UTC',
+            },
+          },
+        };
+      });
+      return createEventPromise;
+    };
+    let createEventPromise = setMockHandlerForCreatingOrUpdatingEvent(2);
+    await scheduleMeeting(meetingID, schedule, app);
+    await createEventPromise;
+
+    const setMockHandlerForDeletingEvent = (expectedTimes: number) => {
+      const [deleteEventPromise, deleteEventResolve, deleteEventReject] = createPromiseCallbacks();
+      let numEventsDeleted = 0;
+      setMockRequestHandler((url, options) => {
+        try {
+          expect(numEventsDeleted).toBeLessThan(expectedTimes);
+          expect(url).toStrictEqual(`${eventsApi}/google_event_1`);
+          expect(options).toEqual({
+            method: 'DELETE',
+            headers: {
+              authorization: 'Bearer google_access_token',
+            },
+          });
+        } catch (err) {
+          deleteEventReject(err);
+          return;
+        }
+        if (++numEventsDeleted === expectedTimes) {
+          deleteEventResolve(null);
+        }
+        return {
+          statusCode: 204,
+          body: undefined,
+        };
+      });
+      return deleteEventPromise;
+    };
+
+    // Removing your availabilities from a scheduled meeting should delete
+    // the event from your calendar
+    let deleteEventPromise = setMockHandlerForDeletingEvent(1);
+    await removeSelfRespondent(meetingID, app, token2);
+    await deleteEventPromise;
+
+    // Adding your availabilities to a scheduled meeting should create
+    // a new event
+    createEventPromise = setMockHandlerForCreatingOrUpdatingEvent(1);
+    await putSelfRespondent({availabilities: []}, meetingID, app, token2);
+    await createEventPromise;
+
+    // Modifying a scheduled event should update the events for each
+    // respondent with a linked calendar
+    createMeetingDto.name = 'A new name';
+    createEventPromise = setMockHandlerForCreatingOrUpdatingEvent(2, true);
+    await PATCH('/api/meetings/' + meetingID, app, token1)
+      .send({name: createMeetingDto.name})
+      .expect(HttpStatus.OK);
+    await createEventPromise;
+
+    // Re-scheduling the meeting should update the events too
+    schedule.startDateTime = '2022-12-22T02:30:00Z';
+    createEventPromise = setMockHandlerForCreatingOrUpdatingEvent(2, true);
+    await scheduleMeeting(meetingID, schedule, app);
+    await createEventPromise;
+
+    // Created events should be filtered out
+    setMockRequestHandler((url, options) => {
+      expect(url.startsWith(eventsApiPrefix)).toBe(true);
+      return {
+        statusCode: 200,
+        body: {
+          nextSyncToken: 'google_sync_token',
+          items: [
+            {
+              id: 'google_event_1',
+              status: 'confirmed',
+              summary: 'Google Event 1',
+              start: {
+                dateTime: schedule.startDateTime,
+                timeZone: 'UTC',
+              },
+              end: {
+                dateTime: schedule.endDateTime,
+                timeZone: 'America/New_York',
+              },
+            },
+          ],
+        },
+      };
+    });
+    await GET(`/api/me/google-calendar-events?meetingID=${meetingID}`, app, token1)
+      .expect(HttpStatus.OK)
+      .expect({events: []});
+
+    // Unscheduling a meeting should delete the event for each respondent
+    // with a linked account
+    deleteEventPromise = setMockHandlerForDeletingEvent(2);
+    await unscheduleMeeting(meetingID, app);
+    await deleteEventPromise;
+
+    // Deleting a meeting should also delete the events created for it
+    createEventPromise = setMockHandlerForCreatingOrUpdatingEvent(2);
+    await scheduleMeeting(meetingID, schedule, app);
+    await createEventPromise;
+    deleteEventPromise = setMockHandlerForDeletingEvent(2);
+    await DELETE('/api/meetings/' + meetingID, app, token1).expect(HttpStatus.NO_CONTENT);
+    await deleteEventPromise;
+
+    await deleteAccountAndExpectTokenToBeRevoked(app, token1);
+    await deleteAccountAndExpectTokenToBeRevoked(app, token2);
+  });
+
+  it('/api/meetings/:id/schedule (PUT) (update/delete event which no longer exists)', async () => {
+    const token = await signupNewUserWithGoogle(
+      {sub: mockSub2, name: mockName2, email: mockEmail2}, app
+    );
+    const createMeetingDto = {...sampleCreateMeetingDto};
+    const {meetingID} = await createMeeting(createMeetingDto, app);
+    await putSelfRespondent({availabilities: []}, meetingID, app, token);
+    const schedule = {...sampleSchedule};
+
+    const [createEventPromise, createEventResolve, createEventReject] = createPromiseCallbacks();
+    const eventCreationHandler = (url: string, options: Dispatcher.DispatchOptions, resolve: (val: unknown) => void, reject: (val: unknown) => void) => {
+      try {
+        expect(url).toStrictEqual(eventsApi);
+        expect(options.method).toStrictEqual('POST');
+      } catch (err) {
+        reject(err);
+        return;
+      }
+      resolve(null);
+      return {
+        statusCode: 200,
+        body: {
+          id: 'google_event_1',
+          status: 'confirmed',
+          summary: createMeetingDto.name,
+          start: {
+            dateTime: schedule.startDateTime,
+            timeZone: 'UTC',
+          },
+          end: {
+            dateTime: schedule.endDateTime,
+            timeZone: 'UTC',
+          },
+        },
+      };
+    };
+    setMockRequestHandler((url, options) => {
+      return eventCreationHandler(url, options, createEventResolve, createEventReject);
+    });
+    await scheduleMeeting(meetingID, schedule, app);
+    await createEventPromise;
+
+    const [updateEventPromise, updateEventResolve, updateEventReject] = createPromiseCallbacks();
+    const GONE_error = {
+      error: {
+        errors: [
+          {
+            domain: "global",
+            reason: "deleted",
+            message: "Resource has been deleted"
+          }
+        ],
+        code: 410,
+        message: "Resource has been deleted",
+      },
+    };
+    setMockRequestHandler((url, options) => {
+      if (options.method === 'PUT') {
+        return {
+          statusCode: 410,
+          body: GONE_error,
+        };
+      }
+      return eventCreationHandler(url, options, updateEventResolve, updateEventReject);
+    });
+    createMeetingDto.about = 'Some new description';
+    await PATCH('/api/meetings/' + meetingID, app, token)
+      .send({about: createMeetingDto.about})
+      .expect(HttpStatus.OK);
+    await updateEventPromise;
+
+    const [deleteEventPromise, deleteEventResolve, deleteEventReject] = createPromiseCallbacks();
+    setMockRequestHandler((url, options) => {
+      try {
+        expect(url).toStrictEqual(`${eventsApi}/google_event_1`);
+        expect(options.method).toStrictEqual('DELETE');
+      } catch (err) {
+        deleteEventReject(err);
+        return;
+      }
+      deleteEventResolve(null);
+      return {
+        statusCode: 410,
+        body: GONE_error,
+      };
+    });
+    await DELETE('/api/meetings/' + meetingID, app, token);
+    await deleteEventPromise;
+
+    await deleteAccountAndExpectTokenToBeRevoked(app, token);
+  });
+
+  it('/api/meetings/:id/schedule (PUT) (account is unlinked)', async () => {
+    const token = await signupNewUserWithGoogle(
+      {sub: mockSub2, name: mockName2, email: mockEmail2}, app
+    );
+    await DELETE('/api/me/link-google-calendar', app, token)
+      .expect(HttpStatus.OK);
+    const createMeetingDto = {...sampleCreateMeetingDto};
+    const schedule = {...sampleSchedule};
+    const {meetingID} = await createMeeting(createMeetingDto, app);
+    await putSelfRespondent({availabilities: []}, meetingID, app, token);
+    await scheduleMeeting(meetingID, schedule, app);
+    // The server should NOT try to create an event.
+    // If the server mistakenly sends a request, give it time for the
+    // error to occur.
+    await sleep(50);
+
+    // Likewise for re-scheduling a meeting.
+    schedule.startDateTime = '2022-12-22T02:30:00Z';
+    await scheduleMeeting(meetingID, schedule, app);
+    await sleep(50);
+
+    // Likewise for modifying a scheduled meeting.
+    createMeetingDto.name = 'A new name';
+    await PATCH('/api/meetings/' + meetingID, app, token)
+      .send({name: createMeetingDto.name})
+      .expect(HttpStatus.OK);
+    await sleep(50);
+
+    await deleteAccountAndExpectTokenToBeRevoked(app, token);
+  });
 });
