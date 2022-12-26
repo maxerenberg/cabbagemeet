@@ -14,6 +14,7 @@ import MeetingsService from '../meetings/meetings.service';
 import { assert, encodeQueryParams } from '../misc.utils';
 import User from '../users/user.entity';
 import { selectUserLeftJoinOAuth2Tables } from '../users/users.service';
+import AbstractOAuth2CalendarCreatedEvent from './abstract-oauth2-calendar-created-event.entity';
 import type {
   OIDCResponse,
   DecodedIDToken,
@@ -21,10 +22,8 @@ import type {
 } from './oauth2-response-types';
 import GoogleCalendarEvents from './google-calendar-events.entity';
 import {
-  AbstractOAuth2CalendarCreatedEvent,
   OAuth2CalendarEvent,
   oauth2CreatedEventTableNamesMap,
-  oauth2ProviderNamesMap,
   oauth2TableNamesMap,
 } from './oauth2-common';
 import GoogleCalendarCreatedEvent from './google-calendar-created-event.entity';
@@ -751,14 +750,17 @@ export default class OAuth2Service {
     return events;
   }
 
-  private async getOAuth2LinkedRespondents(
+  private async getOAuth2LinkedRespondents({
+    provider, meetingID, mustHaveCreatedEvent, userID,
+  }: {
     provider: IOAuth2Provider,
     meetingID: number,
-  ): Promise<AbstractOAuth2[]> {
-    const [placeholder1, placeholder2] = this.dbType === 'postgres'
-      ? ['$1', '$2'] : ['?', '?'];
-    const providerName = oauth2ProviderNamesMap[provider.type];
-    const eventIDColumnName = `Created${providerName}MeetingID`;
+    mustHaveCreatedEvent: boolean,
+    userID?: number,
+  }): Promise<AbstractOAuth2[]> {
+    // sanity check, in case we casted somewhere
+    assert(typeof meetingID === 'number');
+    assert(typeof userID === 'number' || typeof userID === 'undefined');
     const oauth2TableName = oauth2TableNamesMap[provider.type];
     const createdEventTableName = oauth2CreatedEventTableNamesMap[provider.type];
     // Despite best efforts, I was unable to build this query using the
@@ -771,26 +773,33 @@ export default class OAuth2Service {
     const selectCols = AbstractOAuth2.getColumnNames()
       .map(col => `${oauth2TableName}.${col} AS "${col}"`)
       .join(', ')
-      + `, ${createdEventTableName}.${eventIDColumnName} AS "${eventIDColumnName}"`;
+      + `, MeetingRespondent.RespondentID AS "RespondentID"`
+      + `, ${createdEventTableName}.CreatedEventID AS "CreatedEventID"`;
     const rows = await this.dataSource.query(`
       SELECT ${selectCols} FROM ${oauth2TableName}
       INNER JOIN MeetingRespondent
         ON ${oauth2TableName}.UserID = MeetingRespondent.UserID
-        AND MeetingRespondent.MeetingID = ${placeholder1}
-      LEFT JOIN ${createdEventTableName}
-        ON ${oauth2TableName}.UserID = ${createdEventTableName}.UserID
-        AND ${createdEventTableName}.MeetingID = ${placeholder2}
+        AND MeetingRespondent.MeetingID = ${meetingID}
+      ${mustHaveCreatedEvent ? 'INNER' : 'LEFT'} JOIN ${createdEventTableName}
+        ON MeetingRespondent.RespondentID = ${createdEventTableName}.RespondentID
       WHERE ${oauth2TableName}.LinkedCalendar
-    `, [meetingID, meetingID]);
-    const result: any[] = [];
+      ${userID ? `AND ${oauth2TableName}.UserID = ${userID}` : ''}
+    `) as (AbstractOAuth2 & {CreatedEventID: string})[];
+    const result: AbstractOAuth2[] = [];
     for (const row of rows) {
-      const {[eventIDColumnName]: eventID, ...entity} = row;
-      if (eventID) {
-        entity.CreatedEvents = [{MeetingID: meetingID, UserID: row.UserID, [eventIDColumnName]: eventID}];
+      const {CreatedEventID, ...oauth2} = row;
+      if (CreatedEventID) {
+        oauth2.CreatedEvents = [
+          {
+            CreatedEventID,
+            RespondentID: oauth2.RespondentID,
+            UserID: oauth2.UserID,
+          }
+        ];
       } else {
-        entity.CreatedEvents = [];
+        oauth2.CreatedEvents = [];
       }
-      result.push(entity);
+      result.push(oauth2);
     }
     return result;
   }
@@ -799,10 +808,9 @@ export default class OAuth2Service {
     provider: IOAuth2Provider,
     meeting: Meeting,
   ) {
-    const linkedRespondents = await this.getOAuth2LinkedRespondents(
-      provider,
-      meeting.ID,
-    );
+    const linkedRespondents = await this.getOAuth2LinkedRespondents({
+      provider, meetingID: meeting.ID, mustHaveCreatedEvent: false,
+    });
     const results = await Promise.allSettled(
       linkedRespondents.map((linkedRespondent) =>
         this.createOrUpdateEventForMeeting(
@@ -871,22 +879,12 @@ export default class OAuth2Service {
     userID: number,
     meeting: Meeting,
   ) {
-    const oauth2TableName = oauth2TableNamesMap[provider.type];
-    const createdEventTableName =
-      oauth2CreatedEventTableNamesMap[provider.type];
-    const creds = await this.oauth2Repositories[provider.type]
-      .createQueryBuilder()
-      .innerJoin(
-        `${oauth2TableName}.User`, 'User',
-        `${oauth2TableName}.UserID = :userID`, { userID },
-      )
-      .leftJoin(
-        `${oauth2TableName}.CreatedEvents`, createdEventTableName,
-        `${createdEventTableName}.MeetingID = :meetingID`, { meetingID: meeting.ID },
-      )
-      .where(`${oauth2TableName}.LinkedCalendar`)
-      .select([oauth2TableName, createdEventTableName])
-      .getOne();
+    const creds = (await this.getOAuth2LinkedRespondents({
+      provider,
+      meetingID: meeting.ID,
+      mustHaveCreatedEvent: false,
+      userID,
+    }))[0];
     if (!creds) {
       return;
     }
@@ -932,18 +930,9 @@ export default class OAuth2Service {
     provider: IOAuth2Provider,
     meetingID: number,
   ) {
-    const oauth2TableName = oauth2TableNamesMap[provider.type];
-    const createdEventTableName =
-      oauth2CreatedEventTableNamesMap[provider.type];
-    const linkedRespondents = await this.oauth2Repositories[provider.type]
-      .createQueryBuilder()
-      .innerJoin(
-        `${oauth2TableName}.CreatedEvents`, createdEventTableName,
-        `${createdEventTableName}.MeetingID = :meetingID`, { meetingID },
-      )
-      .where(`${oauth2TableName}.LinkedCalendar`)
-      .select([oauth2TableName, createdEventTableName])
-      .getMany();
+    const linkedRespondents = await this.getOAuth2LinkedRespondents({
+      provider, meetingID, mustHaveCreatedEvent: true,
+    });
     const results = await Promise.allSettled(
       linkedRespondents.map((linkedRespondent) =>
         provider.deleteEventForMeeting(
@@ -977,19 +966,12 @@ export default class OAuth2Service {
     userID: number,
     meetingID: number,
   ) {
-    const oauth2TableName = oauth2TableNamesMap[provider.type];
-    const createdEventTableName =
-      oauth2CreatedEventTableNamesMap[provider.type];
-    const creds = await this.oauth2Repositories[provider.type]
-      .createQueryBuilder()
-      .innerJoin(
-        `${oauth2TableName}.CreatedEvents`, createdEventTableName,
-        `${createdEventTableName}.MeetingID = :meetingID`, { meetingID },
-      )
-      .where(`${oauth2TableName}.UserID = :userID`, { userID })
-      .andWhere(`${oauth2TableName}.LinkedCalendar`)
-      .select([oauth2TableName, createdEventTableName])
-      .getOne();
+    const creds = (await this.getOAuth2LinkedRespondents({
+      provider,
+      meetingID,
+      mustHaveCreatedEvent: false,
+      userID,
+    }))[0];
     if (!creds) {
       return;
     }

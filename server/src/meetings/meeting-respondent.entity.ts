@@ -4,8 +4,11 @@ import {
   PrimaryGeneratedColumn,
   Index,
   ManyToOne,
+  OneToMany,
 } from 'typeorm';
 import { CustomJoinColumn } from '../custom-columns/custom-join-column';
+import GoogleCalendarCreatedEvent from '../oauth2/google-calendar-created-event.entity';
+import MicrosoftCalendarCreatedEvent from '../oauth2/microsoft-calendar-created-event.entity';
 import User from '../users/user.entity';
 import Meeting from './meeting.entity';
 
@@ -46,6 +49,19 @@ export default class MeetingRespondent {
   // This is a JSON array of the start times of the 30-minute intervals
   // during which the respondent is available (UTC).
   // e.g. '["2022-10-23T10:00:00Z", "2022-10-23T10:30:00Z"]'
+  // TODO: use 'simple-json' type
   @Column()
   Availabilities: string;
+
+  @OneToMany(
+    () => GoogleCalendarCreatedEvent,
+    (googleEvent) => googleEvent.MeetingRespondent,
+  )
+  GoogleCalendarCreatedEvents: GoogleCalendarCreatedEvent[];
+
+  @OneToMany(
+    () => MicrosoftCalendarCreatedEvent,
+    (msftEvent) => msftEvent.MeetingRespondent,
+  )
+  MicrosoftCalendarCreatedEvents: MicrosoftCalendarCreatedEvent[];
 }

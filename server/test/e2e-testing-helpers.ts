@@ -9,6 +9,7 @@ import * as request from 'supertest';
 import { DataSource } from 'typeorm';
 import { AppModule } from '../src/app.module';
 import { commonAppBootstrap } from '../src/common-setup';
+import type { EnvironmentVariables } from '../src/config/env.validation';
 import type AddGuestRespondentDto from '../src/meetings/add-guest-respondent.dto';
 import type PutRespondentDto from '../src/meetings/put-respondent.dto';
 import type CreateMeetingDto from '../src/meetings/create-meeting.dto';
@@ -18,10 +19,13 @@ import { assert, sleep } from '../src/misc.utils';
 import type EditUserDto from '../src/users/edit-user.dto';
 import type UserResponse from '../src/users/user-response';
 import type { UserResponseWithToken } from '../src/users/user-response';
-import type { EnvironmentVariables } from 'src/config/env.validation';
+
+let originalProcessEnv: NodeJS.ProcessEnv;
 
 export async function commonBeforeAll(envOverride?: Partial<EnvironmentVariables>): Promise<NestExpressApplication> {
-  // TODO: save and restore env vars before/after tests
+  originalProcessEnv = process.env;
+  process.env = {...process.env};
+
   if (envOverride) {
     Object.assign(process.env, envOverride);
   }
@@ -53,6 +57,7 @@ export async function commonAfterAll(app: INestApplication | undefined) {
     await dropDB();
   }
   await stopMockSmtpServer();
+  process.env = originalProcessEnv;
 }
 
 function getDatasourceForSuperuser() {

@@ -44,9 +44,6 @@ export const oauth2CreatedEventTableNamesMap = Object.entries(
   (o, [key, val]) => ({ ...o, [key]: `${val}CalendarCreatedEvent` }),
   {} as Record<OAuth2ProviderType, string>,
 );
-export type AbstractOAuth2CalendarCreatedEvent =
-  | GoogleCalendarCreatedEvent
-  | MicrosoftCalendarCreatedEvent;
 export const oauth2Reasons = ['link', 'signup', 'login'] as const;
 
 export class OAuth2NotConfiguredError extends Error { constructor() { super('OAuth2 not configured'); } }

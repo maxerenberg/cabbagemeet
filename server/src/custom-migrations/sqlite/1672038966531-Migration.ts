@@ -3,7 +3,7 @@ import { latestTentativeOrScheduledDateExpr as indexExpr } from './sqlite-migrat
 
 const indexName = 'IX_Meeting_LatestTentativeOrScheduledDate';
 
-export class Migration1671570734277 implements MigrationInterface {
+export class Migration1672038966531 implements MigrationInterface {
   async up(queryRunner: QueryRunner) {
     await queryRunner.query(
       `CREATE INDEX ${indexName} ON Meeting ((${indexExpr}))`,

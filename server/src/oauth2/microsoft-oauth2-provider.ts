@@ -19,6 +19,7 @@ import {
 import type Meeting from '../meetings/meeting.entity';
 import { encodeQueryParams, jwtSign } from '../misc.utils';
 import User from '../users/user.entity';
+import AbstractOAuth2CalendarCreatedEvent from './abstract-oauth2-calendar-created-event.entity';
 import MicrosoftOAuth2 from './microsoft-oauth2.entity';
 import MicrosoftCalendarEvents from './microsoft-calendar-events.entity';
 import type OAuth2Service from './oauth2.service';
@@ -36,7 +37,6 @@ import {
   OAuth2InvalidOrExpiredNonceError,
   OAuth2ErrorResponseError,
   OAuth2CalendarEvent,
-  AbstractOAuth2CalendarCreatedEvent,
 } from './oauth2-common';
 import type {
   MicrosoftCreateEventResponse,
@@ -470,13 +470,20 @@ export default class MicrosoftOAuth2Provider implements IOAuth2Provider {
       });
     }
     // Filter out the event which we created for this meeting
-    const createdEvent = await this.calendarCreatedEventsRepository.findOneBy({
-      MeetingID: meeting.ID,
-      UserID: userID,
-    });
+    // TODO: reduce code duplication with GoogleOAuth2Provider
+    const createdEvent = await this.calendarCreatedEventsRepository
+      .createQueryBuilder()
+      .innerJoin(
+        'MicrosoftCalendarCreatedEvent.MeetingRespondent',
+        'MeetingRespondent',
+        'MeetingRespondent.MeetingID = :meetingID AND MeetingRespondent.UserID = :userID',
+        {meetingID: meeting.ID, userID},
+      )
+      .select(['MicrosoftCalendarCreatedEvent'])
+      .getOne();
     if (createdEvent) {
       events = events.filter(
-        (event) => event.ID !== createdEvent.CreatedMicrosoftMeetingID,
+        (event) => event.ID !== createdEvent.CreatedEventID,
       );
     }
 
@@ -496,7 +503,7 @@ export default class MicrosoftOAuth2Provider implements IOAuth2Provider {
     let apiURL = MICROSOFT_API_CALENDAR_EVENTS_URL;
     if (existingEvent) {
       // See https://learn.microsoft.com/en-us/graph/api/event-update?view=graph-rest-1.0
-      apiURL += '/' + existingEvent.CreatedMicrosoftMeetingID;
+      apiURL += '/' + existingEvent.CreatedEventID;
       apiMethod = 'PATCH';
     }
     const meetingURL = `${this.publicURL}/m/${meeting.ID}`;
@@ -548,9 +555,9 @@ export default class MicrosoftOAuth2Provider implements IOAuth2Provider {
       }
     }
     await this.calendarCreatedEventsRepository.save({
-      MeetingID: meeting.ID,
+      RespondentID: creds.RespondentID!,
       UserID: userID,
-      CreatedMicrosoftMeetingID: response.id,
+      CreatedEventID: response.id,
     });
   }
 
@@ -559,7 +566,7 @@ export default class MicrosoftOAuth2Provider implements IOAuth2Provider {
     abstractEvent: AbstractOAuth2CalendarCreatedEvent,
   ): Promise<void> {
     const event = abstractEvent as MicrosoftCalendarCreatedEvent;
-    const apiURL = `${MICROSOFT_API_CALENDAR_EVENTS_URL}/${event.CreatedMicrosoftMeetingID}`;
+    const apiURL = `${MICROSOFT_API_CALENDAR_EVENTS_URL}/${event.CreatedEventID}`;
     try {
       await this.oauth2Service.apiRequest(this, creds, apiURL, {
         method: 'DELETE',
@@ -570,8 +577,7 @@ export default class MicrosoftOAuth2Provider implements IOAuth2Provider {
       }
     }
     await this.calendarCreatedEventsRepository.delete({
-      MeetingID: event.MeetingID,
-      UserID: creds.UserID,
+      RespondentID: event.RespondentID,
     });
   }
 }

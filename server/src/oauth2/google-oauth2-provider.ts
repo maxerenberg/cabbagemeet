@@ -9,6 +9,7 @@ import {
 import type Meeting from '../meetings/meeting.entity';
 import { encodeQueryParams } from '../misc.utils';
 import User from '../users/user.entity';
+import AbstractOAuth2CalendarCreatedEvent from './abstract-oauth2-calendar-created-event.entity';
 import GoogleOAuth2 from './google-oauth2.entity';
 import type {
   IOAuth2Provider,
@@ -23,7 +24,6 @@ import type {
   GoogleInsertEventResponse,
 } from './oauth2-response-types';
 import {
-  AbstractOAuth2CalendarCreatedEvent,
   OAuth2CalendarEvent,
   OAuth2ErrorResponseError,
   OAuth2ProviderType,
@@ -348,13 +348,20 @@ export default class GoogleOAuth2Provider implements IOAuth2Provider {
       });
     }
     // Filter out the event which we created for this meeting
-    const createdEvent = await this.calendarCreatedEventsRepository.findOneBy({
-      MeetingID: meeting.ID,
-      UserID: userID,
-    });
+    // TODO: perform this query earlier
+    const createdEvent = await this.calendarCreatedEventsRepository
+      .createQueryBuilder()
+      .innerJoin(
+        'GoogleCalendarCreatedEvent.MeetingRespondent',
+        'MeetingRespondent',
+        'MeetingRespondent.MeetingID = :meetingID AND MeetingRespondent.UserID = :userID',
+        {meetingID: meeting.ID, userID},
+      )
+      .select(['GoogleCalendarCreatedEvent'])
+      .getOne();
     if (createdEvent) {
       events = events.filter(
-        (event) => event.ID !== createdEvent.CreatedGoogleMeetingID,
+        (event) => event.ID !== createdEvent.CreatedEventID,
       );
     }
     return events;
@@ -372,7 +379,7 @@ export default class GoogleOAuth2Provider implements IOAuth2Provider {
     let apiMethod: Dispatcher.HttpMethod = 'POST';
     if (existingEvent) {
       // See https://developers.google.com/calendar/api/v3/reference/events/update
-      apiURL += '/' + existingEvent.CreatedGoogleMeetingID;
+      apiURL += '/' + existingEvent.CreatedEventID;
       apiMethod = 'PUT';
     }
     const params: Record<string, any> = {
@@ -415,10 +422,12 @@ export default class GoogleOAuth2Provider implements IOAuth2Provider {
         throw err;
       }
     }
+    // FIXME: FK constraint fails if meeting is scheduled then unscheduled
+    // in quick succession
     await this.calendarCreatedEventsRepository.save({
-      MeetingID: meeting.ID,
+      RespondentID: creds.RespondentID!,
       UserID: userID,
-      CreatedGoogleMeetingID: response.id,
+      CreatedEventID: response.id,
     });
   }
 
@@ -427,7 +436,7 @@ export default class GoogleOAuth2Provider implements IOAuth2Provider {
     abstractEvent: AbstractOAuth2CalendarCreatedEvent,
   ): Promise<void> {
     const event = abstractEvent as GoogleCalendarCreatedEvent;
-    const apiURL = `${GOOGLE_API_CALENDAR_EVENTS_BASE_URL}/${event.CreatedGoogleMeetingID}`;
+    const apiURL = `${GOOGLE_API_CALENDAR_EVENTS_BASE_URL}/${event.CreatedEventID}`;
     try {
       await this.oauth2Service.apiRequest(this, creds, apiURL, {
         method: 'DELETE',
@@ -438,8 +447,7 @@ export default class GoogleOAuth2Provider implements IOAuth2Provider {
       }
     }
     await this.calendarCreatedEventsRepository.delete({
-      MeetingID: event.MeetingID,
-      UserID: creds.UserID,
+      RespondentID: abstractEvent.RespondentID
     });
   }
 }

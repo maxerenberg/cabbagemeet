@@ -8,6 +8,7 @@ describe('AppController (e2e)', () => {
 
   beforeAll(async () => { app = await commonBeforeAll(); });
   beforeEach(commonBeforeEach);
+  afterAll(() => commonAfterAll(app));
 
   it('/api/server-info (GET)', () => {
     return request(app.getHttpServer())
@@ -18,6 +19,4 @@ describe('AppController (e2e)', () => {
         microsoftOAuth2IsSupported: false,
       });
   });
-
-  afterAll(() => commonAfterAll(app));
 });

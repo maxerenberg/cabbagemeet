@@ -25,6 +25,7 @@ import {
   scheduleMeeting,
   unscheduleMeeting,
 } from './e2e-testing-helpers';
+import { DataSource } from 'typeorm';
 
 // WARNING: do not use jest.mock() because it loads some modules twice,
 // causing the `instanceof` operator to *occasionally* fail.
@@ -244,6 +245,22 @@ async function signupNewUserWithGoogle({sub, name, email}: {sub: string, name: s
   return redirect2Params.token;
 }
 
+// This is leaking implementation details, but I can't think of another way
+// to make sure that the event is saved, since we don't expose it via an API...
+async function waitUntilCreatedEventIsSavedInDB(eventID: string, expectedNumber: number, app: INestApplication) {
+  const datasource = app.get(DataSource);
+  for (let i = 0; i < 20; i++) {
+    const rows = await datasource.query(
+      `SELECT 1 FROM GoogleCalendarCreatedEvent WHERE CreatedEventID = '${eventID}'`
+    );
+    if (rows.length === expectedNumber) {
+      return;
+    }
+    await sleep(50);
+  }
+  throw new Error('timed out waiting for created event to get saved to DB');
+}
+
 describe('OAuth2Controller (e2e)', () => {
   let app: NestExpressApplication;
   let token1: string;
@@ -277,7 +294,6 @@ describe('OAuth2Controller (e2e)', () => {
     });
   });
   beforeEach(commonBeforeEach);
-  afterAll(() => commonAfterAll(app));
 
   beforeEach(() => {
     // See https://undici.nodejs.org/#/docs/best-practices/mocking-request
@@ -286,11 +302,15 @@ describe('OAuth2Controller (e2e)', () => {
     setGlobalDispatcher(mockAgent);
   });
   afterEach(async () => {
-    await mockAgent.close();
+    if (mockAgent) {
+      await mockAgent.close();
+    }
   });
   afterAll(() => {
     setGlobalDispatcher(originalGlobalDispatcher);
   });
+
+  afterAll(() => commonAfterAll(app));
 
   it('/api/signup-with-google (POST)', async () => {
     token1 = await signupNewUserWithGoogle({sub: mockSub1, name: mockName1, email: mockEmail1}, app);
@@ -947,7 +967,18 @@ describe('OAuth2Controller (e2e)', () => {
           return;
         }
         if (++numEventsCreated === expectedTimes) {
-          createEventResolve(null);
+          // The server saves the event to the database AFTER it makes the
+          // request to the Google API. So we need to wait until the DB is
+          // updated.
+          // TODO: figure out a better way to do this
+          (async () => {
+            try {
+              await waitUntilCreatedEventIsSavedInDB('google_event_1', expectedTimes, app);
+              createEventResolve(null);
+            } catch (err) {
+              createEventReject(err);
+            }
+          })();
         }
         return createMockJsonResponse({
           id: 'google_event_1',
@@ -1058,7 +1089,7 @@ describe('OAuth2Controller (e2e)', () => {
     await createEventPromise;
     deleteEventPromise = setMockHandlerForDeletingEvent(2);
     await DELETE('/api/meetings/' + meetingID, app, token1).expect(HttpStatus.NO_CONTENT);
-    await deleteEventPromise;
+    await deleteEventPromise;  // <-- this sometimes hangs forever
 
     await deleteAccountAndExpectTokenToBeRevoked(app, token1);
     await deleteAccountAndExpectTokenToBeRevoked(app, token2);
@@ -1181,4 +1212,7 @@ describe('OAuth2Controller (e2e)', () => {
 
     await deleteAccountAndExpectTokenToBeRevoked(app, token);
   });
+
+  // TODO: test meeting getting deleted/unscheduled right after being scheduled
+  // (add delay to mock API response)
 });

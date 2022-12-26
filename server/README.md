@@ -166,8 +166,7 @@ To do this, you need to first run the existing migrations on a new empty databas
 
 First, create a timestamp which we will use as the migration name for each database type:
 ```bash
-# use gdate on MacOS (brew install coreutils)
-timestamp=$(date +%s)
+timestamp=$(node -p 'Date.now()')
 ```
 
 ### SQLite

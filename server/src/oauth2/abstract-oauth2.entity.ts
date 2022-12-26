@@ -1,5 +1,5 @@
 import { Column, PrimaryColumn, Index } from 'typeorm';
-import type { AbstractOAuth2CalendarCreatedEvent } from './oauth2-common';
+import type AbstractOAuth2CalendarCreatedEvent from './abstract-oauth2-calendar-created-event.entity';
 
 export default abstract class AbstractOAuth2 {
   @PrimaryColumn()
@@ -27,6 +27,9 @@ export default abstract class AbstractOAuth2 {
 
   // Exact type depends on implementation
   CreatedEvents: AbstractOAuth2CalendarCreatedEvent[];
+
+  // This is filled when performing a raw SQL query
+  RespondentID?: number;
 
   static getColumnNames(): string[] {
     // Needed for building a raw SQL query

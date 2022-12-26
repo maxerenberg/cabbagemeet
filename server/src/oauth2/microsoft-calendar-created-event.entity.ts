@@ -1,30 +1,15 @@
-import { Entity, Column, PrimaryColumn, ManyToOne, Index } from 'typeorm';
+import { Entity, ManyToOne } from 'typeorm';
 import { CustomJoinColumn } from '../custom-columns/custom-join-column';
-import Meeting from '../meetings/meeting.entity';
+import MeetingRespondent from '../meetings/meeting-respondent.entity';
+import AbstractOAuth2CalendarCreatedEvent from './abstract-oauth2-calendar-created-event.entity';
 import MicrosoftOAuth2 from './microsoft-oauth2.entity';
 
 @Entity('MicrosoftCalendarCreatedEvent')
-export default class MicrosoftCalendarCreatedEvent {
-  // Composite primary key (order matters - MeetingID must be first)
-  @PrimaryColumn()
-  MeetingID: number;
-
-  @Index()
-  @PrimaryColumn()
-  UserID: number;
-
-  // The ID of the Microsoft Calendar event which we created for this meeting
-  // once it was scheduled.
-  @Column()
-  CreatedMicrosoftMeetingID: string;
-
-  @ManyToOne(
-    () => Meeting,
-    (meeting) => meeting.MicrosoftCalendarCreatedEvents,
-    { onDelete: 'CASCADE' },
-  )
-  @CustomJoinColumn({ name: 'MeetingID' })
-  Meeting: Meeting;
+export default class MicrosoftCalendarCreatedEvent extends AbstractOAuth2CalendarCreatedEvent {
+  // No cascading deletion so that we can delete events which we created
+  @ManyToOne(() => MeetingRespondent, (respondent) => respondent.MicrosoftCalendarCreatedEvents)
+  @CustomJoinColumn({ name: 'RespondentID' })
+  MeetingRespondent: MeetingRespondent;
 
   @ManyToOne(() => MicrosoftOAuth2, (msftOAuth2) => msftOAuth2.CreatedEvents, {
     onDelete: 'CASCADE',
