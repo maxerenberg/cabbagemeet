@@ -2,13 +2,15 @@ import { URL } from 'url';
 import { jest } from '@jest/globals';
 import { HttpStatus, INestApplication } from '@nestjs/common';
 import type { NestExpressApplication } from '@nestjs/platform-express';
+import { DataSource } from 'typeorm';
 import { MockAgent, getGlobalDispatcher, setGlobalDispatcher } from 'undici';
-import { MockInterceptor } from 'undici/types/mock-interceptor';
+import type { MockInterceptor } from 'undici/types/mock-interceptor';
 import type { CustomRedirectResponse } from '../src/common-responses';
 import { getSecondsSinceUnixEpoch } from '../src/dates.utils';
 import type CreateMeetingDto from '../src/meetings/create-meeting.dto';
 import type ScheduleMeetingDto from '../src/meetings/schedule-meeting.dto';
 import { jwtSign, sleep } from '../src/misc.utils';
+import OAuth2Service from '../src/oauth2/oauth2.service';
 import {
   commonAfterAll,
   commonBeforeAll,
@@ -25,7 +27,6 @@ import {
   scheduleMeeting,
   unscheduleMeeting,
 } from './e2e-testing-helpers';
-import { DataSource } from 'typeorm';
 
 // WARNING: do not use jest.mock() because it loads some modules twice,
 // causing the `instanceof` operator to *occasionally* fail.
@@ -78,6 +79,19 @@ const mockClientId = 'google_client_id';
 const mockClientSecret = 'google_client_secret';
 const mockAuthzCode = 'google_code';
 const mockRedirectUri = 'http://cabbagemeet.internal/redirect/google';
+const GONE_error = {
+  error: {
+    errors: [
+      {
+        domain: "global",
+        reason: "deleted",
+        message: "Resource has been deleted"
+      }
+    ],
+    code: 410,
+    message: "Resource has been deleted",
+  },
+};
 
 async function signupOrLoginOrLink(reason: 'signup' | 'login' | 'link', app: INestApplication, token?: string): Promise<string> {
   const apiURL = ({
@@ -1104,46 +1118,32 @@ describe('OAuth2Controller (e2e)', () => {
     await putSelfRespondent({availabilities: []}, meetingID, app, token);
     const schedule = {...sampleSchedule};
 
-    const eventCreationHandler = (resolve: (val: unknown) => void, reject: (val: unknown) => void) => {
-      resolve(null);
-      return createMockJsonResponse({
-        id: 'google_event_1',
-        status: 'confirmed',
-        summary: createMeetingDto.name,
-        start: {
-          dateTime: schedule.startDateTime,
-          timeZone: 'UTC',
-        },
-        end: {
-          dateTime: schedule.endDateTime,
-          timeZone: 'UTC',
-        },
-      });
-    };
+    const eventCreationHandler = (eventID: string) => createMockJsonResponse({
+      id: eventID,
+      status: 'confirmed',
+      summary: createMeetingDto.name,
+      start: {
+        dateTime: schedule.startDateTime,
+        timeZone: 'UTC',
+      },
+      end: {
+        dateTime: schedule.endDateTime,
+        timeZone: 'UTC',
+      },
+    });
     const [createEventPromise, createEventResolve, createEventReject] = createPromiseCallbacks();
     mockAgent.get(apiBaseUrl).intercept({
       method: 'POST',
       path: eventsApiPath,
     }).reply(() => {
-      return eventCreationHandler(createEventResolve, createEventReject);
+      createEventResolve(null);
+      return eventCreationHandler('google_event_1');
     });
     await scheduleMeeting(meetingID, schedule, app);
     await createEventPromise;
+    await waitUntilCreatedEventIsSavedInDB('google_event_1', 1, app);
 
     const [updateEventPromise, updateEventResolve, updateEventReject] = createPromiseCallbacks();
-    const GONE_error = {
-      error: {
-        errors: [
-          {
-            domain: "global",
-            reason: "deleted",
-            message: "Resource has been deleted"
-          }
-        ],
-        code: 410,
-        message: "Resource has been deleted",
-      },
-    };
     mockAgent.get(apiBaseUrl).intercept({
       method: 'PUT',
       path: `${eventsApiPath}/google_event_1`,
@@ -1157,18 +1157,20 @@ describe('OAuth2Controller (e2e)', () => {
       method: 'POST',
       path: eventsApiPath,
     }).reply(() => {
-      return eventCreationHandler(updateEventResolve, updateEventReject);
+      updateEventResolve(null);
+      return eventCreationHandler('google_event_2');
     });
     createMeetingDto.about = 'Some new description';
     await PATCH('/api/meetings/' + meetingID, app, token)
       .send({about: createMeetingDto.about})
       .expect(HttpStatus.OK);
     await updateEventPromise;
+    await waitUntilCreatedEventIsSavedInDB('google_event_2', 1, app);
 
     const [deleteEventPromise, deleteEventResolve, deleteEventReject] = createPromiseCallbacks();
     mockAgent.get(apiBaseUrl).intercept({
       method: 'DELETE',
-      path: `${eventsApiPath}/google_event_1`,
+      path: `${eventsApiPath}/google_event_2`,
     }).reply(() => {
       deleteEventResolve(null);
       return {
@@ -1213,6 +1215,171 @@ describe('OAuth2Controller (e2e)', () => {
     await deleteAccountAndExpectTokenToBeRevoked(app, token);
   });
 
-  // TODO: test meeting getting deleted/unscheduled right after being scheduled
-  // (add delay to mock API response)
+  it.each([true, false])(
+    (
+      '/api/meetings/:id/schedule (PUT) ' +
+      '(unschedule meeting or remove availabilities while event is being created)'
+    ),
+    async (shouldRemoveAvailabilities) =>
+  {
+    const token = await signupNewUserWithGoogle(
+      {sub: mockSub2, name: mockName2, email: mockEmail2}, app
+    );
+    const {meetingID} = await createMeeting(sampleCreateMeetingDto, app);
+    await putSelfRespondent({availabilities: []}, meetingID, app, token);
+    mockAgent.get(apiBaseUrl).intercept({
+      method: 'POST',
+      path: eventsApiPath,
+    }).reply(() => {
+      return createMockJsonResponse({
+        id: 'google_event_1',
+        status: 'confirmed',
+        summary: sampleCreateMeetingDto.name,
+        start: {
+          dateTime: sampleSchedule.startDateTime,
+          timeZone: 'UTC',
+        },
+        end: {
+          dateTime: sampleSchedule.endDateTime,
+          timeZone: 'UTC',
+        },
+      });
+    });
+    const [deleteEventPromise, deleteEventResolve, deleteEventReject] = createPromiseCallbacks();
+    mockAgent.get(apiBaseUrl).intercept({
+      method: 'DELETE',
+      path: `${eventsApiPath}/google_event_1`,
+    }).reply(() => {
+      deleteEventResolve(null);
+      return {
+        statusCode: 204,
+        data: '',
+      };
+    });
+    const [createEventPromise, createEventResolve, createEventReject] = createPromiseCallbacks();
+    const [invalidateEventPromise, invalidateEventResolve, invalidateEventReject] = createPromiseCallbacks();
+    // Workaround for https://github.com/nodejs/undici/issues/1348
+    const oauth2Service = app.get(OAuth2Service);
+    oauth2Service.apiRequest = async (...args: Parameters<InstanceType<typeof OAuth2Service>['apiRequest']>) => {
+      // Deleting the property will restore the prototype's function
+      delete oauth2Service.apiRequest;
+      createEventResolve(null);
+      await invalidateEventPromise;
+      return oauth2Service.apiRequest(...args);
+    };
+    try {
+      await scheduleMeeting(meetingID, sampleSchedule, app);
+      await createEventPromise;
+      if (shouldRemoveAvailabilities) {
+        await removeSelfRespondent(meetingID, app, token);
+      } else {
+        await unscheduleMeeting(meetingID, app);
+      }
+      invalidateEventResolve(null);
+    } catch (err) {
+      invalidateEventReject(err);
+      throw err;
+    } finally {
+      delete oauth2Service.apiRequest;
+    }
+    await deleteEventPromise;
+    await deleteAccountAndExpectTokenToBeRevoked(app, token);
+  });
+
+  it.each([true, false])(
+    (
+      '/api/meetings/:id/schedule (PUT) ' +
+      '(unschedule meeting or remove availabilities while event is being updated)'
+    ),
+    async (shouldRemoveAvailabilities) =>
+  {
+    const token = await signupNewUserWithGoogle(
+      {sub: mockSub2, name: mockName2, email: mockEmail2}, app
+    );
+    const createMeetingDto = {...sampleCreateMeetingDto};
+    const {meetingID} = await createMeeting(createMeetingDto, app);
+    await putSelfRespondent({availabilities: []}, meetingID, app, token);
+    const createCreateOrUpdateResponse = (eventID: string) => createMockJsonResponse({
+      id: eventID,
+      status: 'confirmed',
+      summary: createMeetingDto.name,
+      start: {
+        dateTime: sampleSchedule.startDateTime,
+        timeZone: 'UTC',
+      },
+      end: {
+        dateTime: sampleSchedule.endDateTime,
+        timeZone: 'UTC',
+      },
+    });
+    mockAgent.get(apiBaseUrl).intercept({
+      method: 'POST',
+      path: eventsApiPath,
+    }).reply(() => createCreateOrUpdateResponse('google_event_1'));
+    await scheduleMeeting(meetingID, sampleSchedule, app);
+    await waitUntilCreatedEventIsSavedInDB('google_event_1', 1, app);
+    createMeetingDto.name = 'A new name';
+    // Pretend that the user deleted the event themselves, so the server
+    // will try to create a new one
+    mockAgent.get(apiBaseUrl).intercept({
+      method: 'PUT',
+      path: `${eventsApiPath}/google_event_1`,
+    }).reply(410, '');
+    mockAgent.get(apiBaseUrl).intercept({
+      method: 'POST',
+      path: eventsApiPath,
+    }).reply(() => createCreateOrUpdateResponse('google_event_2'));
+    const [createEventPromise, createEventResolve, createEventReject] = createPromiseCallbacks();
+    const [invalidateEventPromise, invalidateEventResolve, invalidateEventReject] = createPromiseCallbacks();
+    const [deleteEventPromise, deleteEventResolve, deleteEventReject] = createPromiseCallbacks();
+    // Workaround for https://github.com/nodejs/undici/issues/1348
+    const oauth2Service = app.get(OAuth2Service);
+    oauth2Service.apiRequest = async (...args: Parameters<InstanceType<typeof OAuth2Service>['apiRequest']>) => {
+      if (args[3].method === 'POST') {
+        // Deleting the property will restore the prototype's function
+        delete oauth2Service.apiRequest;
+        createEventResolve(null);
+        await invalidateEventPromise;
+      }
+      return OAuth2Service.prototype.apiRequest.call(oauth2Service, ...args);
+    };
+    mockAgent.get(apiBaseUrl).intercept({
+      method: 'DELETE',
+      path: `${eventsApiPath}/google_event_1`,
+    }).reply(() => {
+      return {
+        statusCode: 410,
+        data: '',
+      };
+    });
+    mockAgent.get(apiBaseUrl).intercept({
+      method: 'DELETE',
+      path: `${eventsApiPath}/google_event_2`,
+    }).reply(() => {
+      deleteEventResolve(null);
+      return {
+        statusCode: 204,
+        data: '',
+      };
+    });
+    try {
+      await PATCH('/api/meetings/' + meetingID, app, token)
+        .send({name: createMeetingDto.name})
+        .expect(HttpStatus.OK);
+      await createEventPromise;
+      if (shouldRemoveAvailabilities) {
+        await removeSelfRespondent(meetingID, app, token);
+      } else {
+        await unscheduleMeeting(meetingID, app);
+      }
+      invalidateEventResolve(null);
+    } catch (err) {
+      invalidateEventReject(err);
+      throw err;
+    } finally {
+      delete oauth2Service.apiRequest;
+    }
+    await deleteEventPromise;
+    await deleteAccountAndExpectTokenToBeRevoked(app, token);
+  });
 });

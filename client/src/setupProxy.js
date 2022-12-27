@@ -5,7 +5,7 @@ module.exports = function(app) {
     app.use(
       routePrefix,
       createProxyMiddleware({
-        target: 'http://localhost:3001',
+        target: 'http://127.0.0.1:3001',
         changeOrigin: true,
       })
     );

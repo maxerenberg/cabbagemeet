@@ -6,8 +6,9 @@ import GoogleOAuth2 from './google-oauth2.entity';
 
 @Entity('GoogleCalendarCreatedEvent')
 export default class GoogleCalendarCreatedEvent extends AbstractOAuth2CalendarCreatedEvent {
-  // No cascading deletion so that we can delete events which we created
-  @ManyToOne(() => MeetingRespondent, (respondent) => respondent.GoogleCalendarCreatedEvents)
+  @ManyToOne(() => MeetingRespondent, (respondent) => respondent.GoogleCalendarCreatedEvents, {
+    onDelete: 'CASCADE',
+  })
   @CustomJoinColumn({ name: 'RespondentID' })
   MeetingRespondent: MeetingRespondent;
 

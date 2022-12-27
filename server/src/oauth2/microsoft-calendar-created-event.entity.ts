@@ -7,7 +7,9 @@ import MicrosoftOAuth2 from './microsoft-oauth2.entity';
 @Entity('MicrosoftCalendarCreatedEvent')
 export default class MicrosoftCalendarCreatedEvent extends AbstractOAuth2CalendarCreatedEvent {
   // No cascading deletion so that we can delete events which we created
-  @ManyToOne(() => MeetingRespondent, (respondent) => respondent.MicrosoftCalendarCreatedEvents)
+  @ManyToOne(() => MeetingRespondent, (respondent) => respondent.MicrosoftCalendarCreatedEvents, {
+    onDelete: 'CASCADE',
+  })
   @CustomJoinColumn({ name: 'RespondentID' })
   MeetingRespondent: MeetingRespondent;
 

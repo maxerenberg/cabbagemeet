@@ -7,11 +7,11 @@ import { DataSource, Repository } from 'typeorm';
 import CacherService from '../cacher/cacher.service';
 import ConfigService from '../config/config.service';
 import type { DatabaseType } from '../config/env.validation';
-import { normalizeDBError, UniqueConstraintFailed } from '../database.utils';
+import { getPlaceholders, normalizeDBError, UniqueConstraintFailed } from '../database.utils';
 import { getSecondsSinceUnixEpoch } from '../dates.utils';
 import Meeting from '../meetings/meeting.entity';
 import MeetingsService from '../meetings/meetings.service';
-import { assert, encodeQueryParams } from '../misc.utils';
+import { assert, assertIsNever, encodeQueryParams } from '../misc.utils';
 import User from '../users/user.entity';
 import { selectUserLeftJoinOAuth2Tables } from '../users/users.service';
 import AbstractOAuth2CalendarCreatedEvent from './abstract-oauth2-calendar-created-event.entity';
@@ -150,14 +150,14 @@ export interface IOAuth2Provider {
     creds: AbstractOAuth2,
     meeting: Meeting,
   ): Promise<OAuth2CalendarEvent[]>;
-  createOrUpdateEventForMeeting(
+  apiCreateOrUpdateEvent(
     creds: AbstractOAuth2,
     existingEvent: AbstractOAuth2CalendarCreatedEvent | null,
     meeting: Meeting,
-  ): Promise<void>;
-  deleteEventForMeeting(
+  ): Promise<string>;
+  apiDeleteEvent(
     creds: AbstractOAuth2,
-    event: AbstractOAuth2CalendarCreatedEvent,
+    eventID: string,
   ): Promise<void>;
 }
 
@@ -169,6 +169,10 @@ export default class OAuth2Service {
   private readonly oauth2Repositories: Record<
     OAuth2ProviderType,
     Repository<AbstractOAuth2>
+  >;
+  private readonly createdEventRepositories: Record<
+    OAuth2ProviderType,
+    Repository<AbstractOAuth2CalendarCreatedEvent>
   >;
 
   constructor(
@@ -196,19 +200,21 @@ export default class OAuth2Service {
         configService,
         this,
         googleCalendarEventsRepository,
-        googleCalendarCreatedEventsRepository,
       ),
       [OAuth2ProviderType.MICROSOFT]: new MicrosoftOAuth2Provider(
         configService,
         cacherService,
         this,
         microsoftCalendarEventsRepository,
-        microsoftCalendarCreatedEventsRepository,
       ),
     };
     this.oauth2Repositories = {
       [OAuth2ProviderType.GOOGLE]: googleOAuth2Repository,
       [OAuth2ProviderType.MICROSOFT]: microsoftOAuth2Repository,
+    };
+    this.createdEventRepositories = {
+      [OAuth2ProviderType.GOOGLE]: googleCalendarCreatedEventsRepository,
+      [OAuth2ProviderType.MICROSOFT]: microsoftCalendarCreatedEventsRepository,
     };
   }
 
@@ -620,18 +626,6 @@ export default class OAuth2Service {
     return this.refreshAccessToken(provider, creds);
   }
 
-  async getOrRefreshCreds(
-    provider: IOAuth2Provider,
-    userID: number,
-  ): Promise<AbstractOAuth2 | null> {
-    const oauth2Repository = this.oauth2Repositories[provider.type];
-    const creds = await oauth2Repository.findOneBy({ UserID: userID });
-    if (!creds) {
-      return null;
-    }
-    return this.refreshCredsIfNecessary(provider, creds);
-  }
-
   private async deleteCredsIfErrorIsInvalidToken(
     provider: IOAuth2Provider,
     err: any,
@@ -728,6 +722,7 @@ export default class OAuth2Service {
     );
     for (const result of results) {
       if (result.status === 'rejected') {
+        this.logger.error('unlinkAllOAuth2AccountsForDeletion failed:');
         this.logger.error(result.reason);
       }
     }
@@ -740,10 +735,15 @@ export default class OAuth2Service {
   ): Promise<OAuth2CalendarEvent[]> {
     const provider = this.getProvider(providerType);
     const meeting = await this.meetingsService.getMeetingOrThrow(meetingID);
-    const creds = await this.getOrRefreshCreds(provider, userID);
+    const respondentsForUser = await this.getOAuth2LinkedRespondents({
+      provider, meetingID, mustHaveCreatedEvent: false,
+      mustBeRespondent: false, userID,
+    });
+    let creds = respondentsForUser.length > 0 ? respondentsForUser[0] : null;
     if (!creds || !creds.LinkedCalendar) {
       return [];
     }
+    creds = await this.refreshCredsIfNecessary(provider, creds);
     const events = await provider.getEventsForMeeting(creds, meeting);
     // sort by start date
     events.sort((event1, event2) => event1.start.localeCompare(event2.start));
@@ -751,10 +751,14 @@ export default class OAuth2Service {
   }
 
   private async getOAuth2LinkedRespondents({
-    provider, meetingID, mustHaveCreatedEvent, userID,
+    provider, meetingID,
+    mustBeRespondent = true,
+    mustHaveCreatedEvent,
+    userID,
   }: {
     provider: IOAuth2Provider,
     meetingID: number,
+    mustBeRespondent?: boolean,
     mustHaveCreatedEvent: boolean,
     userID?: number,
   }): Promise<AbstractOAuth2[]> {
@@ -777,7 +781,7 @@ export default class OAuth2Service {
       + `, ${createdEventTableName}.CreatedEventID AS "CreatedEventID"`;
     const rows = await this.dataSource.query(`
       SELECT ${selectCols} FROM ${oauth2TableName}
-      INNER JOIN MeetingRespondent
+      ${mustBeRespondent ? 'INNER' : 'LEFT'} JOIN MeetingRespondent
         ON ${oauth2TableName}.UserID = MeetingRespondent.UserID
         AND MeetingRespondent.MeetingID = ${meetingID}
       ${mustHaveCreatedEvent ? 'INNER' : 'LEFT'} JOIN ${createdEventTableName}
@@ -825,6 +829,7 @@ export default class OAuth2Service {
     );
     for (const result of results) {
       if (result.status === 'rejected') {
+        this.logger.error('tryCreateOrUpdateEventsForMeetingForAllRespondents_provider failed:');
         this.logger.error(result.reason);
       }
     }
@@ -849,6 +854,7 @@ export default class OAuth2Service {
     );
     for (const result of results) {
       if (result.status === 'rejected') {
+        this.logger.error('tryCreateOrUpdateEventsForMeetingForAllRespondents failed:');
         this.logger.error(result.reason);
       }
     }
@@ -867,11 +873,107 @@ export default class OAuth2Service {
       return;
     }
     creds = await this.refreshCredsIfNecessary(provider, creds);
-    return provider.createOrUpdateEventForMeeting(
-      creds,
-      existingEvent,
-      meeting,
-    );
+    const respondentID = creds.RespondentID!;
+    // Note that the eventID might change even if an event previously existed,
+    // e.g. if the user deleted the old event themselves and we had to create
+    // a new one.
+    const eventID = await provider.apiCreateOrUpdateEvent(creds, existingEvent, meeting);
+    if (existingEvent && existingEvent.CreatedEventID === eventID) {
+      return;
+    }
+    const createdEventTableName = oauth2CreatedEventTableNamesMap[provider.type];
+    if (existingEvent) {
+      // TypeORM does not support joins in UPDATE statements
+      // See https://github.com/typeorm/typeorm/issues/564#issuecomment-310331468
+      const placeholders = getPlaceholders(2, this.dbType);
+      let rowsAffected = 0;
+      if (this.dbType === 'mariadb') {
+        const result = await this.dataSource.query(`
+          UPDATE ${createdEventTableName}
+          INNER JOIN MeetingRespondent
+            ON ${createdEventTableName}.RespondentID = MeetingRespondent.RespondentID
+          INNER JOIN Meeting
+            ON MeetingRespondent.MeetingID = Meeting.ID
+          SET CreatedEventID = ${placeholders[0]}
+          WHERE ${createdEventTableName}.RespondentID = ${placeholders[1]}
+          AND Meeting.ScheduledStartDateTime IS NOT NULL
+        `, [eventID, respondentID]);
+        // ResultSetHeader {
+        //   fieldCount: 0,
+        //   affectedRows: 1,
+        //   insertId: 0,
+        //   info: 'Rows matched: 1  Changed: 1  Warnings: 0',
+        //   serverStatus: 2,
+        //   warningStatus: 0,
+        //   changedRows: 1
+        // }
+        rowsAffected = result.affectedRows;
+      } else if (this.dbType === 'postgres' || this.dbType === 'sqlite') {
+        const result = await this.dataSource.query(`
+          UPDATE ${createdEventTableName}
+          SET CreatedEventID = ${placeholders[0]}
+          FROM MeetingRespondent
+          INNER JOIN Meeting ON MeetingRespondent.MeetingID = Meeting.ID
+          WHERE ${createdEventTableName}.RespondentID = MeetingRespondent.RespondentID
+          AND ${createdEventTableName}.RespondentID = ${placeholders[1]}
+          AND Meeting.ScheduledStartDateTime IS NOT NULL
+          RETURNING 1
+        `, [eventID, respondentID]);
+        if (this.dbType === 'postgres') {
+          // If row was updated: [ [ { '?column?': 1 } ], 1 ]
+          // Otherwise: [ [], 0 ]
+          assert(
+            Array.isArray(result) && result.length === 2 && typeof result[1] === 'number',
+            'Unexpected format of Postgres update result',
+          );
+          rowsAffected = result[1];
+        } else {
+          // If row was updated: [ {'1': 1} ]
+          // Otherwise: []
+          assert(Array.isArray(result), 'Unexpected format of SQLite update result');
+          rowsAffected = result.length;
+        }
+      } else {
+        assertIsNever(this.dbType);
+      }
+      if (rowsAffected === 0) {
+        this.logger.debug(
+          'Did not update event: meeting was unscheduled/deleted or respondent' +
+          ` was deleted (respondentID=${respondentID})`
+        );
+        await provider.apiDeleteEvent(creds, eventID);
+        // No need to update the database here - the request which invalidated
+        // the old event is responsible for deleting it
+      }
+    } else {
+      // TypeORM does not support "insert into select", see
+      // https://github.com/typeorm/typeorm/issues/4374
+      const placeholders = getPlaceholders(4, this.dbType);
+      // INSERT ... RETURNING is supported by Postgres, MariaDB (10.5+) and SQLite
+      // (but not by MySQL)
+      //
+      // FIXME: could get a unique constraint violation if e.g. a meeting
+      // is scheduled twice in quick succession
+      const result = await this.dataSource.query(`
+        INSERT INTO ${createdEventTableName} (RespondentID, UserID, CreatedEventID)
+        SELECT ${placeholders[0]}, ${placeholders[1]}, ${placeholders[2]}
+        FROM MeetingRespondent
+        INNER JOIN Meeting ON MeetingRespondent.MeetingID = Meeting.ID
+        WHERE MeetingRespondent.RespondentID = ${placeholders[3]}
+        AND Meeting.ScheduledStartDateTime IS NOT NULL
+        RETURNING 1
+      `, [respondentID, creds.UserID, eventID, respondentID]);
+      // postgres: [ {'?column?': 1} ]
+      // sqlite: [ {'1': 1} ]
+      // mariadb: [ {'1': 1} ]
+      if (result.length === 0) {
+        this.logger.debug(
+          'Did not insert event: meeting was unscheduled/deleted or respondent' +
+          ` was deleted (respondentID=${respondentID})`
+        );
+        await provider.apiDeleteEvent(creds, eventID);
+      }
+    }
   }
 
   private async tryCreateOrUpdateEventsForMeetingForSingleRespondent_provider(
@@ -896,6 +998,7 @@ export default class OAuth2Service {
         meeting,
       );
     } catch (err: any) {
+      this.logger.error('tryCreateOrUpdateEventsForMeetingForSingleRespondent_provider failed:');
       this.logger.error(err);
     }
   }
@@ -921,9 +1024,25 @@ export default class OAuth2Service {
     );
     for (const result of results) {
       if (result.status === 'rejected') {
+        this.logger.error('tryCreateOrUpdateEventsForMeetingForSingleRespondent failed:');
         this.logger.error(result.reason);
       }
     }
+  }
+
+  private async deleteEventForMeeting(
+    provider: IOAuth2Provider,
+    creds: AbstractOAuth2,
+    abstractEvent: AbstractOAuth2CalendarCreatedEvent,
+  ) {
+    creds = await this.refreshCredsIfNecessary(provider, creds);
+    await provider.apiDeleteEvent(creds, abstractEvent.CreatedEventID);
+    // Include CreatedEventID as a condition in case a new event is being
+    // created by a concurrent request or something
+    await this.createdEventRepositories[provider.type].delete({
+      RespondentID: abstractEvent.RespondentID,
+      CreatedEventID: abstractEvent.CreatedEventID,
+    });
   }
 
   private async tryDeleteEventsForMeeting_provider(
@@ -935,7 +1054,8 @@ export default class OAuth2Service {
     });
     const results = await Promise.allSettled(
       linkedRespondents.map((linkedRespondent) =>
-        provider.deleteEventForMeeting(
+        this.deleteEventForMeeting(
+          provider,
           linkedRespondent,
           linkedRespondent.CreatedEvents[0],
         ),
@@ -943,6 +1063,7 @@ export default class OAuth2Service {
     );
     for (const result of results) {
       if (result.status === 'rejected') {
+        this.logger.error('tryDeleteEventsForMeeting_provider failed:');
         this.logger.error(result.reason);
       }
     }
@@ -956,6 +1077,7 @@ export default class OAuth2Service {
     );
     for (const result of results) {
       if (result.status === 'rejected') {
+        this.logger.error('tryDeleteEventsForMeetingForAllRespondents failed:');
         this.logger.error(result.reason);
       }
     }
@@ -969,15 +1091,16 @@ export default class OAuth2Service {
     const creds = (await this.getOAuth2LinkedRespondents({
       provider,
       meetingID,
-      mustHaveCreatedEvent: false,
+      mustHaveCreatedEvent: true,
       userID,
     }))[0];
     if (!creds) {
       return;
     }
     try {
-      await provider.deleteEventForMeeting(creds, creds.CreatedEvents[0]);
+      await this.deleteEventForMeeting(provider, creds, creds.CreatedEvents[0]);
     } catch (err: any) {
+      this.logger.error('tryDeleteEventsForMeetingForSingleRespondent_provider failed:');
       this.logger.error(err);
     }
   }
@@ -997,6 +1120,7 @@ export default class OAuth2Service {
     );
     for (const result of results) {
       if (result.status === 'rejected') {
+        this.logger.error('tryDeleteEventsForMeetingForSingleRespondent failed:');
         this.logger.error(result.reason);
       }
     }

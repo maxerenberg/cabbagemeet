@@ -32,7 +32,6 @@ import {
 import type OAuth2Service from './oauth2.service';
 import GoogleCalendarEvents from './google-calendar-events.entity';
 import { Logger } from '@nestjs/common';
-import GoogleCalendarCreatedEvent from './google-calendar-created-event.entity';
 import AbstractOAuth2 from './abstract-oauth2.entity';
 
 const googleOidcScopes = [
@@ -112,7 +111,6 @@ export default class GoogleOAuth2Provider implements IOAuth2Provider {
     configService: ConfigService,
     private readonly oauth2Service: OAuth2Service,
     private readonly calendarEventsRepository: Repository<GoogleCalendarEvents>,
-    private readonly calendarCreatedEventsRepository: Repository<GoogleCalendarCreatedEvent>,
   ) {
     const client_id = configService.get('OAUTH2_GOOGLE_CLIENT_ID');
     const secret = configService.get('OAUTH2_GOOGLE_CLIENT_SECRET');
@@ -347,18 +345,7 @@ export default class GoogleOAuth2Provider implements IOAuth2Provider {
         SyncToken: nextSyncToken,
       });
     }
-    // Filter out the event which we created for this meeting
-    // TODO: perform this query earlier
-    const createdEvent = await this.calendarCreatedEventsRepository
-      .createQueryBuilder()
-      .innerJoin(
-        'GoogleCalendarCreatedEvent.MeetingRespondent',
-        'MeetingRespondent',
-        'MeetingRespondent.MeetingID = :meetingID AND MeetingRespondent.UserID = :userID',
-        {meetingID: meeting.ID, userID},
-      )
-      .select(['GoogleCalendarCreatedEvent'])
-      .getOne();
+    const createdEvent = creds.CreatedEvents.length > 0 ? creds.CreatedEvents[0] : null;
     if (createdEvent) {
       events = events.filter(
         (event) => event.ID !== createdEvent.CreatedEventID,
@@ -367,14 +354,11 @@ export default class GoogleOAuth2Provider implements IOAuth2Provider {
     return events;
   }
 
-  async createOrUpdateEventForMeeting(
+  async apiCreateOrUpdateEvent(
     creds: AbstractOAuth2,
-    abstractExistingEvent: AbstractOAuth2CalendarCreatedEvent | null,
+    existingEvent: AbstractOAuth2CalendarCreatedEvent | null,
     meeting: Meeting,
-  ): Promise<void> {
-    const existingEvent =
-      abstractExistingEvent as GoogleCalendarCreatedEvent | null;
-    const userID = creds.UserID;
+  ): Promise<string> {
     let apiURL = GOOGLE_API_CALENDAR_EVENTS_BASE_URL;
     let apiMethod: Dispatcher.HttpMethod = 'POST';
     if (existingEvent) {
@@ -422,32 +406,19 @@ export default class GoogleOAuth2Provider implements IOAuth2Provider {
         throw err;
       }
     }
-    // FIXME: FK constraint fails if meeting is scheduled then unscheduled
-    // in quick succession
-    await this.calendarCreatedEventsRepository.save({
-      RespondentID: creds.RespondentID!,
-      UserID: userID,
-      CreatedEventID: response.id,
-    });
+    return response.id;
   }
 
-  async deleteEventForMeeting(
-    creds: AbstractOAuth2,
-    abstractEvent: AbstractOAuth2CalendarCreatedEvent,
-  ): Promise<void> {
-    const event = abstractEvent as GoogleCalendarCreatedEvent;
-    const apiURL = `${GOOGLE_API_CALENDAR_EVENTS_BASE_URL}/${event.CreatedEventID}`;
+  async apiDeleteEvent(creds: AbstractOAuth2, eventID: string) {
+    const apiURL = `${GOOGLE_API_CALENDAR_EVENTS_BASE_URL}/${eventID}`;
     try {
       await this.oauth2Service.apiRequest(this, creds, apiURL, {
         method: 'DELETE',
       });
-    } catch (err: any) {
+    } catch (err) {
       if (!errorIsGoogleCalendarEventNoLongerExists(err)) {
         throw err;
       }
     }
-    await this.calendarCreatedEventsRepository.delete({
-      RespondentID: abstractEvent.RespondentID
-    });
   }
 }

@@ -11,10 +11,12 @@ In development mode, by default a SQLite database will be used (filename is `dev
 This requires no setup. To use a different database, follow the instructions below.
 
 ### MariaDB
-**Note**: Do not set `MARIADB_ALLOW_EMPTY_ROOT_PASSWORD` if you are running this in production.
+MariaDB 10.5+ is required. MySQL will not work as some MariaDB-specific features are used.
+
 ```bash
 docker run -d --name cabbagemeet-mariadb -e MARIADB_USER=cabbagemeet -e MARIADB_PASSWORD=cabbagemeet -e MARIADB_DATABASE=cabbagemeet -e MARIADB_ALLOW_EMPTY_ROOT_PASSWORD=yes -p 127.0.0.1:3306:3306 mariadb
 ```
+(Do not set `MARIADB_ALLOW_EMPTY_ROOT_PASSWORD` if you are running this in production.)
 
 To store the data files in memory (Linux only), create a folder under `/run`
 and mount it with the `-v` flag, e.g.:

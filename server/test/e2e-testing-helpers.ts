@@ -46,6 +46,10 @@ export async function commonBeforeAll(envOverride?: Partial<EnvironmentVariables
   commonAppBootstrap(app);
   await app.init();
 
+  // Workaround for https://github.com/ladjs/supertest/issues/709
+  // (See https://github.com/ladjs/supertest/issues/709#issuecomment-1004883763)
+  app.getHttpServer().listen(0);
+
   return app;
 }
 
@@ -54,8 +58,8 @@ export async function commonAfterAll(app: INestApplication | undefined) {
     // Need to stop the app first because we can't drop a database while a
     // client is connected
     await app.close();
-    await dropDB();
   }
+  await dropDB();
   await stopMockSmtpServer();
   process.env = originalProcessEnv;
 }
