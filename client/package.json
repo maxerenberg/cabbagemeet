@@ -28,7 +28,7 @@
   "scripts": {
     "start": "HOST=localhost react-scripts start",
     "build": "react-scripts build",
-    "test": "react-scripts test",
+    "test": "react-scripts test --watchAll=false",
     "eject": "react-scripts eject"
   },
   "eslintConfig": {
@@ -53,6 +53,7 @@
     "@rtk-query/codegen-openapi": "^1.0.0",
     "@testing-library/jest-dom": "^5.16.5",
     "@testing-library/react": "^13.4.0",
-    "@testing-library/user-event": "^14.4.3"
+    "@testing-library/user-event": "^14.4.3",
+    "msw": "^0.49.2"
   }
 }

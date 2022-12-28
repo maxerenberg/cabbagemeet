@@ -26,7 +26,7 @@ export default function Calendar({firstVisibleDate}: {firstVisibleDate: string})
   const leftArrow = (
     <div className="d-flex align-items-center ms-0 ms-md-3">
       <SVGLeftArrow
-        style={{visibility: page > 0 ? 'visible' : 'hidden'}}
+        className={page > 0 ? 'visible' : 'invisible'}
         onClick={() => setPage(page - 1)}
       />
     </div>
