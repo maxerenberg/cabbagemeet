@@ -136,17 +136,17 @@ export default class MicrosoftOAuth2Provider implements IOAuth2Provider {
     const private_key_path = configService.get(
       'OAUTH2_MICROSOFT_PRIVATE_KEY_PATH'
     );
-    const redirect_uri = configService.get('OAUTH2_MICROSOFT_REDIRECT_URI');
-    if (client_id && private_key_path && redirect_uri && certificate_path) {
+    this.publicURL = configService.get('PUBLIC_URL');
+    this.codeVerifierCache = cacherService;
+    if (client_id && private_key_path && certificate_path) {
       const certificate = fs.readFileSync(certificate_path, {
         encoding: 'utf8',
       });
       this.x5t = certificateToX5t(certificate);
       const private_key = fs.readFileSync(private_key_path);
+      const redirect_uri = `${this.publicURL}/redirect/microsoft`;
       this.envConfig = { client_id, redirect_uri, private_key };
     }
-    this.publicURL = configService.get('PUBLIC_URL');
-    this.codeVerifierCache = cacherService;
   }
 
   isConfigured(): boolean {
@@ -268,11 +268,8 @@ export default class MicrosoftOAuth2Provider implements IOAuth2Provider {
     }
     // Merge results
     for (const updatedEvent of response.value) {
-      const existingEvent = eventsMap[updatedEvent.id];
       if (updatedEvent['@removed'] || updatedEvent.isCancelled) {
-        if (existingEvent) {
-          delete eventsMap[updatedEvent.id];
-        }
+        delete eventsMap[updatedEvent.id];
         continue;
       }
       const newStartDateTime = updatedEvent.start
@@ -290,16 +287,17 @@ export default class MicrosoftOAuth2Provider implements IOAuth2Provider {
       // See https://github.com/microsoftgraph/microsoft-graph-docs/issues/6599 - not every
       // event in the response is guaranteed to be in our original date range
       if (
-        (newStartDateTime && newStartDateTime < apiStartDateTime) ||
-        (newEndDateTime && newEndDateTime > apiEndDateTime)
+        (newStartDateTime && newStartDateTime > apiEndDateTime) ||
+        (newEndDateTime && newEndDateTime < apiStartDateTime)
       ) {
         continue;
       }
+      const existingEvent = eventsMap[updatedEvent.id];
       if (existingEvent) {
         const update: Partial<OAuth2CalendarEvent> = {};
         if (newStartDateTime) update.start = newStartDateTime;
         if (newEndDateTime) update.end = newEndDateTime;
-        if (updatedEvent.start) update.summary = updatedEvent.subject;
+        if (updatedEvent.subject) update.summary = updatedEvent.subject;
         eventsMap[updatedEvent.id] = {
           ...existingEvent,
           ...update,

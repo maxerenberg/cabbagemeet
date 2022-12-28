@@ -6,6 +6,8 @@
 # Secrets
 *.key
 *.crt
+!/test/*.key
+!/test/*.crt
 
 # compiled output
 /dist

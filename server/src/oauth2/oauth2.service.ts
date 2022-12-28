@@ -366,6 +366,7 @@ export default class OAuth2Service {
       await this.deleteCredsIfErrorIsInvalidToken(provider, err, creds);
       throw err;
     }
+    this.logger.debug(data);
     const partialCreds: Partial<AbstractOAuth2> = {
       AccessToken: data.access_token,
       AccessTokenExpiresAt: this.calculateTokenExpirationTime(data.expires_in),
@@ -937,7 +938,7 @@ export default class OAuth2Service {
         assertIsNever(this.dbType);
       }
       if (rowsAffected === 0) {
-        this.logger.debug(
+        this.logger.log(
           'Did not update event: meeting was unscheduled/deleted or respondent' +
           ` was deleted (respondentID=${respondentID})`
         );
@@ -967,7 +968,7 @@ export default class OAuth2Service {
       // sqlite: [ {'1': 1} ]
       // mariadb: [ {'1': 1} ]
       if (result.length === 0) {
-        this.logger.debug(
+        this.logger.log(
           'Did not insert event: meeting was unscheduled/deleted or respondent' +
           ` was deleted (respondentID=${respondentID})`
         );

@@ -5,6 +5,7 @@ import {
   Delete,
   Get,
   HttpCode,
+  HttpException,
   HttpStatus,
   NotFoundException,
   ParseIntPipe,
@@ -21,7 +22,7 @@ import {
   ApiTags,
   ApiUnauthorizedResponse,
 } from '@nestjs/swagger';
-import type { OAuth2CalendarEvent } from '../oauth2/oauth2-common';
+import { OAuth2CalendarEvent, oauth2ProviderNamesMap } from '../oauth2/oauth2-common';
 import { AuthUser } from '../auth/auth-user.decorator';
 import JwtAuthGuard from '../auth/jwt-auth.guard';
 import {
@@ -267,6 +268,11 @@ export class UsersController {
     } catch (err: any) {
       if (err instanceof NoSuchMeetingError) {
         throw new NotFoundException();
+      } else if (err instanceof OAuth2NotConfiguredError) {
+        throw new HttpException(
+          `${oauth2ProviderNamesMap[providerType]} OAuth2 is not configured on this server`,
+          HttpStatus.SERVICE_UNAVAILABLE,
+        );
       }
       throw err;
     }

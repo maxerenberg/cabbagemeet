@@ -6,10 +6,9 @@ import { DataSource } from 'typeorm';
 import { MockAgent, getGlobalDispatcher, setGlobalDispatcher } from 'undici';
 import type { MockInterceptor } from 'undici/types/mock-interceptor';
 import type { CustomRedirectResponse } from '../src/common-responses';
-import { getSecondsSinceUnixEpoch } from '../src/dates.utils';
 import type CreateMeetingDto from '../src/meetings/create-meeting.dto';
 import type ScheduleMeetingDto from '../src/meetings/schedule-meeting.dto';
-import { jwtSign, sleep } from '../src/misc.utils';
+import { sleep } from '../src/misc.utils';
 import OAuth2Service from '../src/oauth2/oauth2.service';
 import {
   commonAfterAll,
@@ -17,6 +16,7 @@ import {
   commonBeforeEach,
   createMeeting,
   createPromiseCallbacks,
+  createTokenResponse,
   createUser,
   DELETE,
   GET,
@@ -26,6 +26,7 @@ import {
   removeSelfRespondent,
   scheduleMeeting,
   unscheduleMeeting,
+  decodeQueryParams,
 } from './e2e-testing-helpers';
 
 // WARNING: do not use jest.mock() because it loads some modules twice,
@@ -60,20 +61,11 @@ function interceptGetEventsApi(
   });
 }
 
-function decodeQueryParams(queryString: string): Record<string, string> {
-  const result: Record<string, string> = {};
-  for (const kvPair of decodeURIComponent(queryString).split('&')) {
-    const [key, val] = kvPair.split('=');
-    result[key] = val;
-  }
-  return result;
-}
-
 const authzEndpointPrefix = 'https://accounts.google.com/o/oauth2/v2/auth?';
 const apiBaseUrl = 'https://www.googleapis.com';
 const eventsApiPath = '/calendar/v3/calendars/primary/events';
 const oauth2ApiBaseUrl = 'https://oauth2.googleapis.com';
-const allScopes = 'openid https://www.googleapis.com/auth/calendar.events.owned https://www.googleapis.com/auth/userinfo.profile https://www.googleapis.com/auth/userinfo.email';
+const responseScopes = 'openid https://www.googleapis.com/auth/calendar.events.owned https://www.googleapis.com/auth/userinfo.profile https://www.googleapis.com/auth/userinfo.email';
 const nonce = 'abcdef';
 const mockClientId = 'google_client_id';
 const mockClientSecret = 'google_client_secret';
@@ -137,46 +129,11 @@ async function signupOrLoginOrLink(reason: 'signup' | 'login' | 'link', app: INe
   return `/redirect/google?code=${mockAuthzCode}&state=${params.state}`;
 }
 
-async function createTokenResponse({
-  sub, name, email, access_token,
-  refresh_token, scope = allScopes,
-}: {
-  sub: string, name: string, email: string, access_token: string,
-  refresh_token?: string | null, scope?: string,
-}) {
-  const now = getSecondsSinceUnixEpoch();
-  // Note: this will use HS256 for signing. Google/Microsoft use RS256.
-  // If we implement JWT verification in the server, we need to create
-  // a new keypair and use RS256 as well.
-  const id_token =  await jwtSign(
-    {
-      iss: 'https://accounts.google.com',
-      sub,
-      email,
-      name,
-      iat: now,
-      exp: now + 3600,
-    },
-    'secret',
-  );
-  const body: Record<string, any> = {
-    access_token,
-    expires_in: 3599,
-    scope,
-    token_type: 'Bearer',
-    id_token,
-  };
-  if (refresh_token) {
-    body.refresh_token = refresh_token;
-  }
-  return body;
-}
-
 async function setMockHandlerForTokenEndpoint({
   sub, name, email,
   access_token = 'google_access_token',
   refresh_token = 'google_refresh_token',
-  scope = allScopes,
+  scope = responseScopes,
 }: {
   sub: string, name: string, email: string,
   access_token?: string, refresh_token?: string | null,
@@ -244,7 +201,15 @@ async function unlinkAccountAndExpectTokenToBeRevoked(app: INestApplication, tok
   expect(user.hasLinkedGoogleAccount).toBe(false);
 }
 
-async function signupNewUserWithGoogle({sub, name, email}: {sub: string, name: string, email: string}, app: INestApplication): Promise<string> {
+let testUserCounter = 1;
+async function signupNewUserWithGoogle(
+  {sub, name, email}: {sub?: string, name?: string, email?: string},
+  app: INestApplication,
+): Promise<{sub: string, name: string, email: string, token: string}> {
+  sub ??= `google_test_sub${testUserCounter}`;
+  name ??= `google_test${testUserCounter}`;
+  email ??= `google_test${testUserCounter}@gmail.com`;
+  testUserCounter++;
   const redirect = await signupOrLoginOrLink('signup', app);
   await setMockHandlerForTokenEndpoint({sub, name, email});
   const redirect2 = (
@@ -256,7 +221,7 @@ async function signupNewUserWithGoogle({sub, name, email}: {sub: string, name: s
     token: redirect2Params.token,
     nonce,
   });
-  return redirect2Params.token;
+  return {token: redirect2Params.token, sub, name, email};
 }
 
 // This is leaking implementation details, but I can't think of another way
@@ -275,15 +240,12 @@ async function waitUntilCreatedEventIsSavedInDB(eventID: string, expectedNumber:
   throw new Error('timed out waiting for created event to get saved to DB');
 }
 
-describe('OAuth2Controller (e2e)', () => {
+describe('OAuth2Controller (e2e) (Google)', () => {
   let app: NestExpressApplication;
   let token1: string;
   const mockSub1 = '000001';
   const mockEmail1 = 'test1@gmail.com';
   const mockName1 = 'Test 1';
-  const mockSub2 = '000002';
-  const mockEmail2 = 'test2@gmail.com';
-  const mockName2 = 'Test 2';
 
   const sampleCreateMeetingDto: CreateMeetingDto = {
     name: 'My meeting',
@@ -304,7 +266,6 @@ describe('OAuth2Controller (e2e)', () => {
       VERIFY_SIGNUP_EMAIL_ADDRESS: 'false',
       OAUTH2_GOOGLE_CLIENT_ID: mockClientId,
       OAUTH2_GOOGLE_CLIENT_SECRET: mockClientSecret,
-      OAUTH2_GOOGLE_REDIRECT_URI: mockRedirectUri,
     });
   });
   beforeEach(commonBeforeEach);
@@ -327,7 +288,7 @@ describe('OAuth2Controller (e2e)', () => {
   afterAll(() => commonAfterAll(app));
 
   it('/api/signup-with-google (POST)', async () => {
-    token1 = await signupNewUserWithGoogle({sub: mockSub1, name: mockName1, email: mockEmail1}, app);
+    ({token: token1} = await signupNewUserWithGoogle({sub: mockSub1, name: mockName1, email: mockEmail1}, app));
     const {body: meBody} = await GET('/api/me', app, token1)
       .expect(HttpStatus.OK);
     expect(meBody).toEqual({
@@ -353,7 +314,7 @@ describe('OAuth2Controller (e2e)', () => {
   it('/api/signup-with-google (POST) (not all scopes granted)', async () => {
     const redirect = await signupOrLoginOrLink('signup', app);
     await setMockHandlerForTokenEndpoint({
-      sub: mockSub2, name: mockName2, email: mockEmail2,
+      sub: '000002', name: 'test2', email: 'test2@gmail.com',
       // missing Calendar API scope
       scope: 'openid https://www.googleapis.com/auth/userinfo.profile https://www.googleapis.com/auth/userinfo.email',
     });
@@ -365,7 +326,7 @@ describe('OAuth2Controller (e2e)', () => {
   it('/api/login-with-google (POST) (user does not exist, no refresh token)', async () => {
     const redirect = await signupOrLoginOrLink('login', app);
     await setMockHandlerForTokenEndpoint({
-      sub: mockSub2, name: mockName2, email: mockEmail2,
+      sub: '000003', name: 'test3', email: 'test3@gmail.com',
       refresh_token: null,
     });
     const redirect2 = (
@@ -375,7 +336,7 @@ describe('OAuth2Controller (e2e)', () => {
     expect(redirect2.startsWith(authzEndpointPrefix)).toBe(true);
     const params = Object.fromEntries(new URL(redirect2).searchParams.entries());
     expect(params.prompt).toStrictEqual('consent');
-    await setMockHandlerForTokenEndpoint({sub: mockSub2, name: mockName2, email: mockEmail2});
+    await setMockHandlerForTokenEndpoint({sub: '000003', name: 'test3', email: 'test3@gmail.com'});
     const redirect3 = (
       await GET(`/redirect/google?code=${mockAuthzCode}&state=${params.state}`, app)
         .expect(HttpStatus.FOUND)
@@ -391,7 +352,7 @@ describe('OAuth2Controller (e2e)', () => {
 
   it('/api/login-with-google (POST) (user does not exist, refresh token is present)', async () => {
     const redirect = await signupOrLoginOrLink('login', app);
-    await setMockHandlerForTokenEndpoint({sub: mockSub2, name: mockName2, email: mockEmail2});
+    await setMockHandlerForTokenEndpoint({sub: '000004', name: 'test4', email: 'test4@gmail.com'});
     const redirect2 = (
       await GET(redirect, app).expect(HttpStatus.FOUND)
     ).headers.location as string;
@@ -405,11 +366,10 @@ describe('OAuth2Controller (e2e)', () => {
   });
 
   it('/api/login-with-google (POST) (user exists, not linked yet, no refresh token)', async () => {
-    const email = 'userExistsButNotLinkedNoRefreshToken@gmail.com';
-    const {token} = await createUser(app, {email});
+    const {token, name, email} = await createUser(app);
     const redirect = await signupOrLoginOrLink('login', app);
     await setMockHandlerForTokenEndpoint({
-      sub: '000003', name: 'Test', email,
+      sub: '000005', name, email,
       refresh_token: null,
     });
     const redirect2 = (
@@ -423,11 +383,9 @@ describe('OAuth2Controller (e2e)', () => {
   });
 
   it('/api/login-with-google (POST) (user exists, not linked yet, refresh token is present)', async () => {
-    const name = 'George';
-    const email = 'userExistsButNotLinked@gmail.com';
-    await createUser(app, {name, email});
+    const {name, email} = await createUser(app);
     const redirect = await signupOrLoginOrLink('login', app);
-    await setMockHandlerForTokenEndpoint({sub: '456789', name: 'Pseudonym', email});
+    await setMockHandlerForTokenEndpoint({sub: '000006', name: 'Pseudonym', email});
     const redirect2 = (
       await GET(redirect, app).expect(HttpStatus.FOUND)
     ).headers.location as string;
@@ -464,12 +422,10 @@ describe('OAuth2Controller (e2e)', () => {
   });
 
   it('/api/login-with-google (POST) (user exists, already linked)', async () => {
-    await signupNewUserWithGoogle(
-      {sub: mockSub2, name: mockName2, email: mockEmail2}, app
-    );
+    const {sub, name, email} = await signupNewUserWithGoogle({}, app);
     const redirect = await signupOrLoginOrLink('login', app);
     await setMockHandlerForTokenEndpoint({
-      sub: mockSub2, name: mockName2, email: mockEmail2,
+      sub, name, email,
       // refresh token is not present in Google OIDC responses if the user
       // already granted consent
       refresh_token: null,
@@ -487,11 +443,10 @@ describe('OAuth2Controller (e2e)', () => {
   });
 
   it('/api/me/link-google-calendar (POST) (no refresh token)', async () => {
-    const {token} = await createUser(app, {name: mockName2, email: mockEmail2});
+    const {name, email, token} = await createUser(app);
     const redirect = await signupOrLoginOrLink('link', app, token);
     await setMockHandlerForTokenEndpoint({
-      sub: mockSub2, name: mockName2, email: mockEmail2,
-      refresh_token: null,
+      sub: '000008', name, email, refresh_token: null,
     });
     const redirect2 = (
       await GET(redirect, app).expect(HttpStatus.FOUND)
@@ -504,9 +459,9 @@ describe('OAuth2Controller (e2e)', () => {
   });
 
   it('/api/me/link-google-calendar (POST) (refresh token is present)', async () => {
-    const {token} = await createUser(app, {name: mockName2, email: mockEmail2});
+    const {name, email, token} = await createUser(app);
     const redirect = await signupOrLoginOrLink('link', app, token);
-    await setMockHandlerForTokenEndpoint({sub: mockSub2, name: mockName2, email: mockEmail2});
+    await setMockHandlerForTokenEndpoint({sub: '000009', name, email});
     const redirect2 = (
       await GET(redirect, app).expect(HttpStatus.FOUND)
     ).headers.location as string;
@@ -517,18 +472,16 @@ describe('OAuth2Controller (e2e)', () => {
   });
 
   it('/api/me/link-google-calendar (DELETE) (signed up with email)', async () => {
-    const {token} = await createUser(app, {name: mockName2, email: mockEmail2});
+    const {name, email, token} = await createUser(app);
     const redirect = await signupOrLoginOrLink('link', app, token);
-    await setMockHandlerForTokenEndpoint({sub: mockSub2, name: mockName2, email: mockEmail2});
+    await setMockHandlerForTokenEndpoint({sub: '000010', name, email});
     await GET(redirect, app).expect(HttpStatus.FOUND);
     await unlinkAccountAndExpectTokenToBeRevoked(app, token);
     await DELETE('/api/me', app, token).expect(HttpStatus.NO_CONTENT);
   });
 
   it('/api/me/link-google-calendar (DELETE) (signed up with Google)', async () => {
-    const token = await signupNewUserWithGoogle(
-      {sub: mockSub2, name: mockName2, email: mockEmail2}, app
-    );
+    const {token} = await signupNewUserWithGoogle({}, app);
     // token should not be revoked because user signed up with Google
     const {body: user} = await DELETE('/api/me/link-google-calendar', app, token)
       .expect(HttpStatus.OK);
@@ -556,9 +509,7 @@ describe('OAuth2Controller (e2e)', () => {
   });
 
   it('/api/me/google-calendar-events (GET)', async () => {
-    const token = await signupNewUserWithGoogle(
-      {sub: mockSub2, name: mockName2, email: mockEmail2}, app
-    );
+    const {token} = await signupNewUserWithGoogle({}, app);
     const {meetingID} = await createMeeting(sampleCreateMeetingDto, app);
     const fullSyncParams = {
       maxAttendees: '1',
@@ -823,9 +774,7 @@ describe('OAuth2Controller (e2e)', () => {
   });
 
   it('/api/me/google-calendar-events (GET) (meeting changes)', async () => {
-    const token = await signupNewUserWithGoogle(
-      {sub: mockSub2, name: mockName2, email: mockEmail2}, app
-    );
+    const {token} = await signupNewUserWithGoogle({}, app);
     const {meetingID} = await createMeeting(sampleCreateMeetingDto, app, token);
     const fullSyncParams = {
       maxAttendees: '1',
@@ -894,13 +843,12 @@ describe('OAuth2Controller (e2e)', () => {
   });
 
   it('/api/me/google-calendar-events (GET) (refresh token)', async () => {
-    const token = await signupNewUserWithGoogle(
-      {sub: mockSub2, name: mockName2, email: mockEmail2}, app
-    );
+    const {sub, name, email, token} = await signupNewUserWithGoogle({}, app);
     const {meetingID} = await createMeeting(sampleCreateMeetingDto, app, token);
     const mockResponseBody = await createTokenResponse({
-      sub: mockSub2, name: mockName2, email: mockEmail2,
+      sub, name, email,
       access_token: 'google_access_token_2',
+      scope: responseScopes,
     });
     mockAgent.get(oauth2ApiBaseUrl).intercept({
       path: '/token',
@@ -939,12 +887,8 @@ describe('OAuth2Controller (e2e)', () => {
   });
 
   it('/api/meetings/:id/schedule (PUT|DELETE) (create/update/delete events)', async () => {
-    const token1 = await signupNewUserWithGoogle(
-      {sub: mockSub2, name: mockName2, email: mockEmail2}, app
-    );
-    const token2 = await signupNewUserWithGoogle(
-      {sub: '000004', name: 'Test', email: '000004@gmail.com'}, app
-    );
+    const {token: token1} = await signupNewUserWithGoogle({}, app);
+    const {token: token2} = await signupNewUserWithGoogle({}, app);
     const createMeetingDto = {...sampleCreateMeetingDto};
     const {meetingID} = await createMeeting(createMeetingDto, app);
     await putSelfRespondent({availabilities: []}, meetingID, app, token1);
@@ -1081,7 +1025,7 @@ describe('OAuth2Controller (e2e)', () => {
             },
             end: {
               dateTime: schedule.endDateTime,
-              timeZone: 'America/New_York',
+              timeZone: 'UTC',
             },
           },
         ],
@@ -1103,16 +1047,14 @@ describe('OAuth2Controller (e2e)', () => {
     await createEventPromise;
     deleteEventPromise = setMockHandlerForDeletingEvent(2);
     await DELETE('/api/meetings/' + meetingID, app, token1).expect(HttpStatus.NO_CONTENT);
-    await deleteEventPromise;  // <-- this sometimes hangs forever
+    await deleteEventPromise;
 
     await deleteAccountAndExpectTokenToBeRevoked(app, token1);
     await deleteAccountAndExpectTokenToBeRevoked(app, token2);
   });
 
   it('/api/meetings/:id/schedule (PUT) (update/delete event which no longer exists)', async () => {
-    const token = await signupNewUserWithGoogle(
-      {sub: mockSub2, name: mockName2, email: mockEmail2}, app
-    );
+    const {token} = await signupNewUserWithGoogle({}, app);
     const createMeetingDto = {...sampleCreateMeetingDto};
     const {meetingID} = await createMeeting(createMeetingDto, app);
     await putSelfRespondent({availabilities: []}, meetingID, app, token);
@@ -1185,9 +1127,7 @@ describe('OAuth2Controller (e2e)', () => {
   });
 
   it('/api/meetings/:id/schedule (PUT) (account is unlinked)', async () => {
-    const token = await signupNewUserWithGoogle(
-      {sub: mockSub2, name: mockName2, email: mockEmail2}, app
-    );
+    const {token} = await signupNewUserWithGoogle({}, app);
     await DELETE('/api/me/link-google-calendar', app, token)
       .expect(HttpStatus.OK);
     const createMeetingDto = {...sampleCreateMeetingDto};
@@ -1222,9 +1162,7 @@ describe('OAuth2Controller (e2e)', () => {
     ),
     async (shouldRemoveAvailabilities) =>
   {
-    const token = await signupNewUserWithGoogle(
-      {sub: mockSub2, name: mockName2, email: mockEmail2}, app
-    );
+    const {token} = await signupNewUserWithGoogle({}, app);
     const {meetingID} = await createMeeting(sampleCreateMeetingDto, app);
     await putSelfRespondent({availabilities: []}, meetingID, app, token);
     mockAgent.get(apiBaseUrl).intercept({
@@ -1293,9 +1231,7 @@ describe('OAuth2Controller (e2e)', () => {
     ),
     async (shouldRemoveAvailabilities) =>
   {
-    const token = await signupNewUserWithGoogle(
-      {sub: mockSub2, name: mockName2, email: mockEmail2}, app
-    );
+    const {token} = await signupNewUserWithGoogle({}, app);
     const createMeetingDto = {...sampleCreateMeetingDto};
     const {meetingID} = await createMeeting(createMeetingDto, app);
     await putSelfRespondent({availabilities: []}, meetingID, app, token);

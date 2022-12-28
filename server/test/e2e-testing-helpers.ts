@@ -10,12 +10,13 @@ import { DataSource } from 'typeorm';
 import { AppModule } from '../src/app.module';
 import { commonAppBootstrap } from '../src/common-setup';
 import type { EnvironmentVariables } from '../src/config/env.validation';
+import { getSecondsSinceUnixEpoch } from '../src/dates.utils';
 import type AddGuestRespondentDto from '../src/meetings/add-guest-respondent.dto';
 import type PutRespondentDto from '../src/meetings/put-respondent.dto';
 import type CreateMeetingDto from '../src/meetings/create-meeting.dto';
 import type MeetingResponse from '../src/meetings/meeting-response';
 import type ScheduleMeetingDto from '../src/meetings/schedule-meeting.dto';
-import { assert, sleep } from '../src/misc.utils';
+import { assert, sleep, jwtSign } from '../src/misc.utils';
 import type EditUserDto from '../src/users/edit-user.dto';
 import type UserResponse from '../src/users/user-response';
 import type { UserResponseWithToken } from '../src/users/user-response';
@@ -343,6 +344,10 @@ export async function unscheduleMeeting(meetingID: number, app: INestApplication
   return body;
 }
 
+export async function deleteAccount(app: INestApplication, token: string) {
+  await DELETE('/api/me', app, token).expect(HttpStatus.NO_CONTENT);
+}
+
 export function createPromiseCallbacks() {
   let resolve: (val: unknown) => void;
   let reject: (val: unknown) => void;
@@ -351,4 +356,48 @@ export function createPromiseCallbacks() {
     reject = reject_;
   });
   return [promise, resolve, reject] as const;
+}
+
+export function decodeQueryParams(queryString: string): Record<string, string> {
+  const result: Record<string, string> = {};
+  for (const kvPair of decodeURIComponent(queryString).split('&')) {
+    const [key, val] = kvPair.split('=');
+    result[key] = val;
+  }
+  return result;
+}
+
+export async function createTokenResponse({
+  sub, name, email, access_token,
+  refresh_token, scope,
+}: {
+  sub: string, name: string, email: string, access_token: string,
+  refresh_token?: string | null, scope: string,
+}) {
+  const now = getSecondsSinceUnixEpoch();
+  // Note: this will use HS256 for signing. Google/Microsoft use RS256.
+  // If we implement JWT verification in the server, we need to create
+  // a new keypair and use RS256 as well.
+  const id_token =  await jwtSign(
+    {
+      iss: 'some-issuer',
+      sub,
+      email,
+      name,
+      iat: now,
+      exp: now + 3600,
+    },
+    'secret',
+  );
+  const body: Record<string, any> = {
+    access_token,
+    expires_in: 3599,
+    scope,
+    token_type: 'Bearer',
+    id_token,
+  };
+  if (refresh_token) {
+    body.refresh_token = refresh_token;
+  }
+  return body;
 }

@@ -126,10 +126,6 @@ export class EnvironmentVariables {
 
   @IsOptional()
   @IsString()
-  OAUTH2_GOOGLE_REDIRECT_URI?: string;
-
-  @IsOptional()
-  @IsString()
   OAUTH2_MICROSOFT_CLIENT_ID?: string;
 
   // Path to a certificate used for PKCE (must be PEM-encoded)
@@ -148,10 +144,6 @@ export class EnvironmentVariables {
   @IsOptional()
   @IsString()
   OAUTH2_MICROSOFT_TENANT_ID?: string = 'consumers';
-
-  @IsOptional()
-  @IsString()
-  OAUTH2_MICROSOFT_REDIRECT_URI?: string;
 
   // Should be set to true if this app is behind a reverse proxy AND the proxy
   // has been configured to set the X-Forwarded-For header

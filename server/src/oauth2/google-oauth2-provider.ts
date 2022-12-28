@@ -114,11 +114,11 @@ export default class GoogleOAuth2Provider implements IOAuth2Provider {
   ) {
     const client_id = configService.get('OAUTH2_GOOGLE_CLIENT_ID');
     const secret = configService.get('OAUTH2_GOOGLE_CLIENT_SECRET');
-    const redirect_uri = configService.get('OAUTH2_GOOGLE_REDIRECT_URI');
-    if (client_id && secret && redirect_uri) {
+    this.publicURL = configService.get('PUBLIC_URL');
+    if (client_id && secret) {
+      const redirect_uri = `${this.publicURL}/redirect/google`;
       this.envConfig = { client_id, secret, redirect_uri };
     }
-    this.publicURL = configService.get('PUBLIC_URL');
   }
 
   isConfigured(): boolean {
