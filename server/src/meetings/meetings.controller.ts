@@ -88,7 +88,7 @@ function meetingToMeetingResponse(
     respondents: meeting.Respondents.map((respondent) => ({
       respondentID: respondent.RespondentID,
       name: respondent.User?.Name ?? respondent.GuestName!,
-      availabilities: JSON.parse(respondent.Availabilities),
+      availabilities: respondent.Availabilities,
     })),
   };
   if (callingUser) {

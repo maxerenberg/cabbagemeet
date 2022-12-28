@@ -264,7 +264,7 @@ export default class MeetingsService {
   ): Promise<MeetingRespondent> {
     const respondent: Partial<MeetingRespondent> = {
       MeetingID: meetingID,
-      Availabilities: JSON.stringify(availabilities),
+      Availabilities: availabilities,
     };
     if (typeof userIDOrGuestName === 'number') {
       respondent.UserID = userIDOrGuestName;
@@ -281,7 +281,7 @@ export default class MeetingsService {
   ): Promise<MeetingRespondent | null> {
     // TODO: wrap in transaction
     await this.respondentsRepository.update(respondentID, {
-      Availabilities: JSON.stringify(availabilities),
+      Availabilities: availabilities,
     });
     return this.respondentsRepository.findOneBy({ RespondentID: respondentID });
   }

@@ -10,7 +10,7 @@ module.exports = class Migration1672038966530 {
         await queryRunner.query(`CREATE UNIQUE INDEX "idx_a6dcffaac17c8fa577daa93ad8" ON "microsoftoauth2" ("sub") `);
         await queryRunner.query(`CREATE TABLE "microsoftcalendarcreatedevent" ("respondentid" integer NOT NULL, "userid" integer NOT NULL, "createdeventid" character varying NOT NULL, CONSTRAINT "pk_0ef4d32bc094fd9da0f043e4317" PRIMARY KEY ("respondentid"))`);
         await queryRunner.query(`CREATE INDEX "idx_44490184afc45b796a4cd7016a" ON "microsoftcalendarcreatedevent" ("userid") `);
-        await queryRunner.query(`CREATE TABLE "meetingrespondent" ("respondentid" SERIAL NOT NULL, "meetingid" integer NOT NULL, "userid" integer, "guestname" character varying, "guestemail" character varying, "availabilities" character varying NOT NULL, CONSTRAINT "pk_f44c9223ccc79a2997293d2d903" PRIMARY KEY ("respondentid"))`);
+        await queryRunner.query(`CREATE TABLE "meetingrespondent" ("respondentid" SERIAL NOT NULL, "meetingid" integer NOT NULL, "userid" integer, "guestname" character varying, "guestemail" character varying, "availabilities" text NOT NULL, CONSTRAINT "pk_f44c9223ccc79a2997293d2d903" PRIMARY KEY ("respondentid"))`);
         await queryRunner.query(`CREATE INDEX "idx_59d8110458da8cb32352de1f95" ON "meetingrespondent" ("userid") WHERE UserID IS NOT NULL`);
         await queryRunner.query(`CREATE UNIQUE INDEX "idx_4de0c48380ef30d01f77431533" ON "meetingrespondent" ("meetingid", "userid") `);
         await queryRunner.query(`CREATE TABLE "googlecalendarcreatedevent" ("respondentid" integer NOT NULL, "userid" integer NOT NULL, "createdeventid" character varying NOT NULL, CONSTRAINT "pk_391b9705eb024e5c282fa4de2df" PRIMARY KEY ("respondentid"))`);

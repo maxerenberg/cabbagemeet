@@ -46,12 +46,11 @@ export default class MeetingRespondent {
   @Column({ nullable: true })
   GuestEmail?: string;
 
-  // This is a JSON array of the start times of the 30-minute intervals
+  // This is an array of the start times of the 30-minute intervals
   // during which the respondent is available (UTC).
-  // e.g. '["2022-10-23T10:00:00Z", "2022-10-23T10:30:00Z"]'
-  // TODO: use 'simple-json' type
-  @Column()
-  Availabilities: string;
+  // e.g. ["2022-10-23T10:00:00Z", "2022-10-23T10:30:00Z"]
+  @Column({type: 'simple-json'})
+  Availabilities: string[];
 
   @OneToMany(
     () => GoogleCalendarCreatedEvent,

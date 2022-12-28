@@ -10,7 +10,7 @@ module.exports = class Migration1672038966530 {
         await queryRunner.query(`CREATE UNIQUE INDEX "IDX_f61d503231a98ecf1dafa783eb" ON "MicrosoftOAuth2" ("Sub") `);
         await queryRunner.query(`CREATE TABLE "MicrosoftCalendarCreatedEvent" ("RespondentID" integer PRIMARY KEY NOT NULL, "UserID" integer NOT NULL, "CreatedEventID" varchar NOT NULL)`);
         await queryRunner.query(`CREATE INDEX "IDX_11dcd204e07423d2d30750c67a" ON "MicrosoftCalendarCreatedEvent" ("UserID") `);
-        await queryRunner.query(`CREATE TABLE "MeetingRespondent" ("RespondentID" integer PRIMARY KEY AUTOINCREMENT NOT NULL, "MeetingID" integer NOT NULL, "UserID" integer, "GuestName" varchar, "GuestEmail" varchar, "Availabilities" varchar NOT NULL)`);
+        await queryRunner.query(`CREATE TABLE "MeetingRespondent" ("RespondentID" integer PRIMARY KEY AUTOINCREMENT NOT NULL, "MeetingID" integer NOT NULL, "UserID" integer, "GuestName" varchar, "GuestEmail" varchar, "Availabilities" text NOT NULL)`);
         await queryRunner.query(`CREATE INDEX "IDX_7683aab7b4f83cd884c396b9ed" ON "MeetingRespondent" ("UserID") WHERE UserID IS NOT NULL`);
         await queryRunner.query(`CREATE UNIQUE INDEX "IDX_84550e253a24bf39b6d37b7839" ON "MeetingRespondent" ("MeetingID", "UserID") `);
         await queryRunner.query(`CREATE TABLE "GoogleCalendarCreatedEvent" ("RespondentID" integer PRIMARY KEY NOT NULL, "UserID" integer NOT NULL, "CreatedEventID" varchar NOT NULL)`);
@@ -44,7 +44,7 @@ module.exports = class Migration1672038966530 {
         await queryRunner.query(`CREATE INDEX "IDX_11dcd204e07423d2d30750c67a" ON "MicrosoftCalendarCreatedEvent" ("UserID") `);
         await queryRunner.query(`DROP INDEX "IDX_7683aab7b4f83cd884c396b9ed"`);
         await queryRunner.query(`DROP INDEX "IDX_84550e253a24bf39b6d37b7839"`);
-        await queryRunner.query(`CREATE TABLE "temporary_MeetingRespondent" ("RespondentID" integer PRIMARY KEY AUTOINCREMENT NOT NULL, "MeetingID" integer NOT NULL, "UserID" integer, "GuestName" varchar, "GuestEmail" varchar, "Availabilities" varchar NOT NULL, CONSTRAINT "FK_ca0240557036d583a1f89e83c2f" FOREIGN KEY ("MeetingID") REFERENCES "Meeting" ("ID") ON DELETE CASCADE ON UPDATE NO ACTION, CONSTRAINT "FK_3ebc034c8b29691278a43922083" FOREIGN KEY ("UserID") REFERENCES "User" ("ID") ON DELETE CASCADE ON UPDATE NO ACTION)`);
+        await queryRunner.query(`CREATE TABLE "temporary_MeetingRespondent" ("RespondentID" integer PRIMARY KEY AUTOINCREMENT NOT NULL, "MeetingID" integer NOT NULL, "UserID" integer, "GuestName" varchar, "GuestEmail" varchar, "Availabilities" text NOT NULL, CONSTRAINT "FK_ca0240557036d583a1f89e83c2f" FOREIGN KEY ("MeetingID") REFERENCES "Meeting" ("ID") ON DELETE CASCADE ON UPDATE NO ACTION, CONSTRAINT "FK_3ebc034c8b29691278a43922083" FOREIGN KEY ("UserID") REFERENCES "User" ("ID") ON DELETE CASCADE ON UPDATE NO ACTION)`);
         await queryRunner.query(`INSERT INTO "temporary_MeetingRespondent"("RespondentID", "MeetingID", "UserID", "GuestName", "GuestEmail", "Availabilities") SELECT "RespondentID", "MeetingID", "UserID", "GuestName", "GuestEmail", "Availabilities" FROM "MeetingRespondent"`);
         await queryRunner.query(`DROP TABLE "MeetingRespondent"`);
         await queryRunner.query(`ALTER TABLE "temporary_MeetingRespondent" RENAME TO "MeetingRespondent"`);
@@ -104,7 +104,7 @@ module.exports = class Migration1672038966530 {
         await queryRunner.query(`DROP INDEX "IDX_84550e253a24bf39b6d37b7839"`);
         await queryRunner.query(`DROP INDEX "IDX_7683aab7b4f83cd884c396b9ed"`);
         await queryRunner.query(`ALTER TABLE "MeetingRespondent" RENAME TO "temporary_MeetingRespondent"`);
-        await queryRunner.query(`CREATE TABLE "MeetingRespondent" ("RespondentID" integer PRIMARY KEY AUTOINCREMENT NOT NULL, "MeetingID" integer NOT NULL, "UserID" integer, "GuestName" varchar, "GuestEmail" varchar, "Availabilities" varchar NOT NULL)`);
+        await queryRunner.query(`CREATE TABLE "MeetingRespondent" ("RespondentID" integer PRIMARY KEY AUTOINCREMENT NOT NULL, "MeetingID" integer NOT NULL, "UserID" integer, "GuestName" varchar, "GuestEmail" varchar, "Availabilities" text NOT NULL)`);
         await queryRunner.query(`INSERT INTO "MeetingRespondent"("RespondentID", "MeetingID", "UserID", "GuestName", "GuestEmail", "Availabilities") SELECT "RespondentID", "MeetingID", "UserID", "GuestName", "GuestEmail", "Availabilities" FROM "temporary_MeetingRespondent"`);
         await queryRunner.query(`DROP TABLE "temporary_MeetingRespondent"`);
         await queryRunner.query(`CREATE UNIQUE INDEX "IDX_84550e253a24bf39b6d37b7839" ON "MeetingRespondent" ("MeetingID", "UserID") `);
