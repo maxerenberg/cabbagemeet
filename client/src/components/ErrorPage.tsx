@@ -1,5 +1,6 @@
 import { useSearchParams } from "react-router-dom";
 import { capitalize } from 'utils/misc.utils';
+import useSetTitle from "utils/title.hook";
 
 function getOAuth2ErrorMessage(e: string, provider: string | null): string {
   provider = provider ?? 'Unknown';
@@ -25,6 +26,9 @@ export default function ErrorPage() {
     : errorCode.startsWith('E_OAUTH2')
     ? getOAuth2ErrorMessage(errorCode, searchParams.get('provider'))
     : 'Internal server error. :((((((((((';
+
+  useSetTitle('Error');
+
   return (
     <>
       <p>An error occurred{errorMessage ? ':' : '.'}</p>

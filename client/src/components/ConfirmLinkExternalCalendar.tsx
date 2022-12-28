@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useMemo } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Link } from 'react-router-dom';
 import { useAppSelector } from 'app/hooks';
@@ -14,6 +14,7 @@ import { useGetSelfInfoIfTokenIsPresent } from 'utils/auth.hooks';
 import { capitalize } from 'utils/misc.utils';
 import { calendarProductNames, logos, OAuth2Provider } from 'utils/oauth2-common';
 import { getReqErrorMessage } from 'utils/requests.utils';
+import useSetTitle from 'utils/title.hook';
 
 const confirmLinkAccountHooks: Record<OAuth2Provider, typeof useConfirmLinkGoogleAccountMutation> = {
   'google': useConfirmLinkGoogleAccountMutation,
@@ -21,7 +22,7 @@ const confirmLinkAccountHooks: Record<OAuth2Provider, typeof useConfirmLinkGoogl
 };
 
 export default function ConfirmLinkExternalCalendar({provider}: {provider: OAuth2Provider}) {
-  const capitalizedProvider = capitalize(provider);
+  const capitalizedProvider = useMemo(() => capitalize(provider), [provider]);
   const tokenIsPresent = useAppSelector(selectTokenIsPresent);
   const {data: userInfo} = useGetSelfInfoIfTokenIsPresent();
   const navigate = useNavigate();
@@ -38,6 +39,10 @@ export default function ConfirmLinkExternalCalendar({provider}: {provider: OAuth
   const tag = searchParams.get('tag');
   const requiredParamsArePresent = !!(postRedirect && encryptedEntity && iv && salt && tag);
   const shouldRedirectToHomePage = !requiredParamsArePresent || (!tokenIsPresent && !token)
+  const calendarProductName = calendarProductNames[provider] ?? capitalizedProvider;
+
+  useSetTitle(`Link ${calendarProductName} Calendar`);
+
   useEffect(() => {
     if (isSuccess) {
       showToast({
@@ -48,18 +53,19 @@ export default function ConfirmLinkExternalCalendar({provider}: {provider: OAuth
       navigate(postRedirect!);
     }
   }, [isSuccess, capitalizedProvider, showToast, navigate, postRedirect]);
+
   useEffect(() => {
     if (shouldRedirectToHomePage) {
       navigate('/');
     }
   }, [shouldRedirectToHomePage, navigate]);
+
   if (shouldRedirectToHomePage) {
     return null;
   }
   if (!userInfo) {
     return <GenericSpinner />;
   }
-  const calendarBrandName = calendarProductNames[provider] ?? capitalizedProvider;
   const onClick = () => confirmLinkAccount({
     encrypted_entity: encryptedEntity,
     iv,
@@ -88,8 +94,8 @@ export default function ConfirmLinkExternalCalendar({provider}: {provider: OAuth
       </p>
       <ul>
         <li>Single sign-on with {capitalizedProvider}</li>
-        <li>See your {calendarBrandName} calendar events when adding your availabilities</li>
-        <li>Synchronize your scheduled meetings with {calendarBrandName} calendar</li>
+        <li>See your {calendarProductName} calendar events when adding your availabilities</li>
+        <li>Synchronize your scheduled meetings with {calendarProductName} calendar</li>
       </ul>
       {error && (
         <p className="text-danger text-center mb-0 mt-4">An error occurred: {getReqErrorMessage(error)}</p>

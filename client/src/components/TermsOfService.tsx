@@ -1,4 +1,7 @@
+import useSetTitle from "utils/title.hook";
+
 export default function TermsOfService() {
+  useSetTitle('Terms of Service');
   return (
     <div className="mx-auto" style={{maxWidth: '600px'}}>
       <h3>Terms of Service</h3>

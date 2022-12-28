@@ -11,6 +11,7 @@ import { isVerifyEmailAddressResponse } from 'slices/enhancedApi';
 import VerifyEmailAddress from './SignupConfirmation';
 import WaitForServerInfo from './WaitForServerInfo';
 import OAuth2ProviderButtons from './OAuth2ProviderButtons';
+import useSetTitle from 'utils/title.hook';
 
 export default function Signup() {
   const [name, setName] = useState('');
@@ -23,7 +24,13 @@ export default function Signup() {
   // force the child components to re-render
   // TODO: encapsulate this in a separate hook
   const lastNonAuthPathRef = useRef('/');
-  useEffect(() => { lastNonAuthPathRef.current = lastNonAuthPath; }, [lastNonAuthPath]);
+
+  useSetTitle('Signup');
+
+  useEffect(() => {
+    lastNonAuthPathRef.current = lastNonAuthPath;
+  }, [lastNonAuthPath]);
+
   const redirectAfterSuccessfulSignup = useCallback(() => {
     navigate(lastNonAuthPathRef.current);
   }, [navigate]);

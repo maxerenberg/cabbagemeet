@@ -3,8 +3,10 @@ import SelectedTimesPicture from 'assets/help-section-selected-times.png';
 import DateCheckmarkPicture from 'assets/help-section-date-checkmark.png';
 import styles from './HowItWorksPage.module.css';
 import { Link } from 'react-router-dom';
+import useSetTitle from 'utils/title.hook';
 
 export default function HowItWorksPage() {
+  useSetTitle('How it Works');
   return (
     <>
       <div className="d-flex align-items-center justify-content-between">

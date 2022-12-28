@@ -14,6 +14,7 @@ import { setCurrentMeetingID } from 'slices/currentMeeting';
 import InfoModal from 'components/InfoModal';
 import { useToast } from 'components/Toast';
 import { resetSelection } from 'slices/availabilitiesSelection';
+import useSetTitle from 'utils/title.hook';
 
 export default function Meeting() {
   const [isEditingMeeting, setIsEditingMeeting] = useState(false);
@@ -21,11 +22,13 @@ export default function Meeting() {
   const params = useParams();
   const meetingID = parseInt(params.id!);
   const skip = isNaN(meetingID);
-  const {isError, error} = useGetMeetingQuery(meetingID, {skip});
+  const {data, error} = useGetMeetingQuery(meetingID, {skip});
 
   useEffect(() => {
     dispatch(setCurrentMeetingID(meetingID));
   }, [dispatch, meetingID]);
+
+  useSetTitle(data?.name);
 
   useEffect(() => {
     // Reset the datetime selections when this component unmounts so
@@ -46,7 +49,7 @@ export default function Meeting() {
   if (skip) {
     return <p>Meeting ID is invalid.</p>;
   }
-  if (isError) {
+  if (error) {
     return (
       <div className="d-flex justify-content-center">
         <p>

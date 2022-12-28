@@ -24,6 +24,7 @@ import {
 import ButtonWithSpinner from "./ButtonWithSpinner";
 import { useGetSelfInfoIfTokenIsPresent } from "utils/auth.hooks";
 import { calendarProductNames, OAuth2Provider } from "utils/oauth2-common";
+import useSetTitle from "utils/title.hook";
 
 export default function Settings() {
   const tokenIsPresent = useAppSelector(selectTokenIsPresent);
@@ -37,6 +38,8 @@ export default function Settings() {
       navigate('/');
     }
   }, [shouldBeRedirectedToHomePage, navigate]);
+
+  useSetTitle('Profile Settings');
 
   if (shouldBeRedirectedToHomePage) {
     return null;

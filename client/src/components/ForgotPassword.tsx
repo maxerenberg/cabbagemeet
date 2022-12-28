@@ -5,10 +5,13 @@ import styles from './ForgotPassword.module.css';
 import ButtonWithSpinner from './ButtonWithSpinner';
 import { useResetPasswordMutation } from 'slices/api';
 import { getReqErrorMessage } from 'utils/requests.utils';
+import useSetTitle from 'utils/title.hook';
 
  export default function ForgotPassword() {
   const [email, setEmail] = useState('');
   const [resetPasswordAtLeastOnce, setResetPasswordAtLeastOnce] = useState(false);
+
+  useSetTitle('Forgot Password');
 
   return (
     <div className="d-flex justify-content-center">

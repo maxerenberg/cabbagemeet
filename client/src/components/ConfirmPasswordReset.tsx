@@ -5,6 +5,7 @@ import ButtonWithSpinner from "components/ButtonWithSpinner";
 import { useConfirmPasswordResetMutation } from "slices/enhancedApi";
 import { getReqErrorMessage } from "utils/requests.utils";
 import { Link } from "react-router-dom";
+import useSetTitle from "utils/title.hook";
 
 export default function ConfirmPasswordReset() {
   const [searchParams] = useSearchParams();
@@ -13,6 +14,8 @@ export default function ConfirmPasswordReset() {
   const [validated, setValidated] = useState(false);
   const [confirmReset, {isLoading, isSuccess, error}] = useConfirmPasswordResetMutation();
   const token = searchParams.get('pwresetToken');
+
+  useSetTitle('Confirm Password Reset');
 
   if (!token) {
     return (

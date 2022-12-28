@@ -1,6 +1,7 @@
 import { Link, useSearchParams } from "react-router-dom";
 import { useVerifyEmailMutation } from "slices/api";
 import { getReqErrorMessage } from "utils/requests.utils";
+import useSetTitle from "utils/title.hook";
 import useEffectOnce from "utils/useEffectOnce.hook";
 import GenericSpinner from "./GenericSpinner";
 
@@ -12,6 +13,8 @@ export default function VerifyEmail() {
   const salt = searchParams.get('salt');
   const tag = searchParams.get('tag');
   const urlIsValid = !!(encrypted_entity && iv && salt && tag);
+
+  useSetTitle('Verify Email Address');
 
   useEffectOnce(() => {
     if (!urlIsValid) return;

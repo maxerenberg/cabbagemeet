@@ -40,6 +40,8 @@ import TermsOfService from 'components/TermsOfService';
 import { useGetServerInfoQuery } from 'slices/api';
 
 export default function App() {
+  // Make sure that every single component passed to a <Route>
+  // sets the document.title
   const dayPicker = <DayPicker />;
   return (
     <BrowserRouter>

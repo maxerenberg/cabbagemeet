@@ -8,6 +8,7 @@ import './DayPicker.css';
 import Calendar from './Calendar';
 import { useTodayString } from 'utils/dates.utils';
 import { useState } from 'react';
+import useSetTitle from 'utils/title.hook';
 
 export default function DayPicker() {
   const dispatch = useAppDispatch();
@@ -18,6 +19,9 @@ export default function DayPicker() {
   const atLeastOneDateSelected = useAppSelector(
     state => Object.keys(selectSelectedDates(state)).length > 0
   );
+
+  useSetTitle();
+
   useEffect(() => {
     // Select today's date by default
     dispatch(setSelectedDates({[todayString]: true}));

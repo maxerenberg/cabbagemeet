@@ -8,6 +8,7 @@ import OAuth2ProviderButtons from 'components/OAuth2ProviderButtons';
 import { useLoginMutation } from 'slices/api';
 import { getReqErrorMessage, useMutationWithPersistentError } from "utils/requests.utils";
 import styles from './Login.module.css';
+import useSetTitle from 'utils/title.hook';
 
 // TODO: reduce code duplication with Signup.tsx
 
@@ -45,7 +46,11 @@ function LoginForm() {
     };
   }
 
-  useEffect(() => { lastNonAuthPathRef.current = lastNonAuthPath; }, [lastNonAuthPath]);
+  useSetTitle('Login');
+
+  useEffect(() => {
+    lastNonAuthPathRef.current = lastNonAuthPath;
+  }, [lastNonAuthPath]);
 
   useEffect(() => {
     if (isSuccess) {

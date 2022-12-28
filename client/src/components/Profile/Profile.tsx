@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import ButtonGroup from 'react-bootstrap/ButtonGroup';
 import { Link, useNavigate } from "react-router-dom";
 import { useAppSelector } from "app/hooks";
@@ -15,6 +15,7 @@ import { useGetSelfInfoQuery, useLogoutMutation } from "slices/api";
 import { useGetSelfInfoIfTokenIsPresent } from "utils/auth.hooks";
 import { getReqErrorMessage, useMutationWithPersistentError } from "utils/requests.utils";
 import { scrollUpIntoViewIfNeeded } from "utils/misc.utils";
+import useSetTitle from "utils/title.hook";
 
 export default function Profile() {
   const tokenIsPresent = useAppSelector(selectTokenIsPresent);
@@ -29,6 +30,12 @@ export default function Profile() {
       navigate('/');
     }
   }, [shouldBeRedirectedToHomePage, navigate]);
+
+  const title = useMemo(
+    () => userInfo ? userInfo.name + "'s Profile" : undefined,
+    [userInfo]
+  );
+  useSetTitle(title);
 
   if (shouldBeRedirectedToHomePage) {
     return null;

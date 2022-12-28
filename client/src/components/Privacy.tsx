@@ -1,4 +1,7 @@
+import useSetTitle from "utils/title.hook";
+
 export default function Privacy() {
+  useSetTitle('Privacy Policy');
   return (
     <div className="mx-auto" style={{maxWidth: '600px'}}>
       <h3>Privacy Policy</h3>
