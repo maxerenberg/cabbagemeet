@@ -763,9 +763,6 @@ export default class OAuth2Service {
     mustHaveCreatedEvent: boolean,
     userID?: number,
   }): Promise<AbstractOAuth2[]> {
-    // sanity check, in case we casted somewhere
-    assert(typeof meetingID === 'number');
-    assert(typeof userID === 'number' || typeof userID === 'undefined');
     const oauth2TableName = oauth2TableNamesMap[provider.type];
     const createdEventTableName = oauth2CreatedEventTableNamesMap[provider.type];
     // Despite best efforts, I was unable to build this query using the
@@ -775,6 +772,11 @@ export default class OAuth2Service {
     // very strange behaviour where TypeORM would try to insert the UserID
     // field multiple times when adding a respondent.
     // So we're going to use a raw query instead.
+    const placeholders = getPlaceholders(2, this.dbType);
+    const placeholderValues = [meetingID];
+    if (userID) {
+      placeholderValues.push(userID);
+    }
     const selectCols = AbstractOAuth2.getColumnNames()
       .map(col => `${oauth2TableName}.${col} AS "${col}"`)
       .join(', ')
@@ -784,12 +786,12 @@ export default class OAuth2Service {
       SELECT ${selectCols} FROM ${oauth2TableName}
       ${mustBeRespondent ? 'INNER' : 'LEFT'} JOIN MeetingRespondent
         ON ${oauth2TableName}.UserID = MeetingRespondent.UserID
-        AND MeetingRespondent.MeetingID = ${meetingID}
+        AND MeetingRespondent.MeetingID = ${placeholders[0]}
       ${mustHaveCreatedEvent ? 'INNER' : 'LEFT'} JOIN ${createdEventTableName}
         ON MeetingRespondent.RespondentID = ${createdEventTableName}.RespondentID
       WHERE ${oauth2TableName}.LinkedCalendar
-      ${userID ? `AND ${oauth2TableName}.UserID = ${userID}` : ''}
-    `) as (AbstractOAuth2 & {CreatedEventID: string})[];
+      ${userID ? `AND ${oauth2TableName}.UserID = ${placeholders[1]}` : ''}
+    `, placeholderValues) as (AbstractOAuth2 & {CreatedEventID: string})[];
     const result: AbstractOAuth2[] = [];
     for (const row of rows) {
       const {CreatedEventID, ...oauth2} = row;
