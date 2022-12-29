@@ -1,7 +1,16 @@
 import { URL } from 'node:url';
 import { HttpStatus } from '@nestjs/common';
 import type { NestExpressApplication } from '@nestjs/platform-express';
-import { commonAfterAll, commonBeforeAll, commonBeforeEach, GET, POST, smtpMessages, waitForEmailMessages } from './e2e-testing-helpers';
+import {
+  commonAfterAll,
+  commonBeforeAll,
+  commonBeforeEach,
+  GET,
+  POST,
+  smtpMessages,
+  waitForEmailMessage,
+} from './e2e-testing-helpers';
+import { sleep } from '../src/misc.utils';
 
 describe('AuthController (e2e)', () => {
   let app: NestExpressApplication;
@@ -71,14 +80,16 @@ http://cabbagemeet.internal/verify-email?`
     await POST('/api/reset-password', app)
       .send({email: 'b@c'})
       .expect(HttpStatus.NO_CONTENT);
-    await waitForEmailMessages();
+    // We are trying to make sure that an email message does *not* arrive
+    await sleep(200);
     // For an email address with no corresponding user, no email should get sent
     expect(smtpMessages).toHaveLength(0);
     await POST('/api/reset-password', app)
       .send({email: 'a@b'})
       .expect(HttpStatus.NO_CONTENT);
-    await waitForEmailMessages();
-    expect(smtpMessages).toHaveLength(1);
+    if (smtpMessages.length < 1) {
+      await waitForEmailMessage();
+    }
     expect(smtpMessages[0].from).toStrictEqual('no-reply@cabbagemeet.internal');
     expect(smtpMessages[0].to).toStrictEqual('a@b');
     expect(smtpMessages[0].subject).toStrictEqual('CabbageMeet password reset');

@@ -148,6 +148,7 @@ type SmtpMessage = {
   body: string;
 };
 export const smtpMessages: SmtpMessage[] = [];
+let smtpMessageArrivalCallback: (arg: null) => void | undefined;
 const smtpMessagesBySessionId: Record<string, SmtpMessage> = {};
 const mockSmtpServer = new SMTPServer({
   secure: false,
@@ -184,6 +185,10 @@ const mockSmtpServer = new SMTPServer({
       }
       if (message.subject && message.body) {
         smtpMessages.push(message);
+        if (smtpMessageArrivalCallback) {
+          smtpMessageArrivalCallback(null);
+          smtpMessageArrivalCallback = undefined;
+        }
       }
       callback();
     });
@@ -220,14 +225,10 @@ export function sortEmailMessagesByRecipient(messages: SmtpMessage[]) {
   messages.sort((m1, m2) => m1.to.localeCompare(m2.to));
 }
 
-export async function waitForEmailMessages(delayMs = 200) {
-  for (;;) {
-    const oldLength = smtpMessages.length;
-    await sleep(delayMs);
-    if (smtpMessages.length === oldLength) {
-      break;
-    }
-  }
+export async function waitForEmailMessage() {
+  const [promise, resolve] = createPromiseCallbacks();
+  smtpMessageArrivalCallback = resolve;
+  await promise;
 }
 
 function makeRequest(method: 'get' | 'post' | 'patch' | 'delete' | 'put', apiPath: string, app: INestApplication, token?: string) {

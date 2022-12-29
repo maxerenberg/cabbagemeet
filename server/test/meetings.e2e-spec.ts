@@ -3,6 +3,7 @@ import type { NestExpressApplication } from '@nestjs/platform-express';
 import type AddGuestRespondentDto from '../src/meetings/add-guest-respondent.dto';
 import type CreateMeetingDto from '../src/meetings/create-meeting.dto';
 import type ScheduleMeetingDto from '../src/meetings/schedule-meeting.dto';
+import { sleep } from '../src/misc.utils';
 import {
   addGuestRespondent,
   commonAfterAll,
@@ -24,10 +25,8 @@ import {
   sortEmailMessagesByRecipient,
   unscheduleMeeting,
   updateRespondent,
-  waitForEmailMessages,
+  waitForEmailMessage,
 } from './e2e-testing-helpers';
-
-const emailDelayMs = 300;
 
 describe('MeetingsController (e2e)', () => {
   let app: NestExpressApplication;
@@ -375,14 +374,16 @@ describe('MeetingsController (e2e)', () => {
       app,
       scheduleAsGuest ? undefined : token3,
     );
-    await waitForEmailMessages(emailDelayMs);
-    sortEmailMessagesByRecipient(smtpMessages);
     // user1 shouldn't get notified because they are not subscribed to notifications
     const expectedRecipients = ['bob@example.com', 'jim@example.com', email2];
     if (scheduleAsGuest) {
       // if user3 scheduled the meeting, they shouldn't get a notification either
       expectedRecipients.push(email3);
     }
+    while (smtpMessages.length < expectedRecipients.length) {
+      await waitForEmailMessage();
+    }
+    sortEmailMessagesByRecipient(smtpMessages);
     expect(smtpMessages.map(m => m.to)).toEqual(expectedRecipients);
     expect(smtpMessages[0].subject).toStrictEqual(`${sampleCreateMeetingDto.name} has been scheduled`);
     // Note: the smtp-server package appears to strip off a single trailing space
@@ -431,12 +432,14 @@ CabbageMeet | http://cabbagemeet.internal
     await addGuestRespondent({name: 'Jim', email: 'jim@example.com', availabilities: []}, meetingID, app);
 
     await scheduleMeeting(meetingID, sampleSchedule, app);
-    await waitForEmailMessages(emailDelayMs);
-    expect(smtpMessages).toHaveLength(1);
+    if (smtpMessages.length < 1) {
+      await waitForEmailMessage();
+    }
 
     await unscheduleMeeting(meetingID, app);
     await scheduleMeeting(meetingID, sampleSchedule, app);
-    await waitForEmailMessages(emailDelayMs);
+    // We are trying to make sure that an email message does *not* arrive
+    await sleep(300);
     // If a meeting is scheduled a second time, no new notifications should be sent
     expect(smtpMessages).toHaveLength(1);
   });
