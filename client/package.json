@@ -30,7 +30,8 @@
     "build": "react-scripts build",
     "test": "react-scripts test --watchAll=false",
     "eject": "react-scripts eject",
-    "test:e2e:cr": "playwright test --project=chromium"
+    "test:e2e:cr": "playwright test --project=chromium",
+    "test:e2e:ff": "playwright test --project=firefox"
   },
   "eslintConfig": {
     "extends": [
