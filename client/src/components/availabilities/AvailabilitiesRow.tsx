@@ -111,36 +111,21 @@ function AvailabilitiesRow({
 
   useEffect(() => {
     if (updateRespondent_isSuccess) {
-      showToast({
-        msg: `${selectedUserNameRef.current}'s availabilities successfully updated`,
-        msgType: 'success',
-        autoClose: true,
-      });
       dispatch(resetSelection());
     }
-  }, [updateRespondent_isSuccess, showToast, dispatch])
+  }, [updateRespondent_isSuccess, dispatch])
 
   useEffect(() => {
     if (schedule_isSuccess) {
-      showToast({
-        msg: 'Successfully scheduled meeting',
-        msgType: 'success',
-        autoClose: true,
-      });
       dispatch(resetSelection());
     }
-  }, [schedule_isSuccess, showToast, dispatch]);
+  }, [schedule_isSuccess, dispatch]);
 
   useEffect(() => {
     if (unschedule_isSuccess) {
-      showToast({
-        msg: `Schedule successfully removed`,
-        msgType: 'success',
-        autoClose: true,
-      });
       dispatch(resetSelection());
     }
-  }, [unschedule_isSuccess, showToast, dispatch]);
+  }, [unschedule_isSuccess, dispatch]);
 
   useEffect(() => {
     if (selMode.type === 'selectedUser') {

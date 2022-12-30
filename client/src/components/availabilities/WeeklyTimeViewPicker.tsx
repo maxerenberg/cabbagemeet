@@ -7,6 +7,8 @@ import MeetingRespondents from './MeetingRespondents';
 import { range } from 'utils/arrays.utils';
 import { assert } from 'utils/misc.utils';
 import { useGetCurrentMeetingWithSelector } from 'utils/meetings.hooks';
+import { useAppSelector } from 'app/hooks';
+import { selectSelMode } from 'slices/availabilitiesSelection';
 
 /**
  * Returns a string which can be used in the CSS grid-template-areas property
@@ -104,8 +106,7 @@ export default function WeeklyViewTimePicker() {
   // span 1 hour instead of 25.
   // As of this writing (2022-10-01), LettuceMeet has this bug as well.
   // !!!!!!!!!!
-  // TODO: I think it would be best to allow the first/last rows to be non-integer times,
-  // e.g. 9:30.
+  // TODO: Need to add an extra day (prior to earliest tentative date) in this scenario.
   const startHour = Math.floor(startTime);
   const endHour = Math.ceil(endTime);
   const [page, pageDispatch] = useReducer(pageNumberReducer, 0);
@@ -121,6 +122,14 @@ export default function WeeklyViewTimePicker() {
     () => generateGridTemplateAreas(numRows, numDaysDisplayed),
     [numRows, numDaysDisplayed]
   );
+  const selModeType = useAppSelector(state => selectSelMode(state).type);
+  const className = useMemo(() => {
+    let result = 'weeklyview-grid';
+    if (selModeType === 'addingRespondent' || selModeType === 'editingRespondent' || selModeType === 'editingSchedule') {
+      result += ' canSelectDates';
+    }
+    return result;
+  }, [selModeType]);
   const moreDaysToLeft = page > 0;
   const moreDaysToRight = dates.length - page*7 > 7;
   return (
@@ -137,7 +146,7 @@ export default function WeeklyViewTimePicker() {
               gridTemplateRows: `auto auto repeat(${numRows}, 1.75em)`,
               gridTemplateAreas,
             }}
-            className="weeklyview-grid"
+            className={className}
           >
             <MeetingGridMonthTextCell dateStrings={datesDisplayed} />
             <MeetingGridDayOfWeekCells dateStrings={datesDisplayed} />

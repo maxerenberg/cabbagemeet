@@ -1,10 +1,18 @@
 import { Link } from "react-router-dom";
 import GenericSpinner from 'components/GenericSpinner';
-import { addDaysToDateString, convertDateTimeStringToHourDecimal, getLocalYearMonthDayFromDate, getMonthAbbr, getYearMonthDayFromDateString, tzAbbr } from "utils/dates.utils";
-import styles from './Profile.module.css';
-import { getReqErrorMessage } from "utils/requests.utils";
 import { useGetCreatedMeetingsQuery, useGetRespondedMeetingsQuery } from 'slices/enhancedApi';
+import {
+  addDaysToDateString,
+  convertDateTimeStringToHourDecimal,
+  getLocalYearMonthDayFromDate,
+  getMonthAbbr,
+  getYearMonthDayFromDateString,
+  to12HourClock,
+  tzAbbr,
+} from "utils/dates.utils";
+import { getReqErrorMessage } from "utils/requests.utils";
 import type { TransformedMeetingShortResponse } from "utils/response-transforms";
+import styles from './Profile.module.css';
 
 export default function CreatedMeetings({showCreatedMeetings}: {showCreatedMeetings: boolean}) {
   const createdMeetingsReqInfo = useGetCreatedMeetingsQuery(undefined, {skip: !showCreatedMeetings});
@@ -96,7 +104,7 @@ export default function CreatedMeetings({showCreatedMeetings}: {showCreatedMeeti
 function ScheduleInfo({meeting}: {meeting: TransformedMeetingShortResponse}) {
   if (!meeting.scheduledStartDateTime) {
     return (
-      <p className="my-auto pe-3 pe-md-4 fs-6 fs-md-4">
+      <p className={"my-auto pe-3 pe-md-4 " + styles.notScheduledText}>
         Not scheduled
       </p>
     );
@@ -131,7 +139,7 @@ function meetingDatesRangeString(dates: string[]): string {
 
 // hour must be a multiple of 0.25
 function shortTimeString(hour: number): string {
-  const HH = String(Math.floor(hour) % 12);
+  const HH = String(to12HourClock(Math.floor(hour)));
   const mm = String(60 * (hour - Math.floor(hour))).padStart(2, '0');
   const amOrPm = hour < 12 ? 'am' : 'pm';
   return `${HH}:${mm} ${amOrPm}`;

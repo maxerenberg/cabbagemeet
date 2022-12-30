@@ -9,7 +9,7 @@ commonSetupsAndTeardowns();
 test('renders the calendar', async () => {
   setToday(new Date('2022-12-27T12:30:00-05:00'));
 
-  const { container, getByText, queryByText } = renderWithProviders(<DayPicker />);
+  const { container, getByText, queryByText, getByLabelText } = renderWithProviders(<DayPicker />);
 
   expect(getByText(/On which days would you like to meet\?/)).toBeInTheDocument();
   expect(getByText('27')).toHaveClass('selected');
@@ -20,9 +20,8 @@ test('renders the calendar', async () => {
   await userEvent.click(getByText('28'));
   await waitFor(() => expect(getByText('28')).not.toHaveClass('selected'));
 
-  const arrows = container.querySelectorAll('svg.arrow');
-  expect(arrows).toHaveLength(2);
-  const [leftArrow, rightArrow] = arrows;
+  const leftArrow = getByLabelText('Previous page');
+  const rightArrow = getByLabelText('Next page');
   expect(leftArrow).toHaveClass('invisible');
   expect(rightArrow).not.toHaveClass('invisible');
 

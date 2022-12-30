@@ -171,7 +171,7 @@ function updateStoreForUserResponseWithToken(
   selfInfoWithToken: UserResponseWithToken,
 ) {
   const {token, ...selfInfo} = selfInfoWithToken;
-  dispatch(replacedApi.util.upsertQueryData(
+  dispatch(enhancedApi.util.upsertQueryData(
     'getSelfInfo', undefined, selfInfo
   ));
   dispatch(setToken(token));
@@ -232,7 +232,7 @@ async function editUser_onQueryStarted(
 ) {
   try {
     const {data: selfInfo} = await queryFulfilled;
-    dispatch(replacedApi.util.upsertQueryData(
+    dispatch(enhancedApi.util.upsertQueryData(
       'getSelfInfo', undefined, selfInfo
     ));
   } catch {}
@@ -244,7 +244,7 @@ async function upsertMeeting_onQueryStarted(
 ) {
   try {
     const {data: meeting} = await queryFulfilled;
-    dispatch(replacedApi.util.upsertQueryData(
+    dispatch(enhancedApi.util.upsertQueryData(
       'getMeeting', meeting.meetingID, transformMeetingResponse(meeting)
     ));
   } catch {}

@@ -33,6 +33,7 @@
   --custom-danger-weak-rgb: 220, 53, 69;
 
   --custom-active-shadow-rgb: 0, 0, 0;
+  --custom-normal-text-color: black;
 }
 
 .btn-primary {

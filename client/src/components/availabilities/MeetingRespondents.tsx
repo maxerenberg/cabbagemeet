@@ -86,6 +86,7 @@ function MeetingRespondents() {
             if (respondentID === selectedRespondentID) {
               onClick = () => dispatch(resetSelection());
             } else {
+              // TODO: disable clicking on a respondent if a request is in-flight
               onClick = () => dispatch(selectUser({respondentID}));
             }
             let onMouseEnter: React.MouseEventHandler | undefined;

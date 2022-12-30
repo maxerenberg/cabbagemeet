@@ -72,6 +72,10 @@
   cursor: pointer;
 }
 
+.canSelectDates .weeklyview__bodycell:hover {
+  cursor: ns-resize;
+}
+
 .weeklyview__bodycell:hover::after {
   /*
     This needs to be in a pseudo-element because if we add a border to

@@ -1,5 +1,7 @@
 .alreadyHaveAccount {
   font-size: 0.9em;
+  text-decoration: none;
+  color: var(--custom-normal-text-color);
 }
 
 .alreadyHaveAccount:hover {

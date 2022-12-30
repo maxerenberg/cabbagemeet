@@ -22,3 +22,13 @@
   border-left-style: solid;
   border-left-color: inherit;
 }
+
+.notScheduledText {
+  font-size: 1rem;
+}
+
+@media (min-width: 768px) {
+  .notScheduledText {
+    font-size: 1.5rem;
+  }
+}

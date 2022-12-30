@@ -33,7 +33,10 @@ export default class SMTPMailStrategy implements IMailStrategy {
     if (smtpPort === 465) {
       transportOptions.secure = true;
     }
-    if (process.env.NODE_ENV === 'production') {
+    if (
+      process.env.NODE_ENV === 'production'
+      && (smtpPort === 25 || smtpPort === 587)
+    ) {
       transportOptions.requireTLS = true;
     }
     this.transport = nodemailer.createTransport(transportOptions, {

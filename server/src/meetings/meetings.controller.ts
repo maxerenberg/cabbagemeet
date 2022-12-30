@@ -128,11 +128,9 @@ function meetingDtoToMeetingEntity(
 }
 
 function tentativeDatesAreOutOfRange(tentativeDates: string[]): boolean {
-  const minDate = tentativeDates.reduce((a, b) => (a < b ? a : b));
   const maxDate = tentativeDates.reduce((a, b) => (a > b ? a : b));
-  const oneYearAgo = oneYearAgoDateString();
   const oneYearFromNow = oneYearFromNowDateString();
-  return minDate < oneYearAgo || maxDate > oneYearFromNow;
+  return maxDate > oneYearFromNow;
 }
 
 @ApiTags('meetings')

@@ -112,7 +112,6 @@ export const availabilitiesSelectionSlice = createSlice({
       };
     },
     selectUser: (state, {payload}: PayloadAction<{respondentID: number}>) => {
-      assert(state.selMode.type === 'none' || state.selMode.type === 'selectedUser');
       return {
         selMode: {type: 'selectedUser', selectedRespondentID: payload.respondentID}
       };

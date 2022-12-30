@@ -3,6 +3,12 @@
 *.db-shm
 *.db-wal
 
+# Production .env file
+/.env
+
+# Symlink to ../client/build
+/client
+
 # Secrets
 *.key
 *.crt

@@ -44,7 +44,7 @@ export default function DeleteRespondentModal({
       show={show}
       setShow={setShow}
       onConfirm={onDeleteClick}
-      title="Delete meeting?"
+      title="Delete respondent?"
       bodyText="Are you sure you want to delete this respondent? This action is irreversible."
       confirmationButtonText="Delete"
       isLoading={isLoading}

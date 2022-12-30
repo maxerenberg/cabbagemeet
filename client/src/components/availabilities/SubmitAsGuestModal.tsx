@@ -1,15 +1,16 @@
 import { useState, useEffect } from 'react';
 import Form from 'react-bootstrap/Form';
 import Modal from 'react-bootstrap/Modal';
-import styles from './SubmitAsGuestModal.module.css';
-import ButtonWithSpinner from 'components/ButtonWithSpinner';
-import { useAddGuestRespondentMutation } from 'slices/api';
+import { Link } from 'react-router-dom';
 import { useAppDispatch, useAppSelector } from 'app/hooks';
+import ButtonWithSpinner from 'components/ButtonWithSpinner';
+import { useToast } from 'components/Toast';
+import { useAddGuestRespondentMutation } from 'slices/api';
 import { selectSelectedTimes, resetSelection } from 'slices/availabilitiesSelection';
 import { selectCurrentMeetingID } from 'slices/currentMeeting';
 import { assert } from 'utils/misc.utils';
 import { getReqErrorMessage } from 'utils/requests.utils';
-import { useToast } from 'components/Toast';
+import styles from './SubmitAsGuestModal.module.css';
 
 function SaveTimesModal({
   show, setShow
@@ -29,6 +30,9 @@ function SaveTimesModal({
   useEffect(() => {
     if (!show) {
       reset();
+      setName('');
+      setEmail('');
+      setValidated(false);
     }
   }, [show, reset]);
 
@@ -111,9 +115,9 @@ function SaveTimesModal({
         </div>
       </Modal.Body>
       <Modal.Footer className="justify-content-between">
-        <div className={styles.alreadyHaveAccount}>
+        <Link className={styles.alreadyHaveAccount} to="/login">
           Already have an account?
-        </div>
+        </Link>
         <ButtonWithSpinner
           as="NonFocusButton"
           type="submit"

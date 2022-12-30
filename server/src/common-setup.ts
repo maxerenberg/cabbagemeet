@@ -10,9 +10,8 @@ import databaseOptionsFactory from './database-options-factory';
 import CustomMigrationsModule from './custom-migrations/custom-migrations.module';
 import { oauth2ProviderNames } from './oauth2/oauth2-common';
 
+// Also used by the database migrations
 export function getCommonImports() {
-
-
   return [
     ConfigModule,
     TypeOrmModule.forRootAsync({

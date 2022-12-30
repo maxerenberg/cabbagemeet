@@ -7,6 +7,9 @@ import { devices } from '@playwright/test';
  */
 // require('dotenv').config();
 
+const connectOptions = process.env.WS_ENDPOINT ?
+  {wsEndpoint: process.env.WS_ENDPOINT} : undefined;
+
 /**
  * See https://playwright.dev/docs/test-configuration.
  */
@@ -30,7 +33,7 @@ const config: PlaywrightTestConfig = {
   /* Opt out of parallel tests on CI. */
   workers: process.env.CI ? 1 : undefined,
   /* Reporter to use. See https://playwright.dev/docs/test-reporters */
-  reporter: 'html',
+  reporter: [['html', {open: 'never'}]],
   /* Shared settings for all the projects below. See https://playwright.dev/docs/api/class-testoptions. */
   use: {
     /* Maximum time each action such as `click()` can take. Defaults to 0 (no limit). */
@@ -40,6 +43,7 @@ const config: PlaywrightTestConfig = {
 
     /* Collect trace when retrying the failed test. See https://playwright.dev/docs/trace-viewer */
     trace: 'on-first-retry',
+    connectOptions,
   },
 
   /* Configure projects for major browsers */

@@ -94,7 +94,7 @@ function GeneralSettings() {
       <h4>General Settings</h4>
       <div className="mt-4 d-flex align-items-center">
         <h5 className="text-primary mt-2">
-          {isEditing ? 'Edit Name' : 'Name'}
+          {isEditing ? <label htmlFor="edit-name-input">Edit name</label> : 'Name'}
         </h5>
         {
           isEditing ? (
@@ -109,7 +109,7 @@ function GeneralSettings() {
               </button>
               <ButtonWithSpinner
                 type="submit"
-                form="edit-name"
+                form="edit-name-form"
                 className="btn btn-primary ms-4"
                 isLoading={isLoading}
               >
@@ -131,11 +131,12 @@ function GeneralSettings() {
         <p className="text-danger text-center mb-0 mt-2">An error occurred: {getReqErrorMessage(error)}</p>
       )}
       {isEditing ? (
-        <Form className="mt-3" id="edit-name" onSubmit={onSubmit}>
+        <Form className="mt-3" id="edit-name-form" onSubmit={onSubmit}>
           <Form.Control
             onChange={(ev) => setName(ev.target.value)}
             value={name}
             autoFocus
+            id="edit-name-input"
           />
         </Form>
       ) : (

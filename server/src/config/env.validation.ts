@@ -41,17 +41,24 @@ export class EnvironmentVariables {
   // Port 3000 is already used by Create-React-App, so use 3001 instead
   @IsOptional()
   @IsPort()
-  PORT?: string = '3001';
+  PORT: string = '3001';
 
   // The IP address or hostname to which the listening socket should be bound
   @IsOptional()
   @IsString()
-  HOST?: string = 'localhost';
+  HOST: string = '127.0.0.1';
 
   // The public-facing URL of this server.
   // Will be used when creating Google calendar events and sending emails.
   @IsUrl({ require_tld: false })
   PUBLIC_URL: string;
+
+  // Folder from which where static files are served
+  @IsOptional()
+  @IsString()
+  // __dirname is like .../server/dist/src/config
+  // This assumes that a folder named "client" is in the server directory
+  STATIC_ROOT: string = __dirname + '/../../../client';
 
   @IsOptional()
   @IsString()
@@ -61,13 +68,13 @@ export class EnvironmentVariables {
   @IsOptional()
   @IsInt()
   @Min(0)
-  HOURLY_MEETING_CREATION_LIMIT_PER_IP?: number = 100;
+  HOURLY_MEETING_CREATION_LIMIT_PER_IP: number = 100;
 
   // Set to 0 to disable automatic deletions
   @IsOptional()
   @IsInt()
   @Min(0)
-  DELETE_MEETINGS_OLDER_THAN_NUM_DAYS?: number = 60;
+  DELETE_MEETINGS_OLDER_THAN_NUM_DAYS: number = 60;
 
   @IsIn(databaseTypes)
   DATABASE_TYPE: DatabaseType;
@@ -143,24 +150,24 @@ export class EnvironmentVariables {
   // 'consumers' if only personal Microsoft accounts can be used
   @IsOptional()
   @IsString()
-  OAUTH2_MICROSOFT_TENANT_ID?: string = 'consumers';
+  OAUTH2_MICROSOFT_TENANT_ID: string = 'consumers';
 
   // Should be set to true if this app is behind a reverse proxy AND the proxy
   // has been configured to set the X-Forwarded-For header
   @IsOptional()
   @IsBooleanString()
-  TRUST_PROXY?: string = 'false';
+  TRUST_PROXY: string = 'false';
 
   @IsOptional()
   @IsBooleanString()
-  VERIFY_SIGNUP_EMAIL_ADDRESS?: string = 'true';
+  VERIFY_SIGNUP_EMAIL_ADDRESS: string = 'true';
 
   // Make sure that this is an IP address if it is not resolvable via
   // an external resolver (e.g. something in /etc/hosts).
   // See https://nodemailer.com/smtp/ for an explanation.
   @IsOptional()
   @IsString()
-  SMTP_HOST?: string;
+  SMTP_HOST: string;
 
   @IsOptional()
   @IsPort()
@@ -182,7 +189,7 @@ export class EnvironmentVariables {
   @IsOptional()
   @IsInt()
   @Min(0)
-  EMAIL_DAILY_LIMIT?: number = 100;
+  EMAIL_DAILY_LIMIT: number = 100;
 
   @IsOptional()
   @IsString()
@@ -190,13 +197,13 @@ export class EnvironmentVariables {
 
   @IsOptional()
   @IsPort()
-  REDIS_PORT?: string = '6379';
+  REDIS_PORT: string = '6379';
 
   @IsOptional()
   @IsInt()
   @Min(0)
   @Max(15)
-  REDIS_DATABASE?: number = 0;
+  REDIS_DATABASE: number = 0;
 }
 
 export function validate(

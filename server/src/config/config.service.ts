@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import * as dotenv from 'dotenv';
+import * as fs from 'fs';
 import type { EnvironmentVariables } from './env.validation';
 import { validate as validateEnv } from './env.validation';
 
@@ -10,15 +11,14 @@ export default class ConfigService {
   private readonly cache: EnvironmentVariables;
 
   constructor() {
-    const envFilePath =
-      process.env.DOTENV_PATH || ({
-        development: '.development.env',
-        production: '.env',
-      } as const)[process.env.NODE_ENV];
-    if (!envFilePath) {
-      throw new Error('NODE_ENV must be set to development or production, or DOTENV_PATH must be set');
+    if (process.env.DOTENV_PATH) {
+      dotenv.config({path: process.env.DOTENV_PATH});
+    } else {
+      const envFilePath = process.env.NODE_ENV === 'development' ? '.development.env' : '.env';
+      if (fs.existsSync(envFilePath)) {
+        dotenv.config({path: envFilePath});
+      }
     }
-    dotenv.config({path: envFilePath});
     this.cache = validateEnv(process.env);
   }
 

@@ -206,7 +206,7 @@ function WhyShouldISignUp() {
       <div className="mt-5">
         <div className="text-primary">3&#41; Notifications</div>
         <p className="mt-2">
-          Get notified when someone responds to a meeting which you've created.
+          Get notified when a meeting to which you have responded has been scheduled.
         </p>
       </div>
     </div>
