@@ -1,5 +1,6 @@
 ## Description
 This directory contains the source code for the server component of CabbageMeet.
+It was created with [NestJS](https://nestjs.com/).
 
 ## Installation
 ```bash
@@ -84,7 +85,7 @@ echo 'DROP DATABASE cabbagemeet; CREATE DATABASE cabbagemeet; \q' | docker exec 
 
 ## Running the SMTP server
 By default, email address verification is enabled, even in development mode.
-To disable this, set `SIGNUP_REQUIRES_EMAIL_VALIDATION = false` in .development.env.
+To disable this, set `VERIFY_SIGNUP_EMAIL_ADDRESS=false` in .development.env.
 
 In development mode, you can run a mock SMTP server in a new terminal window, which
 will listen on `localhost:8025`:
@@ -128,6 +129,18 @@ OK
 OK
 ```
 
+## Environment variables
+If you run `npm run start:dev`, this will set the environment variable
+`NODE_ENV=development`, which will cause the server to read the
+`.development.env` file. If you run `npm run start:prod`, this will set
+the environment variable `NODE_ENV=production`, which will cause the
+server to read a `.env` file in the current directory, if it exists.
+To use an alternative env file, set the environment variable `DOTENV_PATH`
+to the path of the file.
+
+Please see [here](src/config/env.validation.ts) for a description of all
+environment variable values.
+
 ## Running the app
 ```bash
 # development
@@ -142,7 +155,7 @@ $ npm run start:prod
 
 ## Test
 ```bash
-# unit tests
+# unit tests (none right now)
 $ npm run test
 
 # e2e tests

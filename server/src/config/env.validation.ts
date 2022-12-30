@@ -34,16 +34,20 @@ export function isBooleanStringTrue(s: string) {
 // converted into booleans.
 // See https://github.com/typestack/class-transformer/issues/626.
 export class EnvironmentVariables {
+  // One of 'development', 'production', or 'test'.
+  // This is set automatically if you use one of the `npm run` scripts.
   @IsIn(environments)
   NODE_ENV: Environment;
 
-  // Needs to be a string for IsPort() to work
-  // Port 3000 is already used by Create-React-App, so use 3001 instead
+  // The port on which the application will listen.
   @IsOptional()
   @IsPort()
+  // Needs to be a string for IsPort() to work.
+  // Port 3000 is already used by Create-React-App, so 3001 is chosen as the
+  // default instead.
   PORT: string = '3001';
 
-  // The IP address or hostname to which the listening socket should be bound
+  // The IP address or hostname to which the listening socket should be bound.
   @IsOptional()
   @IsString()
   HOST: string = '127.0.0.1';
@@ -53,32 +57,43 @@ export class EnvironmentVariables {
   @IsUrl({ require_tld: false })
   PUBLIC_URL: string;
 
-  // Folder from which where static files are served
+  // Folder from where static files are served
   @IsOptional()
   @IsString()
   // __dirname is like .../server/dist/src/config
   // This assumes that a folder named "client" is in the server directory
   STATIC_ROOT: string = __dirname + '/../../../client';
 
+  // Key used for JWT signing and also for encryption of some URL parameters.
+  // If unspecified, a new random key is created the first time the server
+  // starts, and is saved in the database.
   @IsOptional()
   @IsString()
   JWT_SIGNING_KEY?: string;
 
-  // Set to 0 for no limit
+  // The maximum number of meetings which can be created by requests
+  // from a single IP address.
+  // Set to 0 for no limit.
+  // If the server is running behind a reverse proxy, make sure to set
+  // TRUST_PROXY=true (see below).
   @IsOptional()
   @IsInt()
   @Min(0)
   HOURLY_MEETING_CREATION_LIMIT_PER_IP: number = 100;
 
-  // Set to 0 to disable automatic deletions
+  // Meetings older than this number of days will be automatically deleted
+  // from the database to save storage space.
+  // Set to 0 to disable automatic deletions.
   @IsOptional()
   @IsInt()
   @Min(0)
   DELETE_MEETINGS_OLDER_THAN_NUM_DAYS: number = 60;
 
+  // Set to one of 'sqlite', 'mariadb' or 'postgres'.
   @IsIn(databaseTypes)
   DATABASE_TYPE: DatabaseType;
 
+  // The path to a SQLite file.
   @IsOptional()
   @IsString()
   SQLITE_PATH?: string;
@@ -123,6 +138,8 @@ export class EnvironmentVariables {
   @IsString()
   POSTGRES_DATABASE?: string;
 
+  // The Google OAuth2 client ID to be used for authentication and
+  // Google calendar integration.
   @IsOptional()
   @IsString()
   OAUTH2_GOOGLE_CLIENT_ID?: string;
@@ -131,6 +148,8 @@ export class EnvironmentVariables {
   @IsString()
   OAUTH2_GOOGLE_CLIENT_SECRET?: string;
 
+  // The Microsoft OAuth2 client ID to be used for authentication and
+  // Outlook calendar integration.
   @IsOptional()
   @IsString()
   OAUTH2_MICROSOFT_CLIENT_ID?: string;
@@ -158,10 +177,16 @@ export class EnvironmentVariables {
   @IsBooleanString()
   TRUST_PROXY: string = 'false';
 
+  // If set to true, users are sent a verification link to the email
+  // address which they used when signing up.
+  // If set to false, user accounts are created as soon as they sign up.
   @IsOptional()
   @IsBooleanString()
   VERIFY_SIGNUP_EMAIL_ADDRESS: string = 'true';
 
+  // The Mail Transfer Agent to which emails will be sent.
+  // If unspecified, all email-related functionality will be disabled
+  // (including signup email verification).
   // Make sure that this is an IP address if it is not resolvable via
   // an external resolver (e.g. something in /etc/hosts).
   // See https://nodemailer.com/smtp/ for an explanation.
@@ -169,28 +194,39 @@ export class EnvironmentVariables {
   @IsString()
   SMTP_HOST: string;
 
+  // Should be 25, 465 or 587.
+  // Note that most cloud providers and ISP disable outoing traffic on
+  // port 25.
   @IsOptional()
   @IsPort()
   SMTP_PORT?: string;
 
+  // e.g. cabbagemeet@example.com
   @IsOptional()
   @IsEmail({ allow_display_name: false, require_tld: false })
   SMTP_FROM?: string;
 
+  // Used for SMTP authentication
   @IsOptional()
   @IsString()
   SMTP_USER?: string;
 
+  // Used for SMTP authentication
   @IsOptional()
   @IsString()
   SMTP_PASSWORD?: string;
 
-  // Set to 0 for no limit
+  // The maximum number of emails which this server will send in a single day.
+  // This is useful is using an SMTP relay service with a daily quota.
+  // Set to 0 for no limit.
   @IsOptional()
   @IsInt()
   @Min(0)
   EMAIL_DAILY_LIMIT: number = 100;
 
+  // If unspecified, an in-memory cache will be used.
+  // Redis must be used if multiple instances of the application are running
+  // simultaneously.
   @IsOptional()
   @IsString()
   REDIS_HOST?: string;
