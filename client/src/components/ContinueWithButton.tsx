@@ -1,11 +1,12 @@
 import { useContext, useEffect } from 'react';
+import ButtonWithSpinner from 'components/ButtonWithSpinner';
+import { HistoryContext } from 'components/HistoryProvider';
 import { useLoginWithGoogleMutation, useSignupWithGoogleMutation } from "slices/api";
-import { getReqErrorMessage, useMutationWithPersistentError } from 'utils/requests.utils';
-import ButtonWithSpinner from './ButtonWithSpinner';
 import { createAndStoreSessionNonce } from 'utils/auth.utils';
-import { HistoryContext } from './HistoryProvider';
-import { logos, OAuth2Provider } from 'utils/oauth2-common';
 import { capitalize } from 'utils/misc.utils';
+import { logos, OAuth2Provider } from 'utils/oauth2-common';
+import { getReqErrorMessage, useMutationWithPersistentError } from 'utils/requests.utils';
+import styles from './ContinueWithButton.module.css';
 
 export default function ContinueWithButton({
   reason,
@@ -71,7 +72,7 @@ export default function ContinueWithButton({
   const btnDisabled = isLoading || isSuccess;
   const capitalizedProvider = capitalize(provider);
   const logoPath = logos[provider];
-  className = 'btn btn-light border w-100' + (className ? ` ${className}` : '');
+  className = `btn ${styles.ContinueWithButton} border w-100` + (className ? ` ${className}` : '');
   return (
     <>
       <ButtonWithSpinner
