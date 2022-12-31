@@ -4,7 +4,7 @@
 
 <p align="center">An online application for scheduling group meetings</p>
 
-![CI](https://github.com/maxerenberg/cabbagemeet/workflows/CI/badge.svg)
+[![](https://github.com/maxerenberg/cabbagemeet/workflows/CI/badge.svg)](https://github.com/maxerenberg/cabbagemeet/actions?query=workflow%3ACI)
 
 ## Description
 CabbageMeet aims to be an open-source alternative to [LettuceMeet](https://lettucemeet.com). It is a web-based application for scheduling meetings between two or more people.
@@ -22,7 +22,7 @@ created on your personal calendar when a meeting is scheduled.
 ```bash
 cd server
 npm install
-# Will listen on port 3001 by default, change PORT in .development.env to
+# Will listen on port 3001 by default, set PORT in .development.env to
 # change this
 npm start
 

@@ -12,7 +12,7 @@ jobs:
     runs-on: ubuntu-latest
     defaults:
       run:
-        working-directory: ./server
+        working-directory: server
     strategy:
       matrix:
         # See supported Node.js release schedule at https://nodejs.org/en/about/releases/
@@ -53,6 +53,7 @@ jobs:
       with:
         node-version: ${{ matrix.node-version }}
         cache: 'npm'
+        cache-dependency-path: server/package-lock.json
     - run: npm ci
     - name: E2E tests (SQLite)
       run: npm run test:e2e
@@ -66,12 +67,13 @@ jobs:
     runs-on: ubuntu-latest
     defaults:
       run:
-        working-directory: ./client
+        working-directory: client
     steps:
     - uses: actions/checkout@v3
     - uses: actions/setup-node@v3
       with:
         cache: 'npm'
+        cache-dependency-path: client/package-lock.json
     - run: npm ci
     - name: run unit tests
       run: npm run test
