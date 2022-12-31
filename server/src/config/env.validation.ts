@@ -50,12 +50,21 @@ export class EnvironmentVariables {
   // The IP address or hostname to which the listening socket should be bound.
   @IsOptional()
   @IsString()
-  HOST: string = '127.0.0.1';
+  HOST: string = process.env.NODE_ENV === 'production' ? '0.0.0.0' : '127.0.0.1';
 
-  // The public-facing URL of this server.
+  // The public-facing URL of the website.
   // Will be used when creating Google calendar events and sending emails.
   @IsUrl({ require_tld: false })
   PUBLIC_URL: string;
+
+  // Allow requests from the origin of PUBLIC_URL.
+  // This is useful if the static assets are being served from a different
+  // origin than the API server, e.g. a CDN.
+  // Make sure to also set REACT_APP_API_BASE_URL in the client when
+  // creating the React build.
+  @IsOptional()
+  @IsBooleanString()
+  ENABLE_CORS: string = 'false';
 
   // Folder from where static files are served
   @IsOptional()

@@ -9,14 +9,17 @@ import { useLoginMutation } from 'slices/api';
 import { getReqErrorMessage, useMutationWithPersistentError } from "utils/requests.utils";
 import styles from './Login.module.css';
 import useSetTitle from 'utils/title.hook';
+import WaitForServerInfo from './WaitForServerInfo';
 
 // TODO: reduce code duplication with Signup.tsx
 
 export default function Login() {
   return (
-    <div className="d-flex justify-content-center">
-      <LoginForm />
-    </div>
+    <WaitForServerInfo>
+      <div className="d-flex justify-content-center">
+        <LoginForm />
+      </div>
+    </WaitForServerInfo>
   );
 };
 

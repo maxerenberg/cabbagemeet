@@ -33,6 +33,7 @@ lerna-debug.log*
 
 # Tests
 /coverage
+/test/coverage
 /.nyc_output
 
 # IDEs and editors

@@ -9,6 +9,11 @@ import { devices } from '@playwright/test';
 
 const connectOptions = process.env.WS_ENDPOINT ?
   {wsEndpoint: process.env.WS_ENDPOINT} : undefined;
+const webServer = process.env.CI ?
+  {
+    command: 'cd ../server && npm run start:prod',
+    url: process.env.PUBLIC_URL,
+  } : undefined;
 
 /**
  * See https://playwright.dev/docs/test-configuration.
@@ -102,10 +107,7 @@ const config: PlaywrightTestConfig = {
   // outputDir: 'test-results/',
 
   /* Run your local dev server before starting the tests */
-  // webServer: {
-  //   command: 'npm run start',
-  //   port: 3000,
-  // },
+  webServer,
 };
 
 export default config;

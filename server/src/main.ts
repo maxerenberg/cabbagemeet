@@ -23,11 +23,18 @@ async function bootstrap() {
   const app = await NestFactory.create<NestExpressApplication>(AppModule);
   app.enableShutdownHooks();
   commonAppBootstrap(app);
-  setupSwagger(app);
   const configService = app.get(ConfigService);
   const nodeEnv = configService.get('NODE_ENV');
-  const trustProxy = isBooleanStringTrue(configService.get('TRUST_PROXY'));
-  if (trustProxy) {
+  if (nodeEnv === 'development') {
+    setupSwagger(app);
+  }
+  if (isBooleanStringTrue(configService.get('ENABLE_CORS'))) {
+    app.enableCors({
+      origin: new URL(configService.get('PUBLIC_URL')).origin,
+      allowedHeaders: 'Content-Type,Authorization',
+    });
+  }
+  if (isBooleanStringTrue(configService.get('TRUST_PROXY'))) {
     app.set('trust proxy', true);
   }
   // Note: in development, you will still see the X-Powered-By header in the browser.

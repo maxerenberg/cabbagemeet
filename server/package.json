@@ -1,10 +1,9 @@
 {
   "name": "cabbagemeet-server",
-  "version": "0.0.1",
+  "version": "0.1.0",
   "description": "",
-  "author": "",
   "private": true,
-  "license": "UNLICENSED",
+  "license": "AGPLv3",
   "scripts": {
     "prebuild": "rimraf dist",
     "build": "nest build",

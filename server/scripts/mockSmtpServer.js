@@ -2,7 +2,7 @@
 const { decode: quotedPrintableDecode } = require('quoted-printable');
 const { SMTPServer } = require('smtp-server');
 
-const HOST = 'localhost';
+const HOST = '127.0.0.1';
 const PORT = 8025;
 
 const server = new SMTPServer({

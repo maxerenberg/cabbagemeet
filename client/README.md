@@ -3,6 +3,13 @@
 This directory contains the frontend source code for the CabbageMeet application.
 It was created with [Create-React-App](https://create-react-app.dev).
 
+## Domains
+* Set the environment variable REACT_APP_API_BASE_URL to the domain of the
+  API server if it is different from the domain of the public website. This
+  is useful if the static assets are being served from a CDN. Make sure to
+  also set ENABLE_CORS=true in the server.
+* Consider changing the `og:url` meta tag in index.html.
+
 ## Available Scripts
 
 In the project directory, you can run:
@@ -72,14 +79,15 @@ ln -sf ../client/build client
 #### Backend
 ```bash
 cd ../server
+npm run build
 # You can also place these env variables in a .env file
 export DATABASE_TYPE=sqlite
 export SQLITE_PATH=:memory:
 export PORT=3002
 export VERIFY_SIGNUP_EMAIL_ADDRESS=false
+export HOURLY_MEETING_CREATION_LIMIT_PER_IP=0
 # Use http://localhost:3002 if using a static React build
 export PUBLIC_URL=http://localhost:3003
-npm run build
 npm run start:prod
 ```
 

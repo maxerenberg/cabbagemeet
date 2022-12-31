@@ -1,0 +1,102 @@
+name: CI
+
+on:
+  push:
+    branches: [ master ]
+  pull_request:
+    branches: [ master ]
+
+jobs:
+  server:
+    timeout-minutes: 30
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./server
+    strategy:
+      matrix:
+        # See supported Node.js release schedule at https://nodejs.org/en/about/releases/
+        node-version: [16.x, 18.x]
+    services:
+      mariadb:
+        image: mariadb:10.5
+        ports:
+          - 3306:3306
+        env:
+          MARIADB_USER: cabbagemeet
+          MARIADB_PASSWORD: cabbagemeet
+          MARIADB_DATABASE: cabbagemeet
+          MARIADB_ALLOW_EMPTY_ROOT_PASSWORD: "true"
+        # Adapted from https://stackoverflow.com/a/54854239
+        options: >-
+          --health-cmd "mysqladmin ping -h 127.0.0.1 -u root"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+      postgres:
+        image: postgres:13.9
+        ports:
+          - 5432:5432
+        env:
+          POSTGRES_USER: cabbagemeet
+          POSTGRES_PASSWORD: cabbagemeet
+        # Copied from https://docs.github.com/en/actions/using-containerized-services/creating-postgresql-service-containers
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    steps:
+    - uses: actions/checkout@v3
+    - name: Use Node.js ${{ matrix.node-version }}
+      uses: actions/setup-node@v3
+      with:
+        node-version: ${{ matrix.node-version }}
+        cache: 'npm'
+    - run: npm ci
+    - name: E2E tests (SQLite)
+      run: npm run test:e2e
+    - name: E2E tests (MariaDB)
+      run: npm run test:e2e:mariadb
+    - name: E2E tests (Postgres)
+      run: npm run test:e2e:postgres
+
+  client:
+    timeout-minutes: 30
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./client
+    steps:
+    - uses: actions/checkout@v3
+    - uses: actions/setup-node@v3
+      with:
+        cache: 'npm'
+    - run: npm ci
+    - name: run unit tests
+      run: npm run test
+    # Adapted from https://playwrightsolutions.com/playwright-github-action-to-cache-the-browser-binaries/
+    - name: Get installed Playwright version
+      run: echo "PLAYWRIGHT_VERSION=$(node -e "console.log(require('./package-lock.json').dependencies['@playwright/test'].version)")" >> $GITHUB_ENV
+    - name: Cache playwright binaries
+      uses: actions/cache@v3
+      with:
+        path: "~/.cache/ms-playwright"
+        key: linux-playwright-${{ env.PLAYWRIGHT_VERSION }}
+    - run: npx playwright install --with-deps
+      if: steps.playwright-cache.outputs.cache-hit != 'true'
+    - name: run Playwright tests
+      run: |
+        npm run build
+        cd ../server
+        ln -sf ../client/build client
+        npm run build
+        cd ../client
+        npm run test:e2e
+      env:
+        DATABASE_TYPE: sqlite
+        SQLITE_PATH: ":memory:"
+        PORT: "3001"
+        PUBLIC_URL: "http://localhost:3001"
+        VERIFY_SIGNUP_EMAIL_ADDRESS: "false"
+        HOURLY_MEETING_CREATION_LIMIT_PER_IP: "0"

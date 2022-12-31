@@ -4,6 +4,8 @@
 
 <p align="center">An online application for scheduling group meetings</p>
 
+![CI](https://github.com/maxerenberg/cabbagemeet/workflows/CI/badge.svg)
+
 ## Description
 CabbageMeet aims to be an open-source alternative to [LettuceMeet](https://lettucemeet.com). It is a web-based application for scheduling meetings between two or more people.
 
@@ -19,6 +21,7 @@ created on your personal calendar when a meeting is scheduled.
 ### Backend
 ```bash
 cd server
+npm install
 # Will listen on port 3001 by default, change PORT in .development.env to
 # change this
 npm start
@@ -34,6 +37,7 @@ scripts/mockSmtpServer.js
 ```bash
 # Start the React app
 cd client
+npm install
 # Will listen on port 3000 by default and proxy API requests to port 3001
 # Set the environment variables PORT and PROXY_PORT to change this
 npm start
@@ -43,10 +47,12 @@ npm start
 ```bash
 # Create a static build
 cd client
+# set the env variable REACT_APP_API_BASE_URL if the domain of the
+# API server is not the same as the website itself
 npm run build
 
 cd ../server
-# Create a symlink to the static build folder
+# Create a symlink to the static build folder (or just copy it)
 ln -sf ../client/build client
 npm run build
 # Set any necessary environment variables
@@ -55,3 +61,6 @@ vim .env
 # Start the app
 npm run start:prod
 ```
+
+## Logo credits
+* https://freesvg.org/cabbage-26939
