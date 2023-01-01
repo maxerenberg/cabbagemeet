@@ -111,5 +111,5 @@ jobs:
       if: failure()
       with:
         name: test-results
-        path: test-results/
+        path: client/test-results/
         retention-days: 3
