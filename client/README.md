@@ -86,15 +86,15 @@ export SQLITE_PATH=:memory:
 export PORT=3002
 export VERIFY_SIGNUP_EMAIL_ADDRESS=false
 export HOURLY_MEETING_CREATION_LIMIT_PER_IP=0
-# Use http://localhost:3002 if using a static React build
-export PUBLIC_URL=http://localhost:3003
+# Use http://127.0.0.1:3002 if using a static React build
+export PUBLIC_URL=http://127.0.0.1:3003
 npm run start:prod
 ```
 
 ### Run tests locally
 ```bash
-# Use http://localhost:3002 if using a static React build
-export PUBLIC_URL=http://localhost:3003
+# Use http://127.0.0.1:3002 if using a static React build
+export PUBLIC_URL=http://127.0.0.1:3003
 # I've noticed that the tests usually fail if run in headful mode
 # in parallel, so best to only use one worker unless running headlessly
 npm run test:e2e:cr -- --workers 1

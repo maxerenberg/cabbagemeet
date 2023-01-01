@@ -17,13 +17,16 @@ export default function IsTzDatabaseTimezone(
       target: object.constructor,
       propertyName,
       constraints: ['isTzDatabaseTimezone'],
-      options: validationOptions,
+      options: {
+        message: 'invalid timezone',
+        ...validationOptions,
+      },
       validator: {
         validate(value: any, args: ValidationArguments) {
-          return (
-            typeof value === 'string' &&
-            value.includes('/') &&
-            isATimeZone(value)
+          return typeof value === 'string' && (
+            value === 'UTC' || (
+              value.includes('/') && isATimeZone(value)
+            )
           );
         },
       },

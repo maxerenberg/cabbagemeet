@@ -15,7 +15,10 @@ export default function IsOnlyDateString(
       target: object.constructor,
       propertyName,
       constraints: ['isOnlyDateString'],
-      options: validationOptions,
+      options: {
+        message: 'invalid date string',
+        ...validationOptions,
+      },
       validator: {
         validate(value: any, args: ValidationArguments) {
           return (

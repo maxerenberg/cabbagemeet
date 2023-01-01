@@ -20,7 +20,10 @@ export default function IsCustomISO8601String(
       target: object.constructor,
       propertyName,
       constraints: ['isCustomISO8601String'],
-      options: validationOptions,
+      options: {
+        message: 'invalid date time string',
+        ...validationOptions,
+      },
       validator: {
         validate(value: any, args: ValidationArguments) {
           return (
