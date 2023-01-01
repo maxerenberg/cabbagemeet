@@ -81,14 +81,6 @@ jobs:
     - run: npm ci
     - name: Run unit tests
       run: npm run test
-    # Use production builds for Playwright tests
-    - name: Build client and server
-      run: |
-        npm run build
-        cd ../server
-        ln -sf ../client/build client
-        npm ci
-        npm run build
     # Adapted from https://playwrightsolutions.com/playwright-github-action-to-cache-the-browser-binaries/
     - name: Get installed Playwright version
       run: echo "PLAYWRIGHT_VERSION=$(node -e "console.log(require('./package-lock.json').dependencies['@playwright/test'].version)")" >> $GITHUB_ENV
@@ -99,10 +91,19 @@ jobs:
         key: linux-playwright-${{ env.PLAYWRIGHT_VERSION }}
     - run: npx playwright install --with-deps
       if: steps.playwright-cache.outputs.cache-hit != 'true'
-    - run: npm run test:e2e
+    - name: Run Playwright tests
+      run: |
+        npm run build
+        cd ../server
+        ln -sf ../client/build client
+        npm ci
+        npm run build
+        cd ../client
+        npm run test:e2e
       env:
         DATABASE_TYPE: sqlite
         SQLITE_PATH: ":memory:"
+        HOST: localhost
         PORT: "3001"
         PUBLIC_URL: "http://localhost:3001"
         VERIFY_SIGNUP_EMAIL_ADDRESS: "false"
