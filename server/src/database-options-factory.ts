@@ -54,7 +54,7 @@ export function createDataSourceOptions(
   }
   if (cli || nodeEnv !== 'development') {
     commonOptions.migrations = [
-      `${cli ? '' : 'dist/'}migrations/${dbType}/*.js`,
+      `${nodeEnv === 'production' ? 'dist/' : ''}migrations/${dbType}/*.js`,
       customMigrationsGlobPath,
     ];
     commonOptions.migrationsRun = true;

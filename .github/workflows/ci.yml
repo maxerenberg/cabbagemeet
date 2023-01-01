@@ -16,7 +16,7 @@ jobs:
     strategy:
       matrix:
         # See supported Node.js release schedule at https://nodejs.org/en/about/releases/
-        node-version: [16.x, 18.x]
+        node-version: [18.x]
     services:
       mariadb:
         image: mariadb:10.5
@@ -73,9 +73,13 @@ jobs:
     - uses: actions/setup-node@v3
       with:
         cache: 'npm'
-        cache-dependency-path: client/package-lock.json
+        # See https://github.com/actions/setup-node/blob/main/docs/advanced-usage.md#caching-packages-data
+        # Server deps are needed for running Playwright testes
+        cache-dependency-path: |
+          client/package-lock.json
+          server/package-lock.json
     - run: npm ci
-    - name: run unit tests
+    - name: Run unit tests
       run: npm run test
     # Adapted from https://playwrightsolutions.com/playwright-github-action-to-cache-the-browser-binaries/
     - name: Get installed Playwright version
@@ -87,11 +91,12 @@ jobs:
         key: linux-playwright-${{ env.PLAYWRIGHT_VERSION }}
     - run: npx playwright install --with-deps
       if: steps.playwright-cache.outputs.cache-hit != 'true'
-    - name: run Playwright tests
+    - name: Run Playwright tests
       run: |
         npm run build
         cd ../server
         ln -sf ../client/build client
+        npm ci
         npm run build
         cd ../client
         npm run test:e2e
