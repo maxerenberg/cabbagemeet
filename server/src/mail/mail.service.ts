@@ -53,6 +53,9 @@ export default class MailService {
   }
 
   async sendNowOrLater(args: SendParams) {
+    if (!this.isConfigured()) {
+      return;
+    }
     const MAX_TRIES = 3;
     for (let i = 0; i < MAX_TRIES; i++) {
       if (!this.rateLimiter || await this.rateLimiter.tryAddRequestIfWithinLimits(KEY)) {
@@ -71,6 +74,9 @@ export default class MailService {
   }
 
   async sendNowIfAllowed(args: SendParams): Promise<boolean> {
+    if (!this.isConfigured()) {
+      return false;
+    }
     if (!this.rateLimiter || await this.rateLimiter.tryAddRequestIfWithinLimits(KEY)) {
       return this.trySendNow(args);
     }

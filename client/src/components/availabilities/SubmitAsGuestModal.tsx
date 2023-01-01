@@ -4,7 +4,6 @@ import Modal from 'react-bootstrap/Modal';
 import { Link } from 'react-router-dom';
 import { useAppDispatch, useAppSelector } from 'app/hooks';
 import ButtonWithSpinner from 'components/ButtonWithSpinner';
-import { useToast } from 'components/Toast';
 import { useAddGuestRespondentMutation } from 'slices/api';
 import { selectSelectedTimes, resetSelection } from 'slices/availabilitiesSelection';
 import { selectCurrentMeetingID } from 'slices/currentMeeting';
@@ -25,7 +24,6 @@ function SaveTimesModal({
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [validated, setValidated] = useState(false);
-  const {showToast} = useToast();
 
   useEffect(() => {
     if (!show) {

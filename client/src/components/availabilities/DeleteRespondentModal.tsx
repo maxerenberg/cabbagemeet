@@ -1,7 +1,6 @@
 import { useCallback, useEffect } from "react";
 import { useAppDispatch, useAppSelector } from "app/hooks";
 import ConfirmationModal from "components/ConfirmationModal";
-import { useToast } from "components/Toast";
 import { useDeleteRespondentMutation } from "slices/api";
 import { resetSelection } from "slices/availabilitiesSelection";
 import { selectCurrentMeetingID } from "slices/currentMeeting";
@@ -18,7 +17,6 @@ export default function DeleteRespondentModal({
   assert(meetingID !== undefined);
   const dispatch = useAppDispatch();
   const [deleteRespondent, {isSuccess, isLoading, error, reset}] = useMutationWithPersistentError(useDeleteRespondentMutation);
-  const { showToast } = useToast();
 
   useEffect(() => {
     if (isSuccess) {
