@@ -103,9 +103,8 @@ jobs:
       env:
         DATABASE_TYPE: sqlite
         SQLITE_PATH: ":memory:"
-        HOST: "127.0.0.1"
         PORT: "3001"
-        PUBLIC_URL: "http://127.0.0.1:3001"
+        PUBLIC_URL: "http://localhost:3001"
         VERIFY_SIGNUP_EMAIL_ADDRESS: "false"
         HOURLY_MEETING_CREATION_LIMIT_PER_IP: "0"
     - uses: actions/upload-artifact@v3
