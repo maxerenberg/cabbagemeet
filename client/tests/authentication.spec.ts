@@ -7,7 +7,8 @@ import {
   createNewUser,
   getButton,
   clickModalConfirmationButton,
-  closeAllToasts,
+  closeToast,
+  getByExactText,
 } from './test-utils';
 
 test('signup, logout and login', async ({ page }) => {
@@ -36,15 +37,16 @@ test('Edit user settings', async ({ page }) => {
   await clickButton(page, 'Edit');
   await page.getByLabel('Edit name').fill('Robert');
   await clickButton(page, 'Save');
+  await closeToast(page);
   await getButton(page, 'Edit');
-  await expect(page.getByText('Robert')).toHaveCount(1);
+  await expect(getByExactText(page, 'Robert')).toHaveCount(1);
 
   await clickButton(page, 'Subscribe to updates');
+  await closeToast(page);
   await getButton(page, "Unsubscribe from updates");
-  await closeAllToasts(page);
 
   await clickButton(page, 'Delete');
   await clickModalConfirmationButton(page, 'Delete');
+  await closeToast(page);
   await getButton(page, "Let's meet");
-  await closeAllToasts(page);
 });

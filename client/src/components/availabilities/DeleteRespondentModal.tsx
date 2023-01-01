@@ -22,15 +22,10 @@ export default function DeleteRespondentModal({
 
   useEffect(() => {
     if (isSuccess) {
-      showToast({
-        msg: `Successfully deleted respondent`,
-        msgType: 'success',
-        autoClose: true,
-      });
       setShow(false);
       dispatch(resetSelection());
     }
-  }, [isSuccess, showToast, setShow, dispatch]);
+  }, [isSuccess, setShow, dispatch]);
 
   const onDeleteClick = useCallback(() => {
     deleteRespondent({

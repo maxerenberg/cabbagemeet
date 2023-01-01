@@ -46,10 +46,8 @@ export async function getElementCenter(elem: ElementHandle): Promise<[number, nu
   return [box.x + box.width / 2, box.y + box.height / 2];
 }
 
-export async function closeAllToasts(page: Page) {
-  for (const elem of (await page.locator('.toast .btn-close').all())) {
-    await elem.click();
-  }
+export async function closeToast(page: Page) {
+  await page.locator('.toast .btn-close >> visible=true').click();
   await expect(page.locator('.toast')).toHaveCount(0);
 }
 
@@ -82,4 +80,12 @@ export async function clickModalConfirmationButton(page: Page, text: string) {
     await page.$(`.modal-footer button >> text="${text}" >> visible=true`);
   expect(confirmationButton).not.toBeNull();
   await confirmationButton!.click();
+}
+
+export function getByExactText(page: Page, text: string) {
+  return page.getByText(text, {exact: true});
+}
+
+export function getByDate(page: Page, date: Date) {
+  return getByExactText(page, date.getDate().toString());
 }

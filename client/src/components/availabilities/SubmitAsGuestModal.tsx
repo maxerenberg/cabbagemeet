@@ -38,16 +38,11 @@ function SaveTimesModal({
 
   useEffect(() => {
     if (isSuccess) {
-      showToast({
-        msg: 'Successfully added availabilities',
-        msgType: 'success',
-        autoClose: true,
-      });
       dispatch(resetSelection());
       // automatically close the modal if the request succeeds
       setShow(false);
     }
-  }, [isSuccess, showToast, dispatch, setShow]);
+  }, [isSuccess, dispatch, setShow]);
 
   const onSubmit: React.FormEventHandler<HTMLFormElement> = (ev) => {
     ev.preventDefault();

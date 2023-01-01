@@ -93,7 +93,11 @@ npm run start:prod
 
 ### Run tests locally
 ```bash
-npm run test:e2e:cr
+# Use http://localhost:3002 if using a static React build
+export PUBLIC_URL=http://localhost:3003
+# I've noticed that the tests usually fail if run in headful mode
+# in parallel, so best to only use one worker unless running headlessly
+npm run test:e2e:cr -- --workers 1
 ```
 
 ### Run tests remotely with local browser
