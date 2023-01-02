@@ -173,12 +173,26 @@ export class EnvironmentVariables {
   @IsString()
   OAUTH2_MICROSOFT_REDIRECT_URI?: string;
 
+  // Certificate used for PKCE (must be PEM-encoded)
+  // This takes priority over OAUTH2_MICROSOFT_CERTIFICATE_PATH
+  @IsOptional()
+  @IsString()
+  OAUTH2_MICROSOFT_CERTIFICATE?: string;
+
   // Path to a certificate used for PKCE (must be PEM-encoded)
+  // This has no effect if OAUTH2_MICROSOFT_CERTIFICATE is set
   @IsOptional()
   @IsString()
   OAUTH2_MICROSOFT_CERTIFICATE_PATH?: string;
 
+  // Private key used for PKCE (must be PEM-encoded)
+  // This takes priority over OAUTH2_MICROSOFT_PRIVATE_KEY_PATH
+  @IsOptional()
+  @IsString()
+  OAUTH2_MICROSOFT_PRIVATE_KEY?: string;
+
   // Path to a private key used for PKCE (must be PEM-encoded)
+  // This has no effect if OAUTH2_MICROSOFT_PRIVATE_KEY is set
   @IsOptional()
   @IsString()
   OAUTH2_MICROSOFT_PRIVATE_KEY_PATH?: string;

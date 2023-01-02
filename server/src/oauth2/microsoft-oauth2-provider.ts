@@ -110,6 +110,10 @@ function errorIsMicrosoftCalendarEventNoLongerExists(err: any): boolean {
   );
 }
 
+function slurp(filename: string): string {
+  return fs.readFileSync(filename, {encoding: 'utf8'});
+}
+
 export default class MicrosoftOAuth2Provider implements IOAuth2Provider {
   public readonly type = OAuth2ProviderType.MICROSOFT;
   private readonly oauth2Config: OAuth2Config;
@@ -131,21 +135,23 @@ export default class MicrosoftOAuth2Provider implements IOAuth2Provider {
     this.oauth2Config = createOAuth2Config(tenantID);
     const client_id = configService.get('OAUTH2_MICROSOFT_CLIENT_ID');
     const redirect_uri = configService.get('OAUTH2_MICROSOFT_REDIRECT_URI');
-    const certificate_path = configService.get(
-      'OAUTH2_MICROSOFT_CERTIFICATE_PATH'
-    );
-    const private_key_path = configService.get(
-      'OAUTH2_MICROSOFT_PRIVATE_KEY_PATH'
-    );
+    const certificatePath = configService.get('OAUTH2_MICROSOFT_CERTIFICATE_PATH');
+    const certificate =
+      configService.get('OAUTH2_MICROSOFT_CERTIFICATE') ||
+      (certificatePath ? slurp(certificatePath) : undefined);
+    const privateKeyPath = configService.get('OAUTH2_MICROSOFT_PRIVATE_KEY_PATH');
+    const privateKey =
+      configService.get('OAUTH2_MICROSOFT_PRIVATE_KEY') ||
+      (privateKeyPath ? slurp(privateKeyPath) : undefined);
     this.publicURL = configService.get('PUBLIC_URL');
     this.codeVerifierCache = cacherService;
-    if (client_id && redirect_uri && private_key_path && certificate_path) {
-      const certificate = fs.readFileSync(certificate_path, {
-        encoding: 'utf8',
-      });
+    if (client_id && redirect_uri && privateKey && certificate) {
       this.x5t = certificateToX5t(certificate);
-      const private_key = fs.readFileSync(private_key_path);
-      this.envConfig = { client_id, redirect_uri, private_key };
+      this.envConfig = {
+        client_id,
+        redirect_uri,
+        private_key: Buffer.from(privateKey),
+      };
     }
   }
 
