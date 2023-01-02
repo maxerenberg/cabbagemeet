@@ -9,7 +9,6 @@ import type { CustomRedirectResponse } from '../src/common-responses';
 import type CreateMeetingDto from '../src/meetings/create-meeting.dto';
 import type ScheduleMeetingDto from '../src/meetings/schedule-meeting.dto';
 import { sleep } from '../src/misc.utils';
-import OAuth2Service from '../src/oauth2/oauth2.service';
 import {
   commonAfterAll,
   commonBeforeAll,
@@ -170,8 +169,8 @@ async function signupNewUserWithMicrosoft(
   const redirect2 = (
     await GET(redirect, app).expect(HttpStatus.FOUND)
   ).headers.location as string;
-  expect(redirect2.startsWith('/?')).toBe(true);
-  const redirect2Params = decodeQueryParams(redirect2.slice(2));
+  expect(redirect2.startsWith('http://cabbagemeet.internal/?')).toBe(true);
+  const redirect2Params = decodeQueryParams(redirect2.slice('http://cabbagemeet.internal/?'.length));
   expect(redirect2Params).toEqual({
     token: redirect2Params.token,
     nonce,
@@ -262,7 +261,7 @@ describe('OAuth2Controller (e2e) (Microsoft)', () => {
     const redirect2 = (
       await GET(redirect, app).expect(HttpStatus.FOUND)
     ).headers.location as string;
-    expect(redirect2).toStrictEqual('/error?e=E_OAUTH2_ACCOUNT_ALREADY_LINKED&provider=MICROSOFT');
+    expect(redirect2).toStrictEqual('http://cabbagemeet.internal/error?e=E_OAUTH2_ACCOUNT_ALREADY_LINKED&provider=MICROSOFT');
   });
 
   it('/api/signup-with-microsoft (POST) (not all scopes granted)', async () => {
@@ -274,7 +273,7 @@ describe('OAuth2Controller (e2e) (Microsoft)', () => {
     });
     const {headers} = await GET(redirect, app).expect(HttpStatus.FOUND);
     const redirect2 = headers['location'] as string;
-    expect(redirect2).toStrictEqual('/error?e=E_OAUTH2_NOT_ALL_SCOPES_GRANTED&provider=MICROSOFT');
+    expect(redirect2).toStrictEqual('http://cabbagemeet.internal/error?e=E_OAUTH2_NOT_ALL_SCOPES_GRANTED&provider=MICROSOFT');
   });
 
   it('/api/login-with-microsoft (POST) (user exists, not linked yet, refresh token is present)', async () => {
@@ -285,8 +284,8 @@ describe('OAuth2Controller (e2e) (Microsoft)', () => {
       await GET(redirect, app).expect(HttpStatus.FOUND)
     ).headers.location as string;
     // should get redirected to link confirmation page
-    expect(redirect2.startsWith('/confirm-link-microsoft-account?')).toBe(true);
-    const redirect2Params = decodeQueryParams(redirect2.slice('/confirm-link-microsoft-account?'.length));
+    expect(redirect2.startsWith('http://cabbagemeet.internal/confirm-link-microsoft-account?')).toBe(true);
+    const redirect2Params = decodeQueryParams(redirect2.slice('http://cabbagemeet.internal/confirm-link-microsoft-account?'.length));
     const {token} = redirect2Params;
     expect(redirect2Params).toEqual({
       postRedirect: '/',
@@ -323,7 +322,7 @@ describe('OAuth2Controller (e2e) (Microsoft)', () => {
     const redirect2 = (
       await GET(redirect, app).expect(HttpStatus.FOUND)
     ).headers.location as string;
-    expect(redirect2).toStrictEqual('/');
+    expect(redirect2).toStrictEqual('http://cabbagemeet.internal/');
     const {body: user} = await GET('/api/me', app, token).expect(HttpStatus.OK);
     expect(user.hasLinkedMicrosoftAccount).toBe(true);
     await deleteAccount(app, token);

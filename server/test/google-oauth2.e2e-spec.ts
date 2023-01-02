@@ -215,8 +215,8 @@ async function signupNewUserWithGoogle(
   const redirect2 = (
     await GET(redirect, app).expect(HttpStatus.FOUND)
   ).headers.location as string;
-  expect(redirect2.startsWith('/?')).toBe(true);
-  const redirect2Params = decodeQueryParams(redirect2.slice(2));
+  expect(redirect2.startsWith('http://cabbagemeet.internal/?')).toBe(true);
+  const redirect2Params = decodeQueryParams(redirect2.slice('http://cabbagemeet.internal/?'.length));
   expect(redirect2Params).toEqual({
     token: redirect2Params.token,
     nonce,
@@ -308,7 +308,7 @@ describe('OAuth2Controller (e2e) (Google)', () => {
     const redirect2 = (
       await GET(redirect, app).expect(HttpStatus.FOUND)
     ).headers.location as string;
-    expect(redirect2).toStrictEqual('/error?e=E_OAUTH2_ACCOUNT_ALREADY_LINKED&provider=GOOGLE');
+    expect(redirect2).toStrictEqual('http://cabbagemeet.internal/error?e=E_OAUTH2_ACCOUNT_ALREADY_LINKED&provider=GOOGLE');
   });
 
   it('/api/signup-with-google (POST) (not all scopes granted)', async () => {
@@ -320,7 +320,7 @@ describe('OAuth2Controller (e2e) (Google)', () => {
     });
     const {headers} = await GET(redirect, app).expect(HttpStatus.FOUND);
     const redirect2 = headers['location'] as string;
-    expect(redirect2).toStrictEqual('/error?e=E_OAUTH2_NOT_ALL_SCOPES_GRANTED&provider=GOOGLE');
+    expect(redirect2).toStrictEqual('http://cabbagemeet.internal/error?e=E_OAUTH2_NOT_ALL_SCOPES_GRANTED&provider=GOOGLE');
   });
 
   it('/api/login-with-google (POST) (user does not exist, no refresh token)', async () => {
@@ -341,8 +341,8 @@ describe('OAuth2Controller (e2e) (Google)', () => {
       await GET(`/redirect/google?code=${mockAuthzCode}&state=${params.state}`, app)
         .expect(HttpStatus.FOUND)
     ).headers.location as string;
-    expect(redirect3.startsWith('/?'));
-    const redirect3Params = decodeQueryParams(redirect3.slice(2));
+    expect(redirect3.startsWith('http://cabbagemeet.internal/?'));
+    const redirect3Params = decodeQueryParams(redirect3.slice('http://cabbagemeet.internal/?'.length));
     expect(redirect3Params).toEqual({
       token: redirect3Params.token,
       nonce,
@@ -356,8 +356,8 @@ describe('OAuth2Controller (e2e) (Google)', () => {
     const redirect2 = (
       await GET(redirect, app).expect(HttpStatus.FOUND)
     ).headers.location as string;
-    expect(redirect2.startsWith('/?')).toBe(true);
-    const redirect2Params = decodeQueryParams(redirect2.slice(2));
+    expect(redirect2.startsWith('http://cabbagemeet.internal/?')).toBe(true);
+    const redirect2Params = decodeQueryParams(redirect2.slice('http://cabbagemeet.internal/?'.length));
     expect(redirect2Params).toEqual({
       token: redirect2Params.token,
       nonce,
@@ -390,8 +390,8 @@ describe('OAuth2Controller (e2e) (Google)', () => {
       await GET(redirect, app).expect(HttpStatus.FOUND)
     ).headers.location as string;
     // should get redirected to link confirmation page
-    expect(redirect2.startsWith('/confirm-link-google-account?')).toBe(true);
-    const redirect2Params = decodeQueryParams(redirect2.slice('/confirm-link-google-account?'.length));
+    expect(redirect2.startsWith('http://cabbagemeet.internal/confirm-link-google-account?')).toBe(true);
+    const redirect2Params = decodeQueryParams(redirect2.slice('http://cabbagemeet.internal/confirm-link-google-account?'.length));
     const {token} = redirect2Params;
     expect(redirect2Params).toEqual({
       postRedirect: '/',
@@ -433,8 +433,8 @@ describe('OAuth2Controller (e2e) (Google)', () => {
     const redirect2 = (
       await GET(redirect, app).expect(HttpStatus.FOUND)
     ).headers.location as string;
-    expect(redirect2.startsWith('/?')).toBe(true);
-    const redirect2Params = decodeQueryParams(redirect2.slice('/?'.length));
+    expect(redirect2.startsWith('http://cabbagemeet.internal/?')).toBe(true);
+    const redirect2Params = decodeQueryParams(redirect2.slice('http://cabbagemeet.internal/?'.length));
     expect(redirect2Params).toEqual({
       token: redirect2Params.token,
       nonce,
@@ -465,7 +465,7 @@ describe('OAuth2Controller (e2e) (Google)', () => {
     const redirect2 = (
       await GET(redirect, app).expect(HttpStatus.FOUND)
     ).headers.location as string;
-    expect(redirect2).toStrictEqual('/');
+    expect(redirect2).toStrictEqual('http://cabbagemeet.internal/');
     const {body: user} = await GET('/api/me', app, token).expect(HttpStatus.OK);
     expect(user.hasLinkedGoogleAccount).toBe(true);
     await deleteAccountAndExpectTokenToBeRevoked(app, token);
@@ -505,7 +505,7 @@ describe('OAuth2Controller (e2e) (Google)', () => {
       await GET(`/redirect/google?error=${encodeURIComponent('some error')}`, app)
         .expect(HttpStatus.FOUND)
     ).headers.location;
-    expect(redirect).toStrictEqual('/error?e=E_INTERNAL_SERVER_ERROR');
+    expect(redirect).toStrictEqual('http://cabbagemeet.internal/error?e=E_INTERNAL_SERVER_ERROR');
   });
 
   it('/api/me/google-calendar-events (GET)', async () => {

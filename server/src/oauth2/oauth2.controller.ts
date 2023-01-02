@@ -21,12 +21,14 @@ import {
 import type { Response } from 'express';
 import { AuthUser } from '../auth/auth-user.decorator';
 import JwtAuthGuard from '../auth/jwt-auth.guard';
+import ConfigService from '../config/config.service';
 import CustomJwtService from '../custom-jwt/custom-jwt.service';
 import { assertIsNever, capitalize, encodeQueryParams } from '../misc.utils';
 import UserResponse from '../users/user-response';
 import User from '../users/user.entity';
 import { UserToUserResponse } from '../users/users.controller';
 import UsersService from '../users/users.service';
+import AbstractOAuth2 from './abstract-oauth2.entity';
 import ConfirmLinkAccountDto from './confirm-link-account.dto';
 import OAuth2Service, {
   OIDCLoginResultType,
@@ -41,18 +43,21 @@ import {
   OAuth2NotAllScopesGrantedError,
   OAuth2NoRefreshTokenError,
 } from './oauth2-common';
-import AbstractOAuth2 from './abstract-oauth2.entity';
 
 @ApiTags('externalCalendars')
 @Controller()
 export class Oauth2Controller {
   private readonly logger = new Logger(Oauth2Controller.name);
+  private readonly publicURL: string;
 
   constructor(
+    configService: ConfigService,
     private readonly oauth2Service: OAuth2Service,
     private readonly jwtService: CustomJwtService,
     private readonly usersService: UsersService,
-  ) {}
+  ) {
+    this.publicURL = configService.get('PUBLIC_URL');
+  }
 
   private stateIsValid(state: any): state is OAuth2State {
     return (
@@ -62,6 +67,14 @@ export class Oauth2Controller {
       (state.reason !== 'link' || typeof state.userID === 'number') &&
       typeof state.postRedirect === 'string'
     );
+  }
+
+  private createAbsoluteUrlForRedirect(url: string): string {
+    // The API server might have a different origin than the public URL
+    if (url.startsWith('https://') || url.startsWith('http://')) {
+      return url;
+    }
+    return this.publicURL + (url.startsWith('/') ? '' : '/') + url;
   }
 
   private async redirectWithToken(
@@ -77,6 +90,7 @@ export class Oauth2Controller {
     if (nonce) {
       urlParams.nonce = nonce;
     }
+    redirectURL = this.createAbsoluteUrlForRedirect(redirectURL);
     const encodedURLParams = encodeQueryParams(urlParams);
     if (redirectURL.includes('?')) {
       res.redirect(redirectURL + '&' + encodedURLParams);
@@ -147,7 +161,8 @@ export class Oauth2Controller {
         urlParams.nonce = state.clientNonce;
       }
       res.redirect(
-        `/confirm-link-${providerName}-account?` + encodeQueryParams(urlParams),
+        `${this.publicURL}/confirm-link-${providerName}-account?` +
+        encodeQueryParams(urlParams),
       );
     } else if (
       loginResult.type ===
@@ -177,7 +192,7 @@ export class Oauth2Controller {
     if (error) {
       this.logger.log('Received error from OIDC server:');
       this.logger.log(error);
-      res.redirect('/error?e=E_INTERNAL_SERVER_ERROR');
+      res.redirect(`${this.publicURL}/error?e=E_INTERNAL_SERVER_ERROR`);
       return;
     }
     if (!code) {
@@ -211,7 +226,7 @@ export class Oauth2Controller {
           }
           throw err;
         }
-        res.redirect(state.postRedirect);
+        res.redirect(this.createAbsoluteUrlForRedirect(state.postRedirect));
       } else if (state.reason === 'signup') {
         const user = await this.oauth2Service.fetchAndStoreUserInfoForSignup(
           providerType,
@@ -233,19 +248,19 @@ export class Oauth2Controller {
       const providerParam = providerName.toUpperCase();
       if (err instanceof OAuth2NotConfiguredError) {
         res.redirect(
-          `/error?e=E_OAUTH2_NOT_AVAILABLE&provider=${providerParam}`,
+          `${this.publicURL}/error?e=E_OAUTH2_NOT_AVAILABLE&provider=${providerParam}`,
         );
       } else if (err instanceof OAuth2AccountAlreadyLinkedError) {
         res.redirect(
-          `/error?e=E_OAUTH2_ACCOUNT_ALREADY_LINKED&provider=${providerParam}`,
+          `${this.publicURL}/error?e=E_OAUTH2_ACCOUNT_ALREADY_LINKED&provider=${providerParam}`,
         );
       } else if (err instanceof OAuth2NotAllScopesGrantedError) {
         res.redirect(
-          `/error?e=E_OAUTH2_NOT_ALL_SCOPES_GRANTED&provider=${providerParam}`,
+          `${this.publicURL}/error?e=E_OAUTH2_NOT_ALL_SCOPES_GRANTED&provider=${providerParam}`,
         );
       } else {
         this.logger.error(err);
-        res.redirect('/error?e=E_INTERNAL_SERVER_ERROR');
+        res.redirect(`${this.publicURL}/error?e=E_INTERNAL_SERVER_ERROR`);
       }
     }
   }
