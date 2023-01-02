@@ -99,7 +99,7 @@ jobs:
     - run: npx playwright install --with-deps
       if: steps.playwright-cache.outputs.cache-hit != 'true'
     - name: Set timezone
-      run: ln -sf /usr/share/zoneinfo/America/New_York /etc/localtime
+      run: sudo ln -sf /usr/share/zoneinfo/America/New_York /etc/localtime
     - name: Run Playwright tests
       run: npm run test:e2e
       env:
