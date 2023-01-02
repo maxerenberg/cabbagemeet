@@ -45,7 +45,12 @@ async function bootstrap() {
     helmet({
       // Setting a header to false prevents it from being set
       dnsPrefetchControl: false,
-      hsts: nodeEnv !== 'development' && nodeEnv !== 'test',
+      hsts: nodeEnv === 'production',
+      // Helmet sets the "upgrade-insecure-requests" option in the
+      // Content Security Policy, which causes WebKit to automatically fetch
+      // over HTTPS, which will cause the Playwright tests to fail.
+      // Se https://stackoverflow.com/a/71109928.
+      contentSecurityPolicy: nodeEnv === 'production' && !process.env.CI,
     }),
   );
   const port = configService.get('PORT');

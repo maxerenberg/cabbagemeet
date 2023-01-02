@@ -81,9 +81,16 @@ jobs:
     - run: npm ci
     - name: Run unit tests
       run: npm run test
+    - name: Create static build
+      run: |
+        npm run build
+        cd ../server
+        ln -sf ../client/build client
+        npm ci
+        npm run build
     # Adapted from https://playwrightsolutions.com/playwright-github-action-to-cache-the-browser-binaries/
     - name: Get installed Playwright version
-      run: echo "PLAYWRIGHT_VERSION=$(node -e "console.log(require('./package-lock.json').dependencies['@playwright/test'].version)")" >> $GITHUB_ENV
+      run: echo PLAYWRIGHT_VERSION=$(node -e "console.log(require('./package-lock.json').dependencies['@playwright/test'].version)") >> $GITHUB_ENV
     - name: Cache playwright binaries
       uses: actions/cache@v3
       with:
@@ -91,15 +98,10 @@ jobs:
         key: linux-playwright-${{ env.PLAYWRIGHT_VERSION }}
     - run: npx playwright install --with-deps
       if: steps.playwright-cache.outputs.cache-hit != 'true'
+    - name: Set timezone
+      run: ln -sf /usr/share/zoneinfo/America/New_York /etc/localtime
     - name: Run Playwright tests
-      run: |
-        npm run build
-        cd ../server
-        ln -sf ../client/build client
-        npm ci
-        npm run build
-        cd ../client
-        npm run test:e2e
+      run: npm run test:e2e
       env:
         DATABASE_TYPE: sqlite
         SQLITE_PATH: ":memory:"
