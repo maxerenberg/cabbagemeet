@@ -113,11 +113,11 @@ export default class GoogleOAuth2Provider implements IOAuth2Provider {
     private readonly calendarEventsRepository: Repository<GoogleCalendarEvents>,
   ) {
     const client_id = configService.get('OAUTH2_GOOGLE_CLIENT_ID');
+    const redirect_uri = configService.get('OAUTH2_GOOGLE_REDIRECT_URI');
     const secret = configService.get('OAUTH2_GOOGLE_CLIENT_SECRET');
     this.publicURL = configService.get('PUBLIC_URL');
-    if (client_id && secret) {
-      const redirect_uri = `${this.publicURL}/redirect/google`;
-      this.envConfig = { client_id, secret, redirect_uri };
+    if (client_id && redirect_uri && secret) {
+      this.envConfig = { client_id, redirect_uri, secret };
     }
   }
 

@@ -219,6 +219,7 @@ describe('OAuth2Controller (e2e) (Microsoft)', () => {
       OAUTH2_MICROSOFT_CLIENT_ID: mockClientId,
       OAUTH2_MICROSOFT_CERTIFICATE_PATH: 'test/microsoft-test.crt',
       OAUTH2_MICROSOFT_PRIVATE_KEY_PATH: 'test/microsoft-test.key',
+      OAUTH2_MICROSOFT_REDIRECT_URI: mockRedirectUri,
     });
   });
   beforeEach(commonBeforeEach);

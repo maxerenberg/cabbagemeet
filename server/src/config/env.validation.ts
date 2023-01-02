@@ -153,6 +153,11 @@ export class EnvironmentVariables {
   @IsString()
   OAUTH2_GOOGLE_CLIENT_ID?: string;
 
+  // The redirect URI used for Google OAuth2.
+  @IsOptional()
+  @IsString()
+  OAUTH2_GOOGLE_REDIRECT_URI?: string;
+
   @IsOptional()
   @IsString()
   OAUTH2_GOOGLE_CLIENT_SECRET?: string;
@@ -162,6 +167,11 @@ export class EnvironmentVariables {
   @IsOptional()
   @IsString()
   OAUTH2_MICROSOFT_CLIENT_ID?: string;
+
+  // The redirect URI used for Microsoft OAuth2.
+  @IsOptional()
+  @IsString()
+  OAUTH2_MICROSOFT_REDIRECT_URI?: string;
 
   // Path to a certificate used for PKCE (must be PEM-encoded)
   @IsOptional()

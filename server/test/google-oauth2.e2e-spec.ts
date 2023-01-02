@@ -266,6 +266,7 @@ describe('OAuth2Controller (e2e) (Google)', () => {
       VERIFY_SIGNUP_EMAIL_ADDRESS: 'false',
       OAUTH2_GOOGLE_CLIENT_ID: mockClientId,
       OAUTH2_GOOGLE_CLIENT_SECRET: mockClientSecret,
+      OAUTH2_GOOGLE_REDIRECT_URI: mockRedirectUri,
     });
   });
   beforeEach(commonBeforeEach);

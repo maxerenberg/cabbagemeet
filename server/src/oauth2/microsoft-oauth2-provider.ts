@@ -130,6 +130,7 @@ export default class MicrosoftOAuth2Provider implements IOAuth2Provider {
     const tenantID = configService.get('OAUTH2_MICROSOFT_TENANT_ID');
     this.oauth2Config = createOAuth2Config(tenantID);
     const client_id = configService.get('OAUTH2_MICROSOFT_CLIENT_ID');
+    const redirect_uri = configService.get('OAUTH2_MICROSOFT_REDIRECT_URI');
     const certificate_path = configService.get(
       'OAUTH2_MICROSOFT_CERTIFICATE_PATH'
     );
@@ -138,13 +139,12 @@ export default class MicrosoftOAuth2Provider implements IOAuth2Provider {
     );
     this.publicURL = configService.get('PUBLIC_URL');
     this.codeVerifierCache = cacherService;
-    if (client_id && private_key_path && certificate_path) {
+    if (client_id && redirect_uri && private_key_path && certificate_path) {
       const certificate = fs.readFileSync(certificate_path, {
         encoding: 'utf8',
       });
       this.x5t = certificateToX5t(certificate);
       const private_key = fs.readFileSync(private_key_path);
-      const redirect_uri = `${this.publicURL}/redirect/microsoft`;
       this.envConfig = { client_id, redirect_uri, private_key };
     }
   }
