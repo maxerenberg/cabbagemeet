@@ -66,6 +66,15 @@ export class EnvironmentVariables {
   @IsBooleanString()
   ENABLE_CORS: string = 'false';
 
+  // A comma-separated list of origins to enable for CORS, in addition to
+  // the origin of PUBLIC_URL. ENABLE_CORS must be set to true for this
+  // option to take effect. If an origin begins with '^', it will be
+  // interpreted as a RegExp.
+  // Note that an origin includes scheme, host and port.
+  @IsOptional()
+  @IsString()
+  EXTRA_CORS_ORIGINS?: string;
+
   // Folder from where static files are served
   @IsOptional()
   @IsString()

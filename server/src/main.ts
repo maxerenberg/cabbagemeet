@@ -30,7 +30,13 @@ async function bootstrap() {
   }
   if (isBooleanStringTrue(configService.get('ENABLE_CORS'))) {
     app.enableCors({
-      origin: new URL(configService.get('PUBLIC_URL')).origin,
+      origin: [
+        new URL(configService.get('PUBLIC_URL')).origin,
+        ...(
+          configService.get('EXTRA_CORS_ORIGINS')?.split(',')
+            .map(s => s.charAt(0) === '^' ? new RegExp(s) : s) || []
+        ),
+      ],
       allowedHeaders: 'Content-Type,Authorization',
     });
   }
