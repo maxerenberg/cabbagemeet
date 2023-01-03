@@ -7,7 +7,9 @@
 [![](https://github.com/maxerenberg/cabbagemeet/workflows/CI/badge.svg)](https://github.com/maxerenberg/cabbagemeet/actions?query=workflow%3ACI)
 
 ## Description
-CabbageMeet aims to be an open-source alternative to [LettuceMeet](https://lettucemeet.com). It is a web-based application for scheduling meetings between two or more people.
+[CabbageMeet](https://cabbagemeet.com) aims to be an open-source alternative
+to LettuceMeet. It is a web-based application for
+scheduling meetings between two or more people.
 
 Meeting respondents can submit their availabilities by clicking or dragging
 their available times on a grid, making it easier to see the times at which

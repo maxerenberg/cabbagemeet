@@ -22,54 +22,44 @@ export default function ContinueWithButton({
   className?: string;
 }) {
   const [
-    login,
+    loginOrSignup,
     {
-      data: login_data,
-      isSuccess: login_isSuccess,
-      isLoading: login_isLoading,
-      error: login_error
+      data,
+      isSuccess,
+      isLoading,
+      error,
+      reset,
     }
-  ] = useMutationWithPersistentError(useLoginMutation);
-  const [
-    signup,
-    {
-      data: signup_data,
-      isSuccess: signup_isSuccess,
-      isLoading: signup_isLoading,
-      error: signup_error
-    }
-  ] = useMutationWithPersistentError(useSignupMutation);
+  ] = useMutationWithPersistentError(
+    reason === 'signup' ? useSignupMutation : useLoginMutation
+  );
   const {lastNonAuthPath} = useContext(HistoryContext);
   let onClick: React.MouseEventHandler<HTMLButtonElement> | undefined;
-  if (reason === 'login') {
-    onClick = async () => {
-      login({
-        post_redirect: lastNonAuthPath,
-        nonce: await createAndStoreSessionNonce(),
-      });
-    };
-  } else if (reason === 'signup') {
-    onClick = async () => {
-      signup({
-        post_redirect: lastNonAuthPath,
-        nonce: await createAndStoreSessionNonce(),
-      });
-    };
-  }
+  onClick = async () => {
+    loginOrSignup({
+      post_redirect: lastNonAuthPath,
+      nonce: await createAndStoreSessionNonce(),
+    });
+  };
   useEffect(() => {
-    if (login_isSuccess) {
-      window.location.href = login_data!.redirect;
+    if (isSuccess) {
+      window.location.href = data!.redirect;
     }
-  }, [login_isSuccess, login_data]);
+  }, [isSuccess, data]);
+  // We need to reset the request status so that the spinner isn't still
+  // visible when the user presses the back button from the OAuth2 consent
+  // page (this only happens in the production build).
+  // But we still want the spinner to be visible while the URL is changing,
+  // which is why we can't just call reset() after setting location.href.
   useEffect(() => {
-    if (signup_isSuccess) {
-      window.location.href = signup_data!.redirect;
-    }
-  }, [signup_isSuccess, signup_data]);
-  const isLoading = login_isLoading || signup_isLoading;
-  const isSuccess = login_isSuccess || signup_isSuccess;
-  const error = login_error || signup_error;
-  const btnDisabled = isLoading || isSuccess;
+    const listener = () => {
+      reset();
+    };
+    window.addEventListener('pageshow', listener);
+    return () => {
+      window.removeEventListener('pageshow', listener);
+    };
+  }, [reset]);
   const capitalizedProvider = capitalize(provider);
   const logoPath = logos[provider];
   className = `btn ${styles.ContinueWithButton} border w-100` + (className ? ` ${className}` : '');
@@ -78,7 +68,7 @@ export default function ContinueWithButton({
       <ButtonWithSpinner
         className={className}
         onClick={onClick}
-        isLoading={btnDisabled}
+        isLoading={isLoading || isSuccess}
       >
         <img
           src={logoPath}
