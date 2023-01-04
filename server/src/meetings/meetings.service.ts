@@ -1,16 +1,27 @@
 import { Injectable } from '@nestjs/common';
 import { ModuleRef } from '@nestjs/core';
-import ConfigService from '../config/config.service';
 import { InjectRepository } from '@nestjs/typeorm';
 import { DateTime } from 'luxon';
+import { FindOptionsWhere, Repository } from 'typeorm';
+import ConfigService from '../config/config.service';
+import type { DatabaseType } from '../config/env.validation';
+import { normalizeDBError, ForeignKeyConstraintFailed } from '../database.utils';
 import MailService from '../mail/mail.service';
 import OAuth2Service from '../oauth2/oauth2.service';
 import User from '../users/user.entity';
-import { Repository } from 'typeorm';
 import MeetingRespondent from './meeting-respondent.entity';
 import Meeting from './meeting.entity';
 
-export class NoSuchMeetingError extends Error {}
+export class NoSuchMeetingError extends Error {
+  constructor() {
+    super('No such meeting');
+  }
+}
+export class NoSuchRespondentError extends Error {
+  constructor() {
+    super('No such respondent');
+  }
+}
 
 function formatScheduledTimeRange(
   startDateTime: string,
@@ -42,6 +53,7 @@ function formatScheduledTimeRange(
 export default class MeetingsService {
   private oauth2Service: OAuth2Service;
   private readonly publicURL: string;
+  private readonly dbType: DatabaseType;
 
   constructor(
     @InjectRepository(Meeting) private meetingsRepository: Repository<Meeting>,
@@ -52,6 +64,7 @@ export default class MeetingsService {
     configService: ConfigService,
   ) {
     this.publicURL = configService.get('PUBLIC_URL');
+    this.dbType = configService.get('DATABASE_TYPE');
   }
 
   onModuleInit() {
@@ -225,43 +238,27 @@ export default class MeetingsService {
     await this.meetingsRepository.delete(meetingID);
   }
 
-  async getRespondent(respondentID: number): Promise<MeetingRespondent | null>;
-  async getRespondent(
-    meetingID: number,
-    userID: number,
-  ): Promise<MeetingRespondent | null>;
-  async getRespondent(
-    respondentIDOrMeetingID: number,
-    userID?: number,
-  ): Promise<MeetingRespondent | null> {
-    if (userID === undefined) {
-      return this.respondentsRepository.findOneBy({
-        RespondentID: respondentIDOrMeetingID,
-      });
-    }
-    return this.respondentsRepository.findOneBy({
-      MeetingID: respondentIDOrMeetingID,
-      UserID: userID,
-    });
+  async getRespondent(where: FindOptionsWhere<MeetingRespondent>): Promise<MeetingRespondent | null> {
+    return this.respondentsRepository.findOneBy(where);
   }
 
   async addRespondent(
     meetingID: number,
     availabilities: string[],
     userID: number,
-  ): Promise<MeetingRespondent>;
+  ): Promise<Meeting>;
   async addRespondent(
     meetingID: number,
     availabilities: string[],
     guestName: string,
     guestEmail?: string,
-  ): Promise<MeetingRespondent>;
+  ): Promise<Meeting>;
   async addRespondent(
     meetingID: number,
     availabilities: string[],
     userIDOrGuestName: number | string,
     guestEmail?: string,
-  ): Promise<MeetingRespondent> {
+  ): Promise<Meeting> {
     const respondent: Partial<MeetingRespondent> = {
       MeetingID: meetingID,
       Availabilities: availabilities,
@@ -272,18 +269,36 @@ export default class MeetingsService {
       respondent.GuestName = userIDOrGuestName;
       respondent.GuestEmail = guestEmail || null;
     }
-    return this.respondentsRepository.save(respondent);
+    try {
+      // TODO: wrap in transaction
+      await this.respondentsRepository.insert(respondent);
+      const meeting = await this.getMeetingWithRespondents(meetingID);
+      return meeting;
+    } catch (err) {
+      err = normalizeDBError(err as Error, this.dbType);
+      if (err instanceof ForeignKeyConstraintFailed) {
+        throw new NoSuchMeetingError();
+      }
+      throw err;
+    }
   }
 
   async updateRespondent(
     respondentID: number,
+    meetingID: number,
     availabilities: string[],
-  ): Promise<MeetingRespondent | null> {
+  ): Promise<Meeting> {
     // TODO: wrap in transaction
-    await this.respondentsRepository.update(respondentID, {
+    const result = await this.respondentsRepository.update({
+      RespondentID: respondentID,
+      MeetingID: meetingID,
+    }, {
       Availabilities: availabilities,
     });
-    return this.respondentsRepository.findOneBy({ RespondentID: respondentID });
+    if (result.affected === 0) {
+      throw new NoSuchRespondentError();
+    }
+    return this.getMeetingWithRespondents(meetingID);
   }
 
   async addOrUpdateRespondent(
@@ -291,17 +306,17 @@ export default class MeetingsService {
     userID: number,
     availabilities: string[],
   ): Promise<Meeting> {
-    const existingRespondent = await this.getRespondent(meetingID, userID);
+    const existingRespondent = await this.getRespondent({MeetingID: meetingID, UserID: userID});
+    let updatedMeeting: Meeting | undefined;
     if (existingRespondent) {
-      await this.updateRespondent(
+      updatedMeeting = await this.updateRespondent(
         existingRespondent.RespondentID,
+        meetingID,
         availabilities,
       );
     } else {
-      await this.addRespondent(meetingID, availabilities, userID);
+      updatedMeeting = await this.addRespondent(meetingID, availabilities, userID);
     }
-    // TODO: wrap in transaction
-    const updatedMeeting = await this.getMeetingWithRespondents(meetingID);
     // Update respondent's external calendars
     // Do not await the Promise so that we don't block the caller
     this.oauth2Service.tryCreateOrUpdateEventsForMeetingForSingleRespondent(

@@ -20,6 +20,8 @@ const errorsMap: Record<DatabaseType, Record<string, {new() : Error;}>> = {
     '1062': UniqueConstraintFailed,
     '1216': ForeignKeyConstraintFailed,
     '1217': ForeignKeyConstraintFailed,
+    '1451': ForeignKeyConstraintFailed,
+    '1452': ForeignKeyConstraintFailed,
   },
 };
 

@@ -223,6 +223,23 @@ describe('MeetingsController (e2e)', () => {
     expectBadRequest({name: 'Bob', availabilities: ['2022-12-22T00:00:01Z']});
   });
 
+  it('/api/meetings/:id/respondents/(guest|me|:respondentID) (POST|PUT) (non-existent meeting or respondent)', async () => {
+    const {meetingID} = await createMeeting(sampleCreateMeetingDto, app);
+    const {token} = await createUser(app);
+    await POST(`/api/meetings/1000000/respondents/guest`, app)
+      .send({name: 'Bob', availabilities: []})
+      .expect(HttpStatus.NOT_FOUND)
+      .expect({statusCode: 404, message: 'No such meeting', error: 'Not Found'});
+    await PUT(`/api/meetings/1000000/respondents/me`, app, token)
+      .send({availabilities: []})
+      .expect(HttpStatus.NOT_FOUND)
+      .expect({statusCode: 404, message: 'No such meeting', error: 'Not Found'});
+    await PUT(`/api/meetings/${meetingID}/respondents/1000000`, app)
+      .send({availabilities: []})
+      .expect(HttpStatus.NOT_FOUND)
+      .expect({statusCode: 404, message: 'No such respondent', error: 'Not Found'});
+  });
+
   it('/api/meetings/:id/respondents/me (PUT)', async () => {
     const {token: token1} = await createUser(app);
     const {token: token2} = await createUser(app);

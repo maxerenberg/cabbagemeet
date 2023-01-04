@@ -27,7 +27,7 @@ import CreateMeetingDto from './create-meeting.dto';
 import MeetingResponse from './meeting-response';
 import MeetingRespondent from './meeting-respondent.entity';
 import Meeting from './meeting.entity';
-import MeetingsService from './meetings.service';
+import MeetingsService, { NoSuchMeetingError, NoSuchRespondentError } from './meetings.service';
 import {
   ApiBadRequestResponse,
   ApiBearerAuth,
@@ -133,6 +133,15 @@ function tentativeDatesAreOutOfRange(tentativeDates: string[]): boolean {
   return maxDate > oneYearFromNow;
 }
 
+function convertMeetingServiceError(err: Error): Error {
+  if (err instanceof NoSuchMeetingError) {
+    return new NotFoundException(err.message);
+  } else if (err instanceof NoSuchRespondentError) {
+    return new NotFoundException(err.message);
+  }
+  return err;
+}
+
 @ApiTags('meetings')
 @Controller('meetings')
 export class MeetingsController {
@@ -158,11 +167,11 @@ export class MeetingsController {
     respondentID: number,
     maybeUser: User | null,
   ): Promise<MeetingRespondent> {
-    const existingRespondent = await this.meetingsService.getRespondent(
-      respondentID,
-    );
+    const existingRespondent = await this.meetingsService.getRespondent({
+      RespondentID: respondentID,
+    });
     if (!existingRespondent) {
-      throw new NotFoundException();
+      throw new NoSuchRespondentError();
     }
     if (existingRespondent.UserID) {
       const errorMessage = 'You must be logged in as this user to modify their availabilities';
@@ -368,17 +377,17 @@ export class MeetingsController {
     @Param('id', ParseIntPipe) meetingID: number,
     @Body() body: AddGuestRespondentDto,
   ): Promise<MeetingResponse> {
-    // TODO: wrap in transaction
-    await this.meetingsService.addRespondent(
-      meetingID,
-      body.availabilities,
-      body.name,
-      body.email,
-    );
-    const updatedMeeting = await this.meetingsService.getMeetingWithRespondents(
-      meetingID,
-    );
-    return meetingToMeetingResponse(updatedMeeting!, null);
+    try {
+      const updatedMeeting = await this.meetingsService.addRespondent(
+        meetingID,
+        body.availabilities,
+        body.name,
+        body.email,
+      );
+      return meetingToMeetingResponse(updatedMeeting, null);
+    } catch (err) {
+      throw convertMeetingServiceError(err as Error);
+    }
   }
 
   @ApiOperation({
@@ -396,12 +405,16 @@ export class MeetingsController {
     @AuthUser() user: User,
     @Body() body: PutRespondentDto,
   ): Promise<MeetingResponse> {
-    const meeting = await this.meetingsService.addOrUpdateRespondent(
-      meetingID,
-      user.ID,
-      body.availabilities,
-    );
-    return meetingToMeetingResponse(meeting, user);
+    try {
+      const updatedMeeting = await this.meetingsService.addOrUpdateRespondent(
+        meetingID,
+        user.ID,
+        body.availabilities,
+      );
+      return meetingToMeetingResponse(updatedMeeting, user);
+    } catch (err) {
+      throw convertMeetingServiceError(err as Error);
+    }
   }
 
   @ApiOperation({
@@ -420,18 +433,20 @@ export class MeetingsController {
     @MaybeAuthUser() maybeUser: User | null,
     @Body() body: PutRespondentDto,
   ): Promise<MeetingResponse> {
-    await this.checkIfRespondentExistsAndClientIsAllowedToModifyThem(
-      respondentID,
-      maybeUser,
-    );
-    await this.meetingsService.updateRespondent(
-      respondentID,
-      body.availabilities,
-    );
-    const updatedMeeting = await this.meetingsService.getMeetingWithRespondents(
-      meetingID,
-    );
-    return meetingToMeetingResponse(updatedMeeting!, maybeUser);
+    try {
+      await this.checkIfRespondentExistsAndClientIsAllowedToModifyThem(
+        respondentID,
+        maybeUser,
+      );
+      const updatedMeeting = await this.meetingsService.updateRespondent(
+        respondentID,
+        meetingID,
+        body.availabilities,
+      );
+      return meetingToMeetingResponse(updatedMeeting, maybeUser);
+    } catch (err) {
+      throw convertMeetingServiceError(err as Error);
+    }
   }
 
   @ApiOperation({
@@ -448,14 +463,18 @@ export class MeetingsController {
     @Param('respondentID', ParseIntPipe) respondentID: number,
     @MaybeAuthUser() maybeUser: User | null,
   ): Promise<MeetingResponse> {
-    const respondent =
-      await this.checkIfRespondentExistsAndClientIsAllowedToModifyThem(
-        respondentID,
-        maybeUser,
+    try {
+      const respondent =
+        await this.checkIfRespondentExistsAndClientIsAllowedToModifyThem(
+          respondentID,
+          maybeUser,
+        );
+      const updatedMeeting = await this.meetingsService.deleteRespondent(
+        respondent,
       );
-    const updatedMeeting = await this.meetingsService.deleteRespondent(
-      respondent,
-    );
-    return meetingToMeetingResponse(updatedMeeting, maybeUser);
+      return meetingToMeetingResponse(updatedMeeting, maybeUser);
+    } catch (err) {
+      throw convertMeetingServiceError(err as Error);
+    }
   }
 }
