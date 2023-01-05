@@ -180,7 +180,7 @@ async function signupNewUserWithMicrosoft(
 
 async function waitUntilCreatedEventIsSavedInDB(eventID: string, expectedNumber: number, app: INestApplication) {
   const datasource = app.get(DataSource);
-  for (let i = 0; i < 20; i++) {
+  for (let i = 0; i < 80; i++) {
     const rows = await datasource.query(
       `SELECT 1 FROM MicrosoftCalendarCreatedEvent WHERE CreatedEventID = '${eventID}'`
     );

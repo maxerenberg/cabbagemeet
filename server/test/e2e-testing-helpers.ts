@@ -3,7 +3,6 @@ import { HttpStatus, INestApplication } from '@nestjs/common';
 import type { NestExpressApplication } from '@nestjs/platform-express';
 import { Test, TestingModule } from '@nestjs/testing';
 import * as dotenv from 'dotenv';
-import { decode as quotedPrintableDecode } from 'quoted-printable';
 import { SMTPServer } from 'smtp-server';
 import * as request from 'supertest';
 import { DataSource } from 'typeorm';
@@ -16,7 +15,7 @@ import type PutRespondentDto from '../src/meetings/put-respondent.dto';
 import type CreateMeetingDto from '../src/meetings/create-meeting.dto';
 import type MeetingResponse from '../src/meetings/meeting-response';
 import type ScheduleMeetingDto from '../src/meetings/schedule-meeting.dto';
-import { assert, sleep, jwtSign } from '../src/misc.utils';
+import { assert, jwtSign } from '../src/misc.utils';
 import type EditUserDto from '../src/users/edit-user.dto';
 import type UserResponse from '../src/users/user-response';
 import type { UserResponseWithToken } from '../src/users/user-response';
@@ -170,16 +169,39 @@ const mockSmtpServer = new SMTPServer({
     });
     stream.on('end', () => {
       const lines = chunks
-        .map(chunk => quotedPrintableDecode(chunk.toString()))
+        .map(chunk => chunk.toString())
         .join('')
         .split('\r\n');
       const message = smtpMessagesBySessionId[session.id];
+      let contentTransferEncoding: string | undefined;
       // There is an empty line between the headers and the body
       for (let i = 0; i < lines.length; i++) {
         if (lines[i].startsWith('Subject: ')) {
-          message.subject = lines[i].slice('Subject: '.length);
+          let subject = lines[i].slice('Subject: '.length);
+          if (subject.startsWith('=?UTF-8?B?') && subject.endsWith('?=')) {
+            // https://www.ietf.org/rfc/rfc2047.txt
+            subject = Buffer.from(
+              subject.slice('=?UTF-8?B?'.length, subject.length - '?='.length),
+              'base64',
+            ).toString();
+            if (lines[i + 1].startsWith(' =?UTF-8?B?')) {
+              // wraps around multiple lines
+              subject += Buffer.from(
+                lines[i + 1].slice(' =?UTF-8?B?'.length, lines[i + 1].length - '?='.length),
+                'base64',
+              ).toString();
+              i++;
+            }
+          }
+          message.subject = subject;
+        } else if (lines[i].startsWith('Content-Transfer-Encoding: ')) {
+          contentTransferEncoding = lines[i].slice('Content-Transfer-Encoding: '.length);
         } else if (lines[i].length === 0) {
-          message.body = lines.slice(i + 1).join('\n');
+          if (contentTransferEncoding === 'base64') {
+            message.body = Buffer.from(lines.slice(i + 1).join(), 'base64').toString();
+          } else {
+            message.body = lines.slice(i + 1).join('\n');
+          }
           break;
         }
       }

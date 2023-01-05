@@ -362,6 +362,55 @@ describe('MeetingsController (e2e)', () => {
     expectBadRequest({startDateTime: '2022-12-22T02:00:00Z', endDateTime: '2022-12-22T01:00:00Z'});
   });
 
+  it('/api/meetings/:id/respondents/(guest|me) (POST|PUT) (notifications)', async () => {
+    const {token: token1, name: name1, email} = await createUser(app);
+    const {token: token2, name: name2} = await createUser(app);
+    const {meetingID} = await createMeeting(sampleCreateMeetingDto, app, token1);
+    await editUser({subscribe_to_notifications: true}, app, token1);
+
+    // Meeting creator shouldn't get notified for their own availabilities
+    await putSelfRespondent({availabilities: []}, meetingID, app, token1);
+    await sleep(200);
+    expect(smtpMessages).toHaveLength(0);
+
+    await addGuestRespondent({name: 'Fred', email: 'fred@example.com', availabilities: []}, meetingID, app);
+    if (smtpMessages.length === 0) {
+      await waitForEmailMessage();
+    }
+    expect(smtpMessages[0].subject).toStrictEqual(`Fred responded to "${sampleCreateMeetingDto.name}"`);
+    expect(smtpMessages[0].to).toStrictEqual(email);
+    expect(smtpMessages[0].body).toStrictEqual(
+`Hello ${name1},
+
+Fred has added their availabilities to the meeting "${sampleCreateMeetingDto.name}".
+
+Please visit http://cabbagemeet.internal/m/${meetingID} for details.
+
+--${' '}
+CabbageMeet | http://cabbagemeet.internal
+`);
+    smtpMessages.pop();
+
+    await putSelfRespondent({availabilities: []}, meetingID, app, token2);
+    if (smtpMessages.length === 0) {
+      await waitForEmailMessage();
+    }
+    expect(smtpMessages[0].subject).toStrictEqual(`${name2} responded to "${sampleCreateMeetingDto.name}"`);
+    expect(smtpMessages[0].to).toStrictEqual(email);
+    smtpMessages.pop();
+
+    // Updating an existing respondent shouldn't cause a new notification to be sent
+    await putSelfRespondent({availabilities: []}, meetingID, app, token2);
+    await sleep(200);
+    expect(smtpMessages).toHaveLength(0);
+
+    await editUser({subscribe_to_notifications: false}, app, token1);
+    await addGuestRespondent({name: 'Joe', availabilities: []}, meetingID, app);
+    // No notification should have been sent because notifications were disabled
+    await sleep(200);
+    expect(smtpMessages).toHaveLength(0);
+  });
+
   it.each([
     {createAsGuest: false, scheduleAsGuest: false},
     {createAsGuest: true, scheduleAsGuest: false},
@@ -369,9 +418,7 @@ describe('MeetingsController (e2e)', () => {
   ])('/api/meetings/:id/schedule (PUT) (notifications)', async ({createAsGuest, scheduleAsGuest}) => {
     const {token: token1} = await createUser(app);
     const {token: token2, email: email2, name: name2} = await createUser(app);
-    await editUser({subscribe_to_notifications: true}, app, token2);
     const {token: token3, email: email3} = await createUser(app);
-    await editUser({subscribe_to_notifications: true}, app, token3);
     const {meetingID} = await createMeeting(sampleCreateMeetingDto, app, createAsGuest ? undefined : token3);
     await putSelfRespondent({availabilities: []}, meetingID, app, token1);
     await putSelfRespondent({availabilities: []}, meetingID, app, token2);
@@ -379,6 +426,9 @@ describe('MeetingsController (e2e)', () => {
     await addGuestRespondent({name: 'Joe', availabilities: []}, meetingID, app);
     await addGuestRespondent({name: 'Jim', email: 'jim@example.com', availabilities: []}, meetingID, app);
     await addGuestRespondent({name: 'Bob', email: 'bob@example.com', availabilities: []}, meetingID, app);
+
+    await editUser({subscribe_to_notifications: true}, app, token2);
+    await editUser({subscribe_to_notifications: true}, app, token3);
 
     // Create another meeting with different recipients and make sure that
     // they are unaffected
@@ -403,9 +453,6 @@ describe('MeetingsController (e2e)', () => {
     sortEmailMessagesByRecipient(smtpMessages);
     expect(smtpMessages.map(m => m.to)).toEqual(expectedRecipients);
     expect(smtpMessages[0].subject).toStrictEqual(`${sampleCreateMeetingDto.name} has been scheduled`);
-    // Note: the smtp-server package appears to strip off a single trailing space
-    // from each line, but I tested the nodemailer client against a real SMTP
-    // server, and the trailing space after the "--" really is getting sent.
     expect(smtpMessages[0].body).toStrictEqual(
 `Hello Bob,
 
@@ -416,7 +463,7 @@ The meeting "${sampleCreateMeetingDto.name}" has been scheduled:
 
 View details here: http://cabbagemeet.internal/m/${meetingID}
 
---
+--${' '}
 CabbageMeet | http://cabbagemeet.internal
 `
     );

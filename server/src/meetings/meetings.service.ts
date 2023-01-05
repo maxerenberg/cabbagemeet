@@ -7,8 +7,10 @@ import ConfigService from '../config/config.service';
 import type { DatabaseType } from '../config/env.validation';
 import { normalizeDBError, ForeignKeyConstraintFailed } from '../database.utils';
 import MailService from '../mail/mail.service';
+import { assert } from '../misc.utils';
 import OAuth2Service from '../oauth2/oauth2.service';
 import User from '../users/user.entity';
+import UsersService from '../users/users.service';
 import MeetingRespondent from './meeting-respondent.entity';
 import Meeting from './meeting.entity';
 
@@ -52,6 +54,7 @@ function formatScheduledTimeRange(
 @Injectable()
 export default class MeetingsService {
   private oauth2Service: OAuth2Service;
+  private usersService: UsersService;
   private readonly publicURL: string;
   private readonly dbType: DatabaseType;
 
@@ -68,8 +71,9 @@ export default class MeetingsService {
   }
 
   onModuleInit() {
-    // circular dependency
+    // circular dependencies
     this.oauth2Service = this.moduleRef.get(OAuth2Service, { strict: false });
+    this.usersService = this.moduleRef.get(UsersService, { strict: false });
   }
 
   createMeeting(partialMeeting: Partial<Meeting>): Promise<Meeting> {
@@ -242,38 +246,65 @@ export default class MeetingsService {
     return this.respondentsRepository.findOneBy(where);
   }
 
-  async addRespondent(
+  private async sendRespondentAddedNotification(meeting: Meeting, {
+    user, guestName,
+  }: {user?: User, guestName?: string}) {
+    if (!meeting.CreatorID) {
+      return;
+    }
+    if (user && user.ID === meeting.CreatorID) {
+      // Don't want to notify someone if they added their availabilities
+      // for their own meeting
+      return;
+    }
+    const meetingCreator = await this.usersService.findOneByID(meeting.CreatorID);
+    if (!meetingCreator.IsSubscribedToNotifications) {
+      return;
+    }
+    const respondentName = user?.Name ?? guestName;
+    const body =
+`Hello ${meetingCreator.Name},
+
+${respondentName} has added their availabilities to the meeting "${meeting.Name}".
+
+Please visit ${this.publicURL}/m/${meeting.ID} for details.
+
+--${' '}
+CabbageMeet | ${this.publicURL}
+`;
+    await this.mailService.sendNowOrLater({
+      subject: `${respondentName} responded to "${meeting.Name}"`,
+      recipient: meetingCreator.Email,
+      body,
+    });
+  }
+
+  async addRespondent({
+    meetingID,
+    availabilities,
+    user,
+    guestName,
+    guestEmail,
+  }: {
     meetingID: number,
     availabilities: string[],
-    userID: number,
-  ): Promise<Meeting>;
-  async addRespondent(
-    meetingID: number,
-    availabilities: string[],
-    guestName: string,
+    user?: User,
+    guestName?: string,
     guestEmail?: string,
-  ): Promise<Meeting>;
-  async addRespondent(
-    meetingID: number,
-    availabilities: string[],
-    userIDOrGuestName: number | string,
-    guestEmail?: string,
-  ): Promise<Meeting> {
+  }): Promise<Meeting> {
     const respondent: Partial<MeetingRespondent> = {
       MeetingID: meetingID,
       Availabilities: availabilities,
     };
-    if (typeof userIDOrGuestName === 'number') {
-      respondent.UserID = userIDOrGuestName;
+    if (user) {
+      respondent.UserID = user.ID;
     } else {
-      respondent.GuestName = userIDOrGuestName;
+      assert(guestName, 'guestName should have been set');
+      respondent.GuestName = guestName;
       respondent.GuestEmail = guestEmail || null;
     }
     try {
-      // TODO: wrap in transaction
       await this.respondentsRepository.insert(respondent);
-      const meeting = await this.getMeetingWithRespondents(meetingID);
-      return meeting;
     } catch (err) {
       err = normalizeDBError(err as Error, this.dbType);
       if (err instanceof ForeignKeyConstraintFailed) {
@@ -281,6 +312,10 @@ export default class MeetingsService {
       }
       throw err;
     }
+    const meeting = await this.getMeetingWithRespondents(meetingID);
+    // Do not await the promise to avoid blocking the client
+    this.sendRespondentAddedNotification(meeting, {user, guestName});
+    return meeting;
   }
 
   async updateRespondent(
@@ -303,10 +338,10 @@ export default class MeetingsService {
 
   async addOrUpdateRespondent(
     meetingID: number,
-    userID: number,
+    user: User,
     availabilities: string[],
   ): Promise<Meeting> {
-    const existingRespondent = await this.getRespondent({MeetingID: meetingID, UserID: userID});
+    const existingRespondent = await this.getRespondent({MeetingID: meetingID, UserID: user.ID});
     let updatedMeeting: Meeting | undefined;
     if (existingRespondent) {
       updatedMeeting = await this.updateRespondent(
@@ -315,12 +350,12 @@ export default class MeetingsService {
         availabilities,
       );
     } else {
-      updatedMeeting = await this.addRespondent(meetingID, availabilities, userID);
+      updatedMeeting = await this.addRespondent({meetingID, availabilities, user});
     }
     // Update respondent's external calendars
     // Do not await the Promise so that we don't block the caller
     this.oauth2Service.tryCreateOrUpdateEventsForMeetingForSingleRespondent(
-      userID,
+      user.ID,
       updatedMeeting,
     );
     return updatedMeeting;

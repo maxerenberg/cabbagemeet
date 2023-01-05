@@ -378,12 +378,12 @@ export class MeetingsController {
     @Body() body: AddGuestRespondentDto,
   ): Promise<MeetingResponse> {
     try {
-      const updatedMeeting = await this.meetingsService.addRespondent(
+      const updatedMeeting = await this.meetingsService.addRespondent({
         meetingID,
-        body.availabilities,
-        body.name,
-        body.email,
-      );
+        availabilities: body.availabilities,
+        guestName: body.name,
+        guestEmail: body.email,
+      });
       return meetingToMeetingResponse(updatedMeeting, null);
     } catch (err) {
       throw convertMeetingServiceError(err as Error);
@@ -408,7 +408,7 @@ export class MeetingsController {
     try {
       const updatedMeeting = await this.meetingsService.addOrUpdateRespondent(
         meetingID,
-        user.ID,
+        user,
         body.availabilities,
       );
       return meetingToMeetingResponse(updatedMeeting, user);

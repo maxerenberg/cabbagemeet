@@ -228,7 +228,7 @@ async function signupNewUserWithGoogle(
 // to make sure that the event is saved, since we don't expose it via an API...
 async function waitUntilCreatedEventIsSavedInDB(eventID: string, expectedNumber: number, app: INestApplication) {
   const datasource = app.get(DataSource);
-  for (let i = 0; i < 20; i++) {
+  for (let i = 0; i < 80; i++) {
     const rows = await datasource.query(
       `SELECT 1 FROM GoogleCalendarCreatedEvent WHERE CreatedEventID = '${eventID}'`
     );
