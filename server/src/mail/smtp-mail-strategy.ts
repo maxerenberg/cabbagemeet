@@ -40,7 +40,7 @@ export default class SMTPMailStrategy implements IMailStrategy {
       transportOptions.requireTLS = true;
     }
     const messageDefaults: SMTPTransport.Options = {
-      from: `CabbageMeet <${smtpFrom}>`,
+      from: {name: 'CabbageMeet', address: smtpFrom},
     };
     if (process.env.NODE_ENV === 'development' || process.env.NODE_ENV === 'test') {
       messageDefaults.textEncoding = 'base64';
@@ -48,10 +48,10 @@ export default class SMTPMailStrategy implements IMailStrategy {
     this.transport = nodemailer.createTransport(transportOptions, messageDefaults);
   }
 
-  async sendNow({ recipient, subject, body }: SendParams): Promise<void> {
-    this.logger.debug(`Sending to=${recipient} (subject="${subject}")`);
+  async sendNow({ recipient: {address, name}, subject, body }: SendParams) {
+    this.logger.debug(`Sending to=${address} (subject="${subject}")`);
     await this.transport.sendMail({
-      to: recipient,
+      to: {address, name},
       subject,
       text: body,
     });

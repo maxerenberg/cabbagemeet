@@ -5,12 +5,16 @@ import { sleep } from '../misc.utils';
 import RateLimiterService, {
   IRateLimiter,
 } from '../rate-limiter/rate-limiter.service';
+import MailerSendMailStrategy from './mailersend-mail-strategy';
 import SMTPMailStrategy from './smtp-mail-strategy';
 
 const KEY = 'mail';
 
 export interface SendParams {
-  recipient: string;
+  recipient: {
+    name: string;
+    address: string;
+  };
   subject: string;
   body: string;
 }
@@ -33,7 +37,9 @@ export default class MailService {
     if (dailyLimit) {
       this.rateLimiter = rateLimiterService.factory(SECONDS_PER_DAY, dailyLimit);
     }
-    if (configService.get('SMTP_HOST')) {
+    if (configService.get('MAILERSEND_API_KEY')) {
+      this.strategy = new MailerSendMailStrategy(configService);
+    } else if (configService.get('SMTP_HOST')) {
       this.strategy = new SMTPMailStrategy(configService);
     }
   }

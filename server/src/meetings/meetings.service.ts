@@ -198,11 +198,11 @@ export default class MeetingsService {
           // Don't notify the person who scheduled the meeting
           continue;
         }
-        const recipient = respondent.GuestEmail || respondent.User.Email;
+        const address = respondent.GuestEmail || respondent.User.Email;
         const name = respondent.GuestName || respondent.User.Name;
         // Do not await the Promise so that we don't block the caller
         this.mailService.sendNowOrLater({
-          recipient,
+          recipient: {name, address},
           subject: `${meeting.Name} has been scheduled`,
           body: this.createScheduledNotificationEmailBody(meeting, name),
         });
@@ -274,7 +274,7 @@ CabbageMeet | ${this.publicURL}
 `;
     await this.mailService.sendNowOrLater({
       subject: `${respondentName} responded to "${meeting.Name}"`,
-      recipient: meetingCreator.Email,
+      recipient: {address: meetingCreator.Email, name: meetingCreator.Name},
       body,
     });
   }

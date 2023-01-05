@@ -226,15 +226,25 @@ export class EnvironmentVariables {
   @IsBooleanString()
   VERIFY_SIGNUP_EMAIL_ADDRESS: string = 'true';
 
+  // If both SMTP_HOST and MAILERSEND_API_KEY are unset, then all
+  // email-related functionality will be disabled (including signup
+  // email verification).
+
+  // The API key used for MailerSend requests. Note that SMTP_FROM still
+  // needs to be set.
+  // SMTP_HOST should not be set if this is set.
+  @IsOptional()
+  @IsString()
+  MAILERSEND_API_KEY?: string;
+
   // The Mail Transfer Agent to which emails will be sent.
-  // If unspecified, all email-related functionality will be disabled
-  // (including signup email verification).
+  // MAILERSEND_API_KEY should not be set if this is set.
   // Make sure that this is an IP address if it is not resolvable via
   // an external resolver (e.g. something in /etc/hosts).
   // See https://nodemailer.com/smtp/ for an explanation.
   @IsOptional()
   @IsString()
-  SMTP_HOST: string;
+  SMTP_HOST?: string;
 
   // Should be 25, 465 or 587.
   // Note that most cloud providers and ISP disable outoing traffic on
