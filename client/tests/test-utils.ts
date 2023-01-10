@@ -83,7 +83,7 @@ export async function clickModalConfirmationButton(page: Page, text: string) {
 }
 
 export function getByExactText(page: Page, text: string) {
-  return page.getByText(text, {exact: true});
+  return page.locator(`text="${text}" >> visible=true`);
 }
 
 export function getByDate(page: Page, date: Date) {
