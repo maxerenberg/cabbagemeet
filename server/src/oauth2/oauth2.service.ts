@@ -665,8 +665,9 @@ export default class OAuth2Service {
     }
     try {
       const { headers, body } = await this.request(...args);
+      const contentType = Array.isArray(headers['content-type']) ? headers['content-type'][0] : headers['content-type'];
       // The content-type can be e.g. "application/json; charset=UTF-8"
-      if (headers['content-type']?.startsWith('application/json')) {
+      if (contentType?.startsWith('application/json')) {
         return body.json();
       } else {
         // Some API endpoints, like deleting an event, return no response body

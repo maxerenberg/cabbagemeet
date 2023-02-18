@@ -48,8 +48,10 @@ export default class MailerSendMailStrategy implements IMailStrategy {
       this.logger.warn(await response.body.text());
     } else {
       this.logger.debug('Status code: ' + response.statusCode);
-      this.logger.debug(response.headers);
-      if (response.headers['content-type'].startsWith('application/json')) {
+      const { headers } = response;
+      this.logger.debug(headers);
+      const contentType = Array.isArray(headers['content-type']) ? headers['content-type'][0] : headers['content-type'];
+      if (contentType?.startsWith('application/json')) {
         this.logger.debug(await response.body.json());
       }
     }
