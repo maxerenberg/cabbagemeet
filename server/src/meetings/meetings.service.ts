@@ -34,14 +34,12 @@ function formatScheduledTimeRange(
   timeRangeString: string;
 } {
   const startDate = DateTime.fromISO(startDateTime).setZone(tz);
-  // remove space so that e.g. "8:00 AM" becomes "8:00AM"
-  const startTime = startDate
-    .toLocaleString(DateTime.TIME_SIMPLE)
-    .replace(' ', '');
+  // See https://moment.github.io/luxon/#/formatting?id=table-of-tokens
+  // We want e.g. "8:00AM"
+  const startTime = startDate.toFormat('h:mma');
   const endTime = DateTime.fromISO(endDateTime)
     .setZone(tz)
-    .toLocaleString(DateTime.TIME_SIMPLE)
-    .replace(' ', '');
+    .toFormat('h:mma');
   const tzShort = startDate.offsetNameShort;
   return {
     // See https://moment.github.io/luxon/#/formatting?id=presets
