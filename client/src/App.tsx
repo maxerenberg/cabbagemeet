@@ -168,12 +168,10 @@ function HeaderLinks({onClick}: {onClick: () => void}) {
     {to: '/privacy', desc: 'Privacy'},
     {to: '/feedback', desc: 'Feedback'},
   ];
-  // The @types/react-router-bootstrap package is wrong - className needs to be a string
-  // See https://github.com/react-bootstrap/react-router-bootstrap/blob/master/src/LinkContainer.js
   const linkProps = {
     className: 'header-link',
     activeClassName: 'header-link_active',
-  } as any;
+  };
   const offcanvasOnlyLinksProps = {
     className: 'header-link d-block d-md-none',
     activeClassName: 'header-link_active d-block d-md-none',

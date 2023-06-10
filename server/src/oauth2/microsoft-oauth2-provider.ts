@@ -17,6 +17,7 @@ import {
   toISOStringUTCFromDateStrAndHourAndTz,
 } from '../dates.utils';
 import type Meeting from '../meetings/meeting.entity';
+import { createPublicMeetingURL } from '../meetings/meetings.utils';
 import { encodeQueryParams, jwtSign } from '../misc.utils';
 import User from '../users/user.entity';
 import AbstractOAuth2CalendarCreatedEvent from './abstract-oauth2-calendar-created-event.entity';
@@ -111,7 +112,7 @@ function errorIsMicrosoftCalendarEventNoLongerExists(err: any): boolean {
 }
 
 function slurp(filename: string): string {
-  return fs.readFileSync(filename, {encoding: 'utf8'});
+  return fs.readFileSync(filename, { encoding: 'utf8' });
 }
 
 export default class MicrosoftOAuth2Provider implements IOAuth2Provider {
@@ -135,11 +136,15 @@ export default class MicrosoftOAuth2Provider implements IOAuth2Provider {
     this.oauth2Config = createOAuth2Config(tenantID);
     const client_id = configService.get('OAUTH2_MICROSOFT_CLIENT_ID');
     const redirect_uri = configService.get('OAUTH2_MICROSOFT_REDIRECT_URI');
-    const certificatePath = configService.get('OAUTH2_MICROSOFT_CERTIFICATE_PATH');
+    const certificatePath = configService.get(
+      'OAUTH2_MICROSOFT_CERTIFICATE_PATH',
+    );
     const certificate =
       configService.get('OAUTH2_MICROSOFT_CERTIFICATE') ||
       (certificatePath ? slurp(certificatePath) : undefined);
-    const privateKeyPath = configService.get('OAUTH2_MICROSOFT_PRIVATE_KEY_PATH');
+    const privateKeyPath = configService.get(
+      'OAUTH2_MICROSOFT_PRIVATE_KEY_PATH',
+    );
     const privateKey =
       configService.get('OAUTH2_MICROSOFT_PRIVATE_KEY') ||
       (privateKeyPath ? slurp(privateKeyPath) : undefined);
@@ -472,7 +477,8 @@ export default class MicrosoftOAuth2Provider implements IOAuth2Provider {
       });
     }
     // Filter out the event which we created for this meeting
-    const createdEvent = creds.CreatedEvents.length > 0 ? creds.CreatedEvents[0] : null;
+    const createdEvent =
+      creds.CreatedEvents.length > 0 ? creds.CreatedEvents[0] : null;
     if (createdEvent) {
       events = events.filter(
         (event) => event.ID !== createdEvent.CreatedEventID,
@@ -495,7 +501,7 @@ export default class MicrosoftOAuth2Provider implements IOAuth2Provider {
       apiURL += '/' + existingEvent.CreatedEventID;
       apiMethod = 'PATCH';
     }
-    const meetingURL = `${this.publicURL}/m/${meeting.ID}`;
+    const meetingURL = createPublicMeetingURL(this.publicURL, meeting);
     // See https://learn.microsoft.com/en-us/graph/api/resources/event?view=graph-rest-1.0
     const params: Record<string, any> = {
       subject: meeting.Name,

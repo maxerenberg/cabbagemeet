@@ -4,18 +4,18 @@ import type { DatabaseType } from './config/env.validation';
 export class UniqueConstraintFailed extends Error {}
 export class ForeignKeyConstraintFailed extends Error {}
 
-const errorsMap: Record<DatabaseType, Record<string, {new() : Error;}>> = {
-  'sqlite': {
+const errorsMap: Record<DatabaseType, Record<string, { new (): Error }>> = {
+  sqlite: {
     // See https://sqlite.org/rescode.html
-    'SQLITE_CONSTRAINT_UNIQUE': UniqueConstraintFailed,
-    'SQLITE_CONSTRAINT_FOREIGNKEY': ForeignKeyConstraintFailed,
+    SQLITE_CONSTRAINT_UNIQUE: UniqueConstraintFailed,
+    SQLITE_CONSTRAINT_FOREIGNKEY: ForeignKeyConstraintFailed,
   },
-  'postgres': {
+  postgres: {
     // See https://www.postgresql.org/docs/current/errcodes-appendix.html
     '23505': UniqueConstraintFailed,
     '23503': ForeignKeyConstraintFailed,
   },
-  'mariadb': {
+  mariadb: {
     // See https://mariadb.com/kb/en/mariadb-error-codes/
     '1062': UniqueConstraintFailed,
     '1216': ForeignKeyConstraintFailed,
@@ -29,11 +29,12 @@ export function normalizeDBError(err: Error, dbType: DatabaseType): Error {
   if (!(err instanceof QueryFailedError)) {
     return err;
   }
-  const errorCode: string = (dbType === 'sqlite' || dbType === 'postgres')
-    ? err.driverError.code
-    // The mysql2 package uses the built-in Error type and adds custom fields
-    // See https://github.com/sidorares/node-mysql2/blob/1336ff068f71092ce6c4b0b687a3eb86a686c346/lib/packets/packet.js#L718
-    : (err as any).errno.toString();
+  const errorCode: string =
+    dbType === 'sqlite' || dbType === 'postgres'
+      ? err.driverError.code
+      : // The mysql2 package uses the built-in Error type and adds custom fields
+        // See https://github.com/sidorares/node-mysql2/blob/1336ff068f71092ce6c4b0b687a3eb86a686c346/lib/packets/packet.js#L718
+        (err as any).errno.toString();
   const errorClass = errorsMap[dbType][errorCode];
   if (errorClass) {
     return new errorClass();

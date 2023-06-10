@@ -1,12 +1,18 @@
 import { HttpStatus } from '@nestjs/common';
 import type { NestExpressApplication } from '@nestjs/platform-express';
 import * as request from 'supertest';
-import { commonAfterAll, commonBeforeAll, commonBeforeEach } from './e2e-testing-helpers';
+import {
+  commonAfterAll,
+  commonBeforeAll,
+  commonBeforeEach,
+} from './e2e-testing-helpers';
 
 describe('AppController (e2e)', () => {
   let app: NestExpressApplication;
 
-  beforeAll(async () => { app = await commonBeforeAll(); });
+  beforeAll(async () => {
+    app = await commonBeforeAll();
+  });
   beforeEach(commonBeforeEach);
   afterAll(() => commonAfterAll(app));
 

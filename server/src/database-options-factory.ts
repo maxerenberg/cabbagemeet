@@ -58,6 +58,7 @@ export function createDataSourceOptions(
       customMigrationsGlobPath,
     ];
     commonOptions.migrationsRun = true;
+    commonOptions.migrationsTransactionMode = 'each';
   }
   registerJoinColumns(dbType);
   if (dbType === 'sqlite') {
@@ -70,12 +71,7 @@ export function createDataSourceOptions(
   } else if (dbType === 'mariadb') {
     mysql_injectTypeOrmColumns();
     checkEnvVarsExist(
-      [
-        'MYSQL_HOST',
-        'MYSQL_USER',
-        'MYSQL_PASSWORD',
-        'MYSQL_DATABASE',
-      ],
+      ['MYSQL_HOST', 'MYSQL_USER', 'MYSQL_PASSWORD', 'MYSQL_DATABASE'],
       getEnv,
     );
     return {
@@ -136,4 +132,4 @@ export default function (configService: ConfigService): TypeOrmModuleOptions {
     };
   }
   return options;
-};
+}

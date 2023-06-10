@@ -27,7 +27,8 @@ import CreateMeetingDto from './create-meeting.dto';
 import MeetingResponse from './meeting-response';
 import MeetingRespondent from './meeting-respondent.entity';
 import Meeting from './meeting.entity';
-import MeetingsService, { NoSuchMeetingError, NoSuchRespondentError } from './meetings.service';
+import MeetingsService from './meetings.service';
+import { NoSuchMeetingError, NoSuchRespondentError } from './meetings.utils';
 import {
   ApiBadRequestResponse,
   ApiBearerAuth,
@@ -50,7 +51,6 @@ import RateLimiterService, {
   IRateLimiter,
 } from '../rate-limiter/rate-limiter.service';
 import {
-  oneYearAgoDateString,
   oneYearFromNowDateString,
   SECONDS_PER_HOUR,
 } from '../dates.utils';
@@ -63,7 +63,7 @@ export function meetingToMeetingShortResponse(
   meeting: Meeting,
 ): MeetingShortResponse {
   const response: MeetingShortResponse = {
-    meetingID: meeting.ID,
+    meetingID: meeting.Slug,
     name: meeting.Name,
     about: meeting.About,
     timezone: meeting.Timezone,
@@ -153,7 +153,7 @@ export class MeetingsController {
     rateLimiterService: RateLimiterService,
   ) {
     const meetingCreationLimit = configService.get(
-      'HOURLY_MEETING_CREATION_LIMIT_PER_IP'
+      'HOURLY_MEETING_CREATION_LIMIT_PER_IP',
     );
     if (meetingCreationLimit !== 0) {
       this.meetingCreationRateLimiter = rateLimiterService.factory(
@@ -167,14 +167,15 @@ export class MeetingsController {
     respondentID: number,
     maybeUser: User | null,
   ): Promise<MeetingRespondent> {
-    const existingRespondent = await this.meetingsService.getRespondent({
-      RespondentID: respondentID,
-    });
+    const existingRespondent = await this.meetingsService.getRespondent(
+      respondentID,
+    );
     if (!existingRespondent) {
       throw new NoSuchRespondentError();
     }
     if (existingRespondent.UserID) {
-      const errorMessage = 'You must be logged in as this user to modify their availabilities';
+      const errorMessage =
+        'You must be logged in as this user to modify their availabilities';
       if (!maybeUser) {
         throw new UnauthorizedException(errorMessage);
       } else if (maybeUser.ID !== existingRespondent.UserID) {
@@ -185,12 +186,12 @@ export class MeetingsController {
   }
 
   private async checkIfMeetingExistsAndClientIsAllowedToModifyIt(
-    meetingID: number,
+    meetingSlug: string,
     maybeUser: User | null,
     allowIfCreatedByGuest = false,
   ) {
-    const meeting = await this.meetingsService.getMeetingWithRespondents(
-      meetingID,
+    const meeting = await this.meetingsService.getMeetingWithRespondentsBySlug(
+      meetingSlug,
     );
     if (!meeting) {
       throw new NotFoundException();
@@ -199,10 +200,14 @@ export class MeetingsController {
       return meeting;
     }
     if (!maybeUser) {
-      throw new UnauthorizedException('You must be logged in to edit this meeting');
+      throw new UnauthorizedException(
+        'You must be logged in to edit this meeting',
+      );
     }
     if (meeting.CreatorID && maybeUser.ID !== meeting.CreatorID) {
-      throw new ForbiddenException('You must be logged in as the creator of this meeting.');
+      throw new ForbiddenException(
+        'You must be logged in as the creator of this meeting.',
+      );
     }
     return meeting;
   }
@@ -257,11 +262,11 @@ export class MeetingsController {
   @Get(':id')
   @UseGuards(OptionalJwtAuthGuard)
   async getMeeting(
-    @Param('id', ParseIntPipe) meetingID: number,
+    @Param('id') meetingSlug: string,
     @MaybeAuthUser() maybeUser: User | null,
   ): Promise<MeetingResponse> {
-    const meeting = await this.meetingsService.getMeetingWithRespondents(
-      meetingID,
+    const meeting = await this.meetingsService.getMeetingWithRespondentsBySlug(
+      meetingSlug,
     );
     if (!meeting) {
       throw new NotFoundException();
@@ -280,12 +285,12 @@ export class MeetingsController {
   @Patch(':id')
   @UseGuards(OptionalJwtAuthGuard)
   async editMeeting(
-    @Param('id', ParseIntPipe) meetingID: number,
+    @Param('id') meetingSlug: string,
     @Body() body: EditMeetingDto,
     @MaybeAuthUser() maybeUser: User | null,
   ): Promise<MeetingResponse> {
     const meeting = await this.checkIfMeetingExistsAndClientIsAllowedToModifyIt(
-      meetingID,
+      meetingSlug,
       maybeUser,
     );
     const partialUpdate = meetingDtoToMeetingEntity(body);
@@ -307,7 +312,7 @@ export class MeetingsController {
   @Put(':id/schedule')
   @UseGuards(OptionalJwtAuthGuard)
   async scheduleMeeting(
-    @Param('id', ParseIntPipe) meetingID: number,
+    @Param('id') meetingSlug: string,
     @Body() body: ScheduleMeetingDto,
     @MaybeAuthUser() maybeUser: User | null,
   ): Promise<MeetingResponse> {
@@ -315,7 +320,9 @@ export class MeetingsController {
       throw new BadRequestException('end time must be greater than start time');
     }
     const meeting = await this.checkIfMeetingExistsAndClientIsAllowedToModifyIt(
-      meetingID, maybeUser, true,
+      meetingSlug,
+      maybeUser,
+      true,
     );
     await this.meetingsService.scheduleMeeting(
       maybeUser,
@@ -336,11 +343,13 @@ export class MeetingsController {
   @Delete(':id/schedule')
   @UseGuards(OptionalJwtAuthGuard)
   async unscheduleMeeting(
-    @Param('id', ParseIntPipe) meetingID: number,
+    @Param('id') meetingSlug: string,
     @MaybeAuthUser() maybeUser: User | null,
   ): Promise<MeetingResponse> {
     const meeting = await this.checkIfMeetingExistsAndClientIsAllowedToModifyIt(
-      meetingID, maybeUser, true,
+      meetingSlug,
+      maybeUser,
+      true,
     );
     await this.meetingsService.unscheduleMeeting(meeting);
     return meetingToMeetingResponse(meeting, maybeUser);
@@ -357,14 +366,14 @@ export class MeetingsController {
   @HttpCode(HttpStatus.NO_CONTENT)
   @UseGuards(OptionalJwtAuthGuard)
   async deleteMeeting(
-    @Param('id', ParseIntPipe) meetingID: number,
+    @Param('id') meetingSlug: string,
     @MaybeAuthUser() maybeUser: User | null,
   ): Promise<void> {
     await this.checkIfMeetingExistsAndClientIsAllowedToModifyIt(
-      meetingID,
+      meetingSlug,
       maybeUser,
     );
-    await this.meetingsService.deleteMeeting(meetingID);
+    await this.meetingsService.deleteMeeting(meetingSlug);
   }
 
   @ApiOperation({
@@ -374,12 +383,12 @@ export class MeetingsController {
   })
   @Post(':id/respondents/guest')
   async addGuestRespondent(
-    @Param('id', ParseIntPipe) meetingID: number,
+    @Param('id') meetingSlug: string,
     @Body() body: AddGuestRespondentDto,
   ): Promise<MeetingResponse> {
     try {
       const updatedMeeting = await this.meetingsService.addRespondent({
-        meetingID,
+        meetingSlug,
         availabilities: body.availabilities,
         guestName: body.name,
         guestEmail: body.email,
@@ -401,13 +410,13 @@ export class MeetingsController {
   @Put(':id/respondents/me')
   @UseGuards(JwtAuthGuard)
   async putSelfRespondent(
-    @Param('id', ParseIntPipe) meetingID: number,
+    @Param('id') meetingSlug: string,
     @AuthUser() user: User,
     @Body() body: PutRespondentDto,
   ): Promise<MeetingResponse> {
     try {
       const updatedMeeting = await this.meetingsService.addOrUpdateRespondent(
-        meetingID,
+        meetingSlug,
         user,
         body.availabilities,
       );
@@ -428,7 +437,7 @@ export class MeetingsController {
   @Put(':id/respondents/:respondentID')
   @UseGuards(OptionalJwtAuthGuard)
   async updateRespondent(
-    @Param('id', ParseIntPipe) meetingID: number,
+    @Param('id') meetingSlug: string,
     @Param('respondentID', ParseIntPipe) respondentID: number,
     @MaybeAuthUser() maybeUser: User | null,
     @Body() body: PutRespondentDto,
@@ -440,7 +449,7 @@ export class MeetingsController {
       );
       const updatedMeeting = await this.meetingsService.updateRespondent(
         respondentID,
-        meetingID,
+        meetingSlug,
         body.availabilities,
       );
       return meetingToMeetingResponse(updatedMeeting, maybeUser);
@@ -459,7 +468,7 @@ export class MeetingsController {
   @Delete(':id/respondents/:respondentID')
   @UseGuards(OptionalJwtAuthGuard)
   async deleteRespondent(
-    @Param('id', ParseIntPipe) meetingID: number,
+    @Param('id') meetingSlug: string,
     @Param('respondentID', ParseIntPipe) respondentID: number,
     @MaybeAuthUser() maybeUser: User | null,
   ): Promise<MeetingResponse> {

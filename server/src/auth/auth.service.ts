@@ -82,7 +82,7 @@ export default class AuthService {
       '/verify-email?' +
       encodeQueryParams(params as unknown as Record<string, string>);
     const sent = await this.mailService.sendNowIfAllowed({
-      recipient: {address: body.email, name: body.name},
+      recipient: { address: body.email, name: body.name },
       subject: 'CabbageMeet signup confirmation',
       body: this.createEmailVerificationEmailBody(
         body.name,
@@ -195,7 +195,7 @@ export default class AuthService {
       return;
     }
     this.mailService.sendNowOrLater({
-      recipient: {address: email, name: user.Name},
+      recipient: { address: email, name: user.Name },
       subject: 'CabbageMeet password reset',
       body: this.createPasswordResetEmailBody(user),
     });

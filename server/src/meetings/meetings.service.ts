@@ -2,10 +2,10 @@ import { Injectable } from '@nestjs/common';
 import { ModuleRef } from '@nestjs/core';
 import { InjectRepository } from '@nestjs/typeorm';
 import { DateTime } from 'luxon';
-import { FindOptionsWhere, Repository } from 'typeorm';
+import ShortUniqueId from 'short-unique-id';
+import { Repository } from 'typeorm';
 import ConfigService from '../config/config.service';
 import type { DatabaseType } from '../config/env.validation';
-import { normalizeDBError, ForeignKeyConstraintFailed } from '../database.utils';
 import MailService from '../mail/mail.service';
 import { assert } from '../misc.utils';
 import OAuth2Service from '../oauth2/oauth2.service';
@@ -13,17 +13,9 @@ import User from '../users/user.entity';
 import UsersService from '../users/users.service';
 import MeetingRespondent from './meeting-respondent.entity';
 import Meeting from './meeting.entity';
+import { NoSuchMeetingError, NoSuchRespondentError, createPublicMeetingURL } from './meetings.utils';
 
-export class NoSuchMeetingError extends Error {
-  constructor() {
-    super('No such meeting');
-  }
-}
-export class NoSuchRespondentError extends Error {
-  constructor() {
-    super('No such respondent');
-  }
-}
+const generateSlug = new ShortUniqueId({ length: 12 });
 
 function formatScheduledTimeRange(
   startDateTime: string,
@@ -37,9 +29,7 @@ function formatScheduledTimeRange(
   // See https://moment.github.io/luxon/#/formatting?id=table-of-tokens
   // We want e.g. "8:00AM"
   const startTime = startDate.toFormat('h:mma');
-  const endTime = DateTime.fromISO(endDateTime)
-    .setZone(tz)
-    .toFormat('h:mma');
+  const endTime = DateTime.fromISO(endDateTime).setZone(tz).toFormat('h:mma');
   const tzShort = startDate.offsetNameShort;
   return {
     // See https://moment.github.io/luxon/#/formatting?id=presets
@@ -75,24 +65,39 @@ export default class MeetingsService {
   }
 
   createMeeting(partialMeeting: Partial<Meeting>): Promise<Meeting> {
+    partialMeeting.Slug = generateSlug();
     return this.meetingsRepository.save(partialMeeting);
   }
 
-  async getMeetingOrThrow(meetingID: number): Promise<Meeting> {
-    const meeting = await this.meetingsRepository.findOneBy({ ID: meetingID });
+  async getMeetingOrThrow(meetingSlug: string): Promise<Meeting> {
+    const meeting = await this.meetingsRepository.findOneBy({
+      Slug: meetingSlug,
+    });
     if (!meeting) {
       throw new NoSuchMeetingError();
     }
     return meeting;
   }
 
-  getMeetingWithRespondents(meetingID: number): Promise<Meeting | null> {
+  private _getMeetingWithRespondents() {
     return this.meetingsRepository
       .createQueryBuilder()
       .leftJoin('Meeting.Respondents', 'MeetingRespondent')
       .leftJoin('MeetingRespondent.User', 'User')
-      .select(['Meeting', 'MeetingRespondent', 'User.ID', 'User.Name'])
+      .select(['Meeting', 'MeetingRespondent', 'User.ID', 'User.Name']);
+  }
+
+  getMeetingWithRespondentsByID(meetingID: number): Promise<Meeting | null> {
+    return this._getMeetingWithRespondents()
       .where('Meeting.ID = :meetingID', { meetingID })
+      .getOne();
+  }
+
+  getMeetingWithRespondentsBySlug(
+    meetingSlug: string,
+  ): Promise<Meeting | null> {
+    return this._getMeetingWithRespondents()
+      .where('Meeting.Slug = :meetingSlug', { meetingSlug })
       .getOne();
   }
 
@@ -153,7 +158,7 @@ export default class MeetingsService {
     meeting: Meeting,
     name: string,
   ): string {
-    const {dayString, timeRangeString} = formatScheduledTimeRange(
+    const { dayString, timeRangeString } = formatScheduledTimeRange(
       meeting.ScheduledStartDateTime,
       meeting.ScheduledEndDateTime,
       meeting.Timezone,
@@ -166,7 +171,7 @@ export default class MeetingsService {
       `  ${dayString}\n` +
       `  ${timeRangeString}\n` +
       '\n' +
-      `View details here: ${this.publicURL}/m/${meeting.ID}\n` +
+      `View details here: ${createPublicMeetingURL(this.publicURL, meeting)}\n` +
       '\n' +
       '-- \n' +
       `CabbageMeet | ${this.publicURL}\n`
@@ -200,7 +205,7 @@ export default class MeetingsService {
         const name = respondent.GuestName || respondent.User.Name;
         // Do not await the Promise so that we don't block the caller
         this.mailService.sendNowOrLater({
-          recipient: {name, address},
+          recipient: { name, address },
           subject: `${meeting.Name} has been scheduled`,
           body: this.createScheduledNotificationEmailBody(meeting, name),
         });
@@ -224,7 +229,7 @@ export default class MeetingsService {
     this.oauth2Service.tryDeleteEventsForMeetingForAllRespondents(meeting.ID);
   }
 
-  async deleteMeeting(meetingID: number): Promise<void> {
+  async deleteMeeting(meetingSlug: string): Promise<void> {
     // This meeting needs to be deleted from all of the respondents' Google calendars.
     // We need to wait until this runs to completion or else the row in
     // the GoogleCalendarCreatedEvents table might be deleted prematurely
@@ -234,19 +239,43 @@ export default class MeetingsService {
     // Promise.allSettled() in the OAuth2Service should hopefully speed things up.
     //
     // Alternative solution: use a tombstoned row
+    const meeting = await this.getMeetingOrThrow(meetingSlug);
     await this.oauth2Service.tryDeleteEventsForMeetingForAllRespondents(
-      meetingID,
+      meeting.ID,
     );
-    await this.meetingsRepository.delete(meetingID);
+    await this.meetingsRepository.delete(meeting.ID);
   }
 
-  async getRespondent(where: FindOptionsWhere<MeetingRespondent>): Promise<MeetingRespondent | null> {
-    return this.respondentsRepository.findOneBy(where);
+  async getRespondent(respondentID: number): Promise<MeetingRespondent | null> {
+    return this.respondentsRepository
+      .createQueryBuilder()
+      .innerJoin('MeetingRespondent.Meeting', 'Meeting')
+      .select(['MeetingRespondent', 'Meeting'])
+      .where('MeetingRespondent.RespondentID = :respondentID', { respondentID })
+      .getOne();
   }
 
-  private async sendRespondentAddedNotification(meeting: Meeting, {
-    user, guestName,
-  }: {user?: User, guestName?: string}) {
+  private async getRespondentByMeetingAndUserID(
+    meetingSlug: string,
+    userID: number,
+  ): Promise<MeetingRespondent | null> {
+    return this.respondentsRepository
+      .createQueryBuilder()
+      .innerJoin(
+        'MeetingRespondent.Meeting',
+        'Meeting',
+        'Meeting.Slug = :meetingSlug',
+        { meetingSlug },
+      )
+      .select(['MeetingRespondent', 'Meeting'])
+      .where('MeetingRespondent.UserID = :userID', { userID })
+      .getOne();
+  }
+
+  private async sendRespondentAddedNotification(
+    meeting: Meeting,
+    { user, guestName }: { user?: User; guestName?: string },
+  ) {
     if (!meeting.CreatorID) {
       return;
     }
@@ -255,43 +284,51 @@ export default class MeetingsService {
       // for their own meeting
       return;
     }
-    const meetingCreator = await this.usersService.findOneByID(meeting.CreatorID);
+    const meetingCreator = await this.usersService.findOneByID(
+      meeting.CreatorID,
+    );
     if (!meetingCreator.IsSubscribedToNotifications) {
       return;
     }
     const respondentName = user?.Name ?? guestName;
-    const body =
-`Hello ${meetingCreator.Name},
+    const body = `Hello ${meetingCreator.Name},
 
-${respondentName} has added their availabilities to the meeting "${meeting.Name}".
+${respondentName} has added their availabilities to the meeting "${
+      meeting.Name
+    }".
 
-Please visit ${this.publicURL}/m/${meeting.ID} for details.
+Please visit ${createPublicMeetingURL(this.publicURL, meeting)} for details.
 
 --${' '}
 CabbageMeet | ${this.publicURL}
 `;
     await this.mailService.sendNowOrLater({
       subject: `${respondentName} responded to "${meeting.Name}"`,
-      recipient: {address: meetingCreator.Email, name: meetingCreator.Name},
+      recipient: { address: meetingCreator.Email, name: meetingCreator.Name },
       body,
     });
   }
 
   async addRespondent({
-    meetingID,
+    meetingSlug,
     availabilities,
     user,
     guestName,
     guestEmail,
   }: {
-    meetingID: number,
-    availabilities: string[],
-    user?: User,
-    guestName?: string,
-    guestEmail?: string,
+    meetingSlug: string;
+    availabilities: string[];
+    user?: User;
+    guestName?: string;
+    guestEmail?: string;
   }): Promise<Meeting> {
+    // TODO: use transaction
+    const meeting = await this.getMeetingWithRespondentsBySlug(meetingSlug);
+    if (!meeting) {
+      throw new NoSuchMeetingError();
+    }
     const respondent: Partial<MeetingRespondent> = {
-      MeetingID: meetingID,
+      MeetingID: meeting.ID,
       Availabilities: availabilities,
     };
     if (user) {
@@ -301,54 +338,67 @@ CabbageMeet | ${this.publicURL}
       respondent.GuestName = guestName;
       respondent.GuestEmail = guestEmail || null;
     }
-    try {
-      await this.respondentsRepository.insert(respondent);
-    } catch (err) {
-      err = normalizeDBError(err as Error, this.dbType);
-      if (err instanceof ForeignKeyConstraintFailed) {
-        throw new NoSuchMeetingError();
-      }
-      throw err;
-    }
-    const meeting = await this.getMeetingWithRespondents(meetingID);
+    await this.respondentsRepository.insert(respondent);
+    assert(respondent.RespondentID, 'RespondentID should have been updated');
+    meeting.Respondents.push(respondent as MeetingRespondent);
     // Do not await the promise to avoid blocking the client
-    this.sendRespondentAddedNotification(meeting, {user, guestName});
+    this.sendRespondentAddedNotification(meeting, { user, guestName });
     return meeting;
   }
 
   async updateRespondent(
     respondentID: number,
-    meetingID: number,
+    meetingSlug: string,
     availabilities: string[],
   ): Promise<Meeting> {
     // TODO: wrap in transaction
-    const result = await this.respondentsRepository.update({
-      RespondentID: respondentID,
-      MeetingID: meetingID,
-    }, {
-      Availabilities: availabilities,
-    });
+    const meeting = await this.getMeetingWithRespondentsBySlug(meetingSlug);
+    if (!meeting) {
+      throw new NoSuchMeetingError();
+    }
+    const result = await this.respondentsRepository.update(
+      {
+        RespondentID: respondentID,
+        MeetingID: meeting.ID,
+      },
+      {
+        Availabilities: availabilities,
+      },
+    );
     if (result.affected === 0) {
       throw new NoSuchRespondentError();
     }
-    return this.getMeetingWithRespondents(meetingID);
+    for (const respondent of meeting.Respondents) {
+      if (respondent.RespondentID === respondentID) {
+        respondent.Availabilities = availabilities;
+        break;
+      }
+    }
+    return meeting;
   }
 
   async addOrUpdateRespondent(
-    meetingID: number,
+    meetingSlug: string,
     user: User,
     availabilities: string[],
   ): Promise<Meeting> {
-    const existingRespondent = await this.getRespondent({MeetingID: meetingID, UserID: user.ID});
+    const existingRespondent = await this.getRespondentByMeetingAndUserID(
+      meetingSlug,
+      user.ID,
+    );
     let updatedMeeting: Meeting | undefined;
     if (existingRespondent) {
       updatedMeeting = await this.updateRespondent(
         existingRespondent.RespondentID,
-        meetingID,
+        meetingSlug,
         availabilities,
       );
     } else {
-      updatedMeeting = await this.addRespondent({meetingID, availabilities, user});
+      updatedMeeting = await this.addRespondent({
+        meetingSlug,
+        availabilities,
+        user,
+      });
     }
     // Update respondent's external calendars
     // Do not await the Promise so that we don't block the caller
@@ -371,7 +421,7 @@ CabbageMeet | ${this.publicURL}
     }
     await this.respondentsRepository.delete(respondent.RespondentID);
     // TODO: wrap in transaction
-    return this.getMeetingWithRespondents(respondent.MeetingID);
+    return this.getMeetingWithRespondentsByID(respondent.MeetingID);
   }
 
   async getMeetingsCreatedBy(userID: number): Promise<Meeting[]> {

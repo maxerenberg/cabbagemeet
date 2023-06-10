@@ -12,11 +12,12 @@ export default class ConfigService {
 
   constructor() {
     if (process.env.DOTENV_PATH) {
-      dotenv.config({path: process.env.DOTENV_PATH});
+      dotenv.config({ path: process.env.DOTENV_PATH });
     } else {
-      const envFilePath = process.env.NODE_ENV === 'development' ? '.development.env' : '.env';
+      const envFilePath =
+        process.env.NODE_ENV === 'development' ? '.development.env' : '.env';
       if (fs.existsSync(envFilePath)) {
-        dotenv.config({path: envFilePath});
+        dotenv.config({ path: envFilePath });
       }
     }
     this.cache = validateEnv(process.env);
@@ -26,7 +27,9 @@ export default class ConfigService {
     return this.cache[key];
   }
 
-  getOrThrow<K extends keyof EnvironmentVariables>(key: K): EnvironmentVariables[K] {
+  getOrThrow<K extends keyof EnvironmentVariables>(
+    key: K,
+  ): EnvironmentVariables[K] {
     const val = this.cache[key];
     if (val === undefined) {
       throw new ConfigOptionNotSetError(key + ' was not set');

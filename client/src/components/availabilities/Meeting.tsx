@@ -20,9 +20,9 @@ export default function Meeting() {
   const [isEditingMeeting, setIsEditingMeeting] = useState(false);
   const dispatch = useAppDispatch();
   const params = useParams();
-  const meetingID = parseInt(params.id!);
-  const skip = isNaN(meetingID);
-  const {data, error} = useGetMeetingQuery(meetingID, {skip});
+  const meetingID = params.id;
+  const skip = !meetingID;
+  const {data, error} = useGetMeetingQuery(meetingID ?? '', {skip});
 
   useEffect(() => {
     dispatch(setCurrentMeetingID(meetingID));

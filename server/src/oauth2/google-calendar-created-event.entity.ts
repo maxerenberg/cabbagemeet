@@ -6,9 +6,13 @@ import GoogleOAuth2 from './google-oauth2.entity';
 
 @Entity('GoogleCalendarCreatedEvent')
 export default class GoogleCalendarCreatedEvent extends AbstractOAuth2CalendarCreatedEvent {
-  @ManyToOne(() => MeetingRespondent, (respondent) => respondent.GoogleCalendarCreatedEvents, {
-    onDelete: 'CASCADE',
-  })
+  @ManyToOne(
+    () => MeetingRespondent,
+    (respondent) => respondent.GoogleCalendarCreatedEvents,
+    {
+      onDelete: 'CASCADE',
+    },
+  )
   @CustomJoinColumn({ name: 'RespondentID' })
   MeetingRespondent: MeetingRespondent;
 

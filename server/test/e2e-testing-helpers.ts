@@ -22,9 +22,11 @@ import type { UserResponseWithToken } from '../src/users/user-response';
 
 let originalProcessEnv: NodeJS.ProcessEnv;
 
-export async function commonBeforeAll(envOverride?: Partial<EnvironmentVariables>): Promise<NestExpressApplication> {
+export async function commonBeforeAll(
+  envOverride?: Partial<EnvironmentVariables>,
+): Promise<NestExpressApplication> {
   originalProcessEnv = process.env;
-  process.env = {...process.env};
+  process.env = { ...process.env };
 
   if (envOverride) {
     Object.assign(process.env, envOverride);
@@ -33,7 +35,7 @@ export async function commonBeforeAll(envOverride?: Partial<EnvironmentVariables
   // This is necessary because we need to know which database we're using
   // *before* creating the module fixture. Once the module fixture is
   // created, all of the providers will already have been instantiated.
-  dotenv.config({path: process.env.DOTENV_PATH});
+  dotenv.config({ path: process.env.DOTENV_PATH });
 
   await createDB();
   await startMockSmtpServer();
@@ -89,7 +91,9 @@ function getDatasourceForSuperuser() {
       database: process.env.MYSQL_SUPERDATABASE,
     });
   }
-  throw new Error('Unrecognized database type "' + process.env.DATABASE_TYPE + '"');
+  throw new Error(
+    'Unrecognized database type "' + process.env.DATABASE_TYPE + '"',
+  );
 }
 
 async function createDB() {
@@ -102,10 +106,14 @@ async function createDB() {
   try {
     await datasource.query(`CREATE DATABASE ${databaseName}`);
     if (process.env.DATABASE_TYPE === 'postgres') {
-      await datasource.query(`ALTER DATABASE ${databaseName} OWNER TO ${process.env.POSTGRES_USER}`);
+      await datasource.query(
+        `ALTER DATABASE ${databaseName} OWNER TO ${process.env.POSTGRES_USER}`,
+      );
       process.env.POSTGRES_DATABASE = databaseName;
     } else if (process.env.DATABASE_TYPE === 'mariadb') {
-      await datasource.query(`GRANT ALL PRIVILEGES ON ${databaseName}.* TO ${process.env.MYSQL_USER}`);
+      await datasource.query(
+        `GRANT ALL PRIVILEGES ON ${databaseName}.* TO ${process.env.MYSQL_USER}`,
+      );
       process.env.MYSQL_DATABASE = databaseName;
     }
   } finally {
@@ -154,22 +162,22 @@ const mockSmtpServer = new SMTPServer({
   authOptional: true,
   disabledCommands: ['STARTTLS'],
   disableReverseLookup: true,
-  onMailFrom({address}, session, callback) {
-    smtpMessagesBySessionId[session.id] = {from: address} as SmtpMessage;
+  onMailFrom({ address }, session, callback) {
+    smtpMessagesBySessionId[session.id] = { from: address } as SmtpMessage;
     return callback();
   },
-  onRcptTo({address}, session, callback) {
+  onRcptTo({ address }, session, callback) {
     smtpMessagesBySessionId[session.id].to = address;
     return callback();
   },
   onData(stream, session, callback) {
     const chunks: Buffer[] = [];
-    stream.on('data', data => {
+    stream.on('data', (data) => {
       chunks.push(data);
     });
     stream.on('end', () => {
       const lines = chunks
-        .map(chunk => chunk.toString())
+        .map((chunk) => chunk.toString())
         .join('')
         .split('\r\n');
       const message = smtpMessagesBySessionId[session.id];
@@ -187,7 +195,10 @@ const mockSmtpServer = new SMTPServer({
             if (lines[i + 1].startsWith(' =?UTF-8?B?')) {
               // wraps around multiple lines
               subject += Buffer.from(
-                lines[i + 1].slice(' =?UTF-8?B?'.length, lines[i + 1].length - '?='.length),
+                lines[i + 1].slice(
+                  ' =?UTF-8?B?'.length,
+                  lines[i + 1].length - '?='.length,
+                ),
                 'base64',
               ).toString();
               i++;
@@ -195,10 +206,15 @@ const mockSmtpServer = new SMTPServer({
           }
           message.subject = subject;
         } else if (lines[i].startsWith('Content-Transfer-Encoding: ')) {
-          contentTransferEncoding = lines[i].slice('Content-Transfer-Encoding: '.length);
+          contentTransferEncoding = lines[i].slice(
+            'Content-Transfer-Encoding: '.length,
+          );
         } else if (lines[i].length === 0) {
           if (contentTransferEncoding === 'base64') {
-            message.body = Buffer.from(lines.slice(i + 1).join(), 'base64').toString();
+            message.body = Buffer.from(
+              lines.slice(i + 1).join(),
+              'base64',
+            ).toString();
           } else {
             message.body = lines.slice(i + 1).join('\n');
           }
@@ -229,14 +245,14 @@ function startMockSmtpServer() {
   process.env.SMTP_PORT = String(port);
 
   return new Promise<void>((resolve, reject) => {
-    mockSmtpServer.listen({host: '127.0.0.1', port}, () => {
+    mockSmtpServer.listen({ host: '127.0.0.1', port }, () => {
       resolve();
     });
-    mockSmtpServer.on('error', err => reject(err));
+    mockSmtpServer.on('error', (err) => reject(err));
   });
 }
 function stopMockSmtpServer() {
-  return new Promise<void>(resolve => {
+  return new Promise<void>((resolve) => {
     mockSmtpServer.close(() => {
       resolve();
     });
@@ -253,7 +269,12 @@ export async function waitForEmailMessage() {
   await promise;
 }
 
-function makeRequest(method: 'get' | 'post' | 'patch' | 'delete' | 'put', apiPath: string, app: INestApplication, token?: string) {
+function makeRequest(
+  method: 'get' | 'post' | 'patch' | 'delete' | 'put',
+  apiPath: string,
+  app: INestApplication,
+  token?: string,
+) {
   let req = request(app.getHttpServer())[method](apiPath);
   if (token) {
     req = req.set('Authorization', `Bearer ${token}`);
@@ -279,89 +300,160 @@ export function PUT(apiPath: string, app: INestApplication, token?: string) {
 
 let userCounter = 1;
 // VERIFY_SIGNUP_EMAIL_ADDRESS must be set to false to use this function
-export async function createUser(app: INestApplication, options?: {name?: string, email?: string}): Promise<UserResponseWithToken> {
+export async function createUser(
+  app: INestApplication,
+  options?: { name?: string; email?: string },
+): Promise<UserResponseWithToken> {
   const name = options?.name ?? 'Test ' + userCounter;
   const email = options?.email ?? 'test' + userCounter + '@example.com';
   const password = 'abcdef';
   userCounter++;
-  const {body} = await POST('/api/signup', app)
-    .send({name, email, password})
+  const { body } = await POST('/api/signup', app)
+    .send({ name, email, password })
     .expect(HttpStatus.CREATED);
   expect(body.userID).toBeDefined();
   return body;
 }
 
-export async function editUser(editUserDto: EditUserDto, app: INestApplication, token: string): Promise<UserResponse> {
-  const {body} = await PATCH('/api/me', app, token)
+export async function editUser(
+  editUserDto: EditUserDto,
+  app: INestApplication,
+  token: string,
+): Promise<UserResponse> {
+  const { body } = await PATCH('/api/me', app, token)
     .send(editUserDto)
     .expect(HttpStatus.OK);
   return body;
 }
 
-export async function createMeeting(meetingDto: CreateMeetingDto, app: INestApplication, token?: string): Promise<MeetingResponse> {
-  const {body} = await POST('/api/meetings', app, token)
+export async function createMeeting(
+  meetingDto: CreateMeetingDto,
+  app: INestApplication,
+  token?: string,
+): Promise<MeetingResponse> {
+  const { body } = await POST('/api/meetings', app, token)
     .send(meetingDto)
     .expect(HttpStatus.CREATED);
   return body;
 }
 
-export async function getMeeting(meetingID: number, app: INestApplication, token?: string): Promise<MeetingResponse> {
-  const {body} = await GET('/api/meetings/' + meetingID, app, token)
-    .expect(HttpStatus.OK);
+export async function getMeeting(
+  meetingID: string,
+  app: INestApplication,
+  token?: string,
+): Promise<MeetingResponse> {
+  const { body } = await GET('/api/meetings/' + meetingID, app, token).expect(
+    HttpStatus.OK,
+  );
   return body;
 }
 
-function sortRespondentsInResponse({body}: {body: MeetingResponse}) {
+function sortRespondentsInResponse({ body }: { body: MeetingResponse }) {
   body.respondents.sort((r1, r2) => r1.respondentID - r2.respondentID);
 }
 
-export async function addGuestRespondent(guestRespondentDto: AddGuestRespondentDto, meetingID: number, app: INestApplication): Promise<MeetingResponse> {
-  const {body} = await POST(`/api/meetings/${meetingID}/respondents/guest`, app)
+export async function addGuestRespondent(
+  guestRespondentDto: AddGuestRespondentDto,
+  meetingID: string,
+  app: INestApplication,
+): Promise<MeetingResponse> {
+  const { body } = await POST(
+    `/api/meetings/${meetingID}/respondents/guest`,
+    app,
+  )
     .send(guestRespondentDto)
     .expect(HttpStatus.CREATED)
     .expect(sortRespondentsInResponse);
   return body;
 }
 
-export async function putSelfRespondent(putRespondentDto: PutRespondentDto, meetingID: number, app: INestApplication, token: string): Promise<MeetingResponse> {
-  const {body} = await PUT(`/api/meetings/${meetingID}/respondents/me`, app, token)
+export async function putSelfRespondent(
+  putRespondentDto: PutRespondentDto,
+  meetingID: string,
+  app: INestApplication,
+  token: string,
+): Promise<MeetingResponse> {
+  const { body } = await PUT(
+    `/api/meetings/${meetingID}/respondents/me`,
+    app,
+    token,
+  )
     .send(putRespondentDto)
     .expect(HttpStatus.OK)
     .expect(sortRespondentsInResponse);
   return body;
 }
 
-export async function removeSelfRespondent(meetingID: number, app: INestApplication, token: string) {
-  const {body}: {body: MeetingResponse} = await GET('/api/meetings/' + meetingID, app, token)
-    .expect(HttpStatus.OK);
+export async function removeSelfRespondent(
+  meetingID: string,
+  app: INestApplication,
+  token: string,
+) {
+  const { body }: { body: MeetingResponse } = await GET(
+    '/api/meetings/' + meetingID,
+    app,
+    token,
+  ).expect(HttpStatus.OK);
   await deleteRespondent(body.selfRespondentID, meetingID, app, token);
 }
 
-export async function updateRespondent(respondentID: number, putRespondentDto: PutRespondentDto, meetingID: number, app: INestApplication, token?: string): Promise<MeetingResponse> {
-  const {body} = await PUT(`/api/meetings/${meetingID}/respondents/${respondentID}`, app, token)
+export async function updateRespondent(
+  respondentID: number,
+  putRespondentDto: PutRespondentDto,
+  meetingID: string,
+  app: INestApplication,
+  token?: string,
+): Promise<MeetingResponse> {
+  const { body } = await PUT(
+    `/api/meetings/${meetingID}/respondents/${respondentID}`,
+    app,
+    token,
+  )
     .send(putRespondentDto)
     .expect(HttpStatus.OK)
     .expect(sortRespondentsInResponse);
   return body;
 }
 
-export async function deleteRespondent(respondentID: number, meetingID: number, app: INestApplication, token?: string): Promise<MeetingResponse> {
-  const {body} = await DELETE(`/api/meetings/${meetingID}/respondents/${respondentID}`, app, token)
+export async function deleteRespondent(
+  respondentID: number,
+  meetingID: string,
+  app: INestApplication,
+  token?: string,
+): Promise<MeetingResponse> {
+  const { body } = await DELETE(
+    `/api/meetings/${meetingID}/respondents/${respondentID}`,
+    app,
+    token,
+  )
     .expect(HttpStatus.OK)
     .expect(sortRespondentsInResponse);
   return body;
 }
 
-export async function scheduleMeeting(meetingID: number, scheduleDto: ScheduleMeetingDto, app: INestApplication, token?: string): Promise<MeetingResponse> {
-  const {body} = await PUT(`/api/meetings/${meetingID}/schedule`, app, token)
+export async function scheduleMeeting(
+  meetingID: string,
+  scheduleDto: ScheduleMeetingDto,
+  app: INestApplication,
+  token?: string,
+): Promise<MeetingResponse> {
+  const { body } = await PUT(`/api/meetings/${meetingID}/schedule`, app, token)
     .send(scheduleDto)
     .expect(HttpStatus.OK)
     .expect(sortRespondentsInResponse);
   return body;
 }
 
-export async function unscheduleMeeting(meetingID: number, app: INestApplication, token?: string): Promise<MeetingResponse> {
-  const {body} = await DELETE(`/api/meetings/${meetingID}/schedule`, app, token)
+export async function unscheduleMeeting(
+  meetingID: string,
+  app: INestApplication,
+  token?: string,
+): Promise<MeetingResponse> {
+  const { body } = await DELETE(
+    `/api/meetings/${meetingID}/schedule`,
+    app,
+    token,
+  )
     .expect(HttpStatus.OK)
     .expect(sortRespondentsInResponse);
   return body;
@@ -391,17 +483,25 @@ export function decodeQueryParams(queryString: string): Record<string, string> {
 }
 
 export async function createTokenResponse({
-  sub, name, email, access_token,
-  refresh_token, scope,
+  sub,
+  name,
+  email,
+  access_token,
+  refresh_token,
+  scope,
 }: {
-  sub: string, name: string, email: string, access_token: string,
-  refresh_token?: string | null, scope: string,
+  sub: string;
+  name: string;
+  email: string;
+  access_token: string;
+  refresh_token?: string | null;
+  scope: string;
 }) {
   const now = getSecondsSinceUnixEpoch();
   // Note: this will use HS256 for signing. Google/Microsoft use RS256.
   // If we implement JWT verification in the server, we need to create
   // a new keypair and use RS256 as well.
-  const id_token =  await jwtSign(
+  const id_token = await jwtSign(
     {
       iss: 'some-issuer',
       sub,

@@ -23,10 +23,9 @@ export default function IsTzDatabaseTimezone(
       },
       validator: {
         validate(value: any, args: ValidationArguments) {
-          return typeof value === 'string' && (
-            value === 'UTC' || (
-              value.includes('/') && isATimeZone(value)
-            )
+          return (
+            typeof value === 'string' &&
+            (value === 'UTC' || (value.includes('/') && isATimeZone(value)))
           );
         },
       },

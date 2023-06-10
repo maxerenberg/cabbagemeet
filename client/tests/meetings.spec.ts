@@ -69,7 +69,7 @@ test('create meeting as guest', async ({ page }) => {
   await page.locator(`text="am" >> visible=true`).click();
 
   await clickButton(page, 'Create');
-  await expect(page).toHaveURL(/m\/\d+$/);
+  await expect(page).toHaveURL(/m\/[0-9A-Za-z]+$/);
 
   await expect(getByExactText(page, 'My meeting')).toHaveCount(1);
   await expect(getByExactText(page, 'My description')).toHaveCount(1);
@@ -149,7 +149,7 @@ test('create meeting when logged in', async ({ page }) => {
   await clickButton(page, "Let's meet");
   await page.getByPlaceholder('Name your meeting').fill('My meeting');
   await clickButton(page, 'Create');
-  await expect(page).toHaveURL(/\/m\/\d+$/);
+  await expect(page).toHaveURL(/\/m\/[0-9A-Za-z]+$/);
 
   await clickNavbarLink(page, 'Profile');
   await expect(page).toHaveURL(/\/me$/);
@@ -157,7 +157,7 @@ test('create meeting when logged in', async ({ page }) => {
   await expect(getByExactText(page, 'My meeting')).toHaveCount(1);
   await expect(getByExactText(page, 'Not scheduled')).toHaveCount(1);
   await getByExactText(page, 'My meeting').click();
-  await expect(page).toHaveURL(/\/m\/\d+$/);
+  await expect(page).toHaveURL(/\/m\/[0-9A-Za-z]+$/);
 
   await clickButton(page, 'Add availability');
   await clickButton(page, 'Continue');
@@ -193,7 +193,7 @@ test('create meeting when logged in', async ({ page }) => {
   await clickButton(page, "Let's meet");
   await page.getByPlaceholder('Name your meeting').fill('My second meeting');
   await clickButton(page, 'Create');
-  await expect(page).toHaveURL(/\/m\/\d+$/);
+  await expect(page).toHaveURL(/\/m\/[0-9A-Za-z]+$/);
 
   await clickNavbarLink(page, 'Profile');
   await expect(getByExactText(page, 'My new meeting')).toHaveCount(1);

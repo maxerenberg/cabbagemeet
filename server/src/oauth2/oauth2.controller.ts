@@ -111,9 +111,7 @@ export class Oauth2Controller {
       code,
       state,
     );
-    if (
-      loginResult.type === OIDCLoginResultType.USER_EXISTS_AND_IS_LINKED
-    ) {
+    if (loginResult.type === OIDCLoginResultType.USER_EXISTS_AND_IS_LINKED) {
       await this.redirectWithToken(
         res,
         state.postRedirect,
@@ -136,9 +134,7 @@ export class Oauth2Controller {
       // The user signed up with this Gmail account, but never linked the account
       // via the settings page. We need them to confirm whether they want
       // to link the accounts together.
-      const { token } = this.jwtService.serializeUserToJwt(
-        loginResult.user,
-      );
+      const { token } = this.jwtService.serializeUserToJwt(loginResult.user);
       // To avoid showing OAuth2 tokens in the browser URL bar, we encrypt the
       // entity first
       const {
@@ -162,17 +158,15 @@ export class Oauth2Controller {
       }
       res.redirect(
         `${this.publicURL}/confirm-link-${providerName}-account?` +
-        encodeQueryParams(urlParams),
+          encodeQueryParams(urlParams),
       );
     } else if (
       loginResult.type ===
       OIDCLoginResultType.USER_DOES_NOT_EXIST_AND_NEED_A_NEW_REFRESH_TOKEN
     ) {
-      this.logger.debug(
-        'User does not exist. Redirecting to consent page.',
-      );
+      this.logger.debug('User does not exist. Redirecting to consent page.');
       res.redirect(
-        await this.oauth2Service.getRequestURL(providerType, state, true)
+        await this.oauth2Service.getRequestURL(providerType, state, true),
       );
     } else {
       assertIsNever(loginResult.type);
@@ -196,17 +190,19 @@ export class Oauth2Controller {
       return;
     }
     if (!code) {
-      res.status(400).send({error: 'Bad Request', message: 'Missing code'});
+      res.status(400).send({ error: 'Bad Request', message: 'Missing code' });
       return;
     }
     if (!stateStr) {
-      res.status(400).send({error: 'Bad Request', message: 'Missing state'});
+      res.status(400).send({ error: 'Bad Request', message: 'Missing state' });
       return;
     }
     try {
       const state = JSON.parse(stateStr);
       if (!this.stateIsValid(state)) {
-        res.status(400).send({error: 'Bad Request', message: 'Invalid state'});
+        res
+          .status(400)
+          .send({ error: 'Bad Request', message: 'Invalid state' });
         return;
       }
       if (state.reason === 'link') {
@@ -218,9 +214,11 @@ export class Oauth2Controller {
           );
         } catch (err) {
           if (err instanceof OAuth2NoRefreshTokenError) {
-            this.logger.debug('OIDC response has no refresh token. Redirecting to consent page.');
+            this.logger.debug(
+              'OIDC response has no refresh token. Redirecting to consent page.',
+            );
             res.redirect(
-              await this.oauth2Service.getRequestURL(providerType, state, true)
+              await this.oauth2Service.getRequestURL(providerType, state, true),
             );
             return;
           }
@@ -240,7 +238,13 @@ export class Oauth2Controller {
           user,
         );
       } else if (state.reason === 'login') {
-        await this.handleRedirectForLogin(providerType, providerName, res, code, state);
+        await this.handleRedirectForLogin(
+          providerType,
+          providerName,
+          res,
+          code,
+          state,
+        );
       } else {
         assertIsNever(state.reason);
       }

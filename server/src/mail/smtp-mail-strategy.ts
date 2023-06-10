@@ -5,7 +5,9 @@ import ConfigService from '../config/config.service';
 import type { IMailStrategy, SendParams } from './mail.service';
 
 export default class SMTPMailStrategy implements IMailStrategy {
-  private transport: nodemailer.Transporter<SMTPTransport.SentMessageInfo> | undefined;
+  private transport:
+    | nodemailer.Transporter<SMTPTransport.SentMessageInfo>
+    | undefined;
   private readonly logger = new Logger(SMTPMailStrategy.name);
 
   constructor(configService: ConfigService) {
@@ -34,24 +36,30 @@ export default class SMTPMailStrategy implements IMailStrategy {
       transportOptions.secure = true;
     }
     if (
-      process.env.NODE_ENV === 'production'
-      && (smtpPort === 25 || smtpPort === 587)
+      process.env.NODE_ENV === 'production' &&
+      (smtpPort === 25 || smtpPort === 587)
     ) {
       transportOptions.requireTLS = true;
     }
     const messageDefaults: SMTPTransport.Options = {
-      from: {name: 'CabbageMeet', address: smtpFrom},
+      from: { name: 'CabbageMeet', address: smtpFrom },
     };
-    if (process.env.NODE_ENV === 'development' || process.env.NODE_ENV === 'test') {
+    if (
+      process.env.NODE_ENV === 'development' ||
+      process.env.NODE_ENV === 'test'
+    ) {
       messageDefaults.textEncoding = 'base64';
     }
-    this.transport = nodemailer.createTransport(transportOptions, messageDefaults);
+    this.transport = nodemailer.createTransport(
+      transportOptions,
+      messageDefaults,
+    );
   }
 
-  async sendNow({ recipient: {address, name}, subject, body }: SendParams) {
+  async sendNow({ recipient: { address, name }, subject, body }: SendParams) {
     this.logger.debug(`Sending to=${address} (subject="${subject}")`);
     await this.transport.sendMail({
-      to: {address, name},
+      to: { address, name },
       subject,
       text: body,
     });

@@ -45,7 +45,5 @@ export function commonAppBootstrap(app: INestApplication) {
     }),
   );
   const { httpAdapter } = app.get(HttpAdapterHost);
-  app.useGlobalFilters(
-    new EnoentFilter(httpAdapter),
-  );
+  app.useGlobalFilters(new EnoentFilter(httpAdapter));
 }

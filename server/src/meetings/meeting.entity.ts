@@ -101,4 +101,8 @@ export default class Meeting {
 
   @OneToMany(() => MicrosoftCalendarEvents, (msftEvent) => msftEvent.Meeting)
   MicrosoftCalendarEvents: MicrosoftCalendarEvents[];
+
+  @Index({ unique: true })
+  @Column()
+  Slug: string;
 }

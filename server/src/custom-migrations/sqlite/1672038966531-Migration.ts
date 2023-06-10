@@ -1,7 +1,8 @@
 import { MigrationInterface, QueryRunner } from 'typeorm';
-import { latestTentativeOrScheduledDateExpr as indexExpr } from './sqlite-migration-constants';
-
-const indexName = 'IX_Meeting_LatestTentativeOrScheduledDate';
+import {
+  latestTentativeOrScheduledDateExpr as indexExpr,
+  latestTentativeOrScheduledDateIndexName as indexName,
+} from './sqlite-migration-constants';
 
 export class Migration1672038966531 implements MigrationInterface {
   async up(queryRunner: QueryRunner) {

@@ -13,7 +13,10 @@ import type { Response } from 'express';
 // This filter creates a custom error response for ENOENT errors.
 
 @Catch()
-export default class EnoentFilter extends BaseExceptionFilter implements ExceptionFilter {
+export default class EnoentFilter
+  extends BaseExceptionFilter
+  implements ExceptionFilter
+{
   catch(exception: any, host: ArgumentsHost) {
     const ctx = host.switchToHttp();
     const response = ctx.getResponse<Response>();

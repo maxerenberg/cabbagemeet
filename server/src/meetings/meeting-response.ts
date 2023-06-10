@@ -12,8 +12,8 @@ export class MeetingRespondent {
 }
 
 export default class MeetingResponse {
-  @ApiProperty({ example: 1 })
-  meetingID: number;
+  @ApiProperty({ example: 'Pm9OwtKWxeRQ' })
+  meetingID: string;
 
   @ApiProperty({ example: 'Some meeting' })
   name: string;
