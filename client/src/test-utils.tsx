@@ -27,8 +27,10 @@ export function renderWithProviders(ui: React.ReactElement, {
   );
 }
 
+export const sampleMeetingSlug = 'abcdefghijkl';
+
 export const sampleMeetingResponse = {
-  meetingID: 1,
+  meetingID: sampleMeetingSlug,
   name: 'Meeting 1',
   about: '',
   timezone: 'America/Toronto',
@@ -50,7 +52,7 @@ export const sampleSelfInfoResponse = {
 Object.freeze(sampleSelfInfoResponse);
 
 export const server = setupServer(
-  rest.get('/api/meetings/1', (req, res, ctx) => {
+  rest.get(`/api/meetings/${sampleMeetingSlug}`, (req, res, ctx) => {
     return res(ctx.json(sampleMeetingResponse));
   }),
   rest.get('/api/me', (req, res, ctx) => {

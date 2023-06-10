@@ -8,6 +8,7 @@ import {
   commonSetupsAndTeardowns,
   renderWithProviders,
   sampleMeetingResponse,
+  sampleMeetingSlug,
   sampleSelfInfoResponse,
   server,
 } from 'test-utils';
@@ -22,7 +23,7 @@ function renderMeeting(store?: AppStore) {
     (<Routes>
       <Route path={'/m/:id'} element={<Meeting />} />
     </Routes>),
-    {initialEntries: ['/m/1'], store},
+    {initialEntries: [`/m/${sampleMeetingSlug}`], store},
   );
 }
 
@@ -50,7 +51,7 @@ test('renders the external event boxes', async () => {
       }));
     }),
     rest.get('/api/me/google-calendar-events', (req, res, ctx) => {
-      if (req.url.searchParams.get('meetingID') !== '1') {
+      if (req.url.searchParams.get('meetingID') !== sampleMeetingSlug) {
         return res(
           ctx.status(404),
           ctx.json({
