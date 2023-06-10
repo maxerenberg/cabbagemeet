@@ -24,7 +24,11 @@ export default class RateLimiterService {
   factory(intervalSeconds: number, limit: number): IRateLimiter {
     let rateLimiter: IRateLimiter | undefined;
     if (this.redisClient) {
-      rateLimiter = new RedisRateLimiter(this.redisClient, intervalSeconds, limit);
+      rateLimiter = new RedisRateLimiter(
+        this.redisClient,
+        intervalSeconds,
+        limit,
+      );
     } else {
       rateLimiter = new MemoryRateLimiter(intervalSeconds, limit);
     }

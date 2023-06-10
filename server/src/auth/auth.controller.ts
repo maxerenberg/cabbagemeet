@@ -94,7 +94,7 @@ export class AuthController {
     // A user can try to login at most 10 times per minute
     this.loginRateLimiter = rateLimiterService.factory(SECONDS_PER_MINUTE, 10);
     this.verifySignupEmailAddress = isBooleanStringTrue(
-      configService.get('VERIFY_SIGNUP_EMAIL_ADDRESS')
+      configService.get('VERIFY_SIGNUP_EMAIL_ADDRESS'),
     );
   }
 

@@ -1,6 +1,10 @@
 // Adapted from https://docs.nestjs.com/techniques/configuration#custom-validate-function
 
-import { plainToInstance } from 'class-transformer';
+import {
+  plainToInstance,
+  Transform,
+  TransformFnParams,
+} from 'class-transformer';
 import {
   IsBooleanString,
   IsEmail,
@@ -30,6 +34,17 @@ export function isBooleanStringTrue(s: string) {
   return booleanTrueStrings.includes(s.toLowerCase());
 }
 
+function stringToNonNegativeNumber({ value }: TransformFnParams) {
+  if (typeof value === 'string') {
+    // This also accepts trailing spaces ... meh
+    if (value === '' || value[0] < '0' || value[0] > '9') {
+      return NaN;
+    }
+    return +value;
+  }
+  return value;
+}
+
 // WARNING: do not use the boolean type; boolean strings are not actually
 // converted into booleans.
 // See https://github.com/typestack/class-transformer/issues/626.
@@ -45,12 +60,13 @@ export class EnvironmentVariables {
   // Needs to be a string for IsPort() to work.
   // Port 3000 is already used by Create-React-App, so 3001 is chosen as the
   // default instead.
-  PORT: string = '3001';
+  PORT = '3001';
 
   // The IP address or hostname to which the listening socket should be bound.
   @IsOptional()
   @IsString()
-  HOST: string = process.env.NODE_ENV === 'production' ? '0.0.0.0' : '127.0.0.1';
+  HOST: string =
+    process.env.NODE_ENV === 'production' ? '0.0.0.0' : '127.0.0.1';
 
   // The public-facing URL of the website.
   // Will be used when creating Google calendar events and sending emails.
@@ -64,7 +80,7 @@ export class EnvironmentVariables {
   // creating the React build.
   @IsOptional()
   @IsBooleanString()
-  ENABLE_CORS: string = 'false';
+  ENABLE_CORS = 'false';
 
   // A comma-separated list of origins to enable for CORS, in addition to
   // the origin of PUBLIC_URL. ENABLE_CORS must be set to true for this
@@ -95,17 +111,19 @@ export class EnvironmentVariables {
   // If the server is running behind a reverse proxy, make sure to set
   // TRUST_PROXY=true (see below).
   @IsOptional()
+  @Transform(stringToNonNegativeNumber)
   @IsInt()
   @Min(0)
-  HOURLY_MEETING_CREATION_LIMIT_PER_IP: number = 100;
+  HOURLY_MEETING_CREATION_LIMIT_PER_IP = 100;
 
   // Meetings older than this number of days will be automatically deleted
   // from the database to save storage space.
   // Set to 0 to disable automatic deletions.
   @IsOptional()
+  @Transform(stringToNonNegativeNumber)
   @IsInt()
   @Min(0)
-  DELETE_MEETINGS_OLDER_THAN_NUM_DAYS: number = 60;
+  DELETE_MEETINGS_OLDER_THAN_NUM_DAYS = 60;
 
   // Set to one of 'sqlite', 'mariadb' or 'postgres'.
   @IsIn(databaseTypes)
@@ -211,20 +229,20 @@ export class EnvironmentVariables {
   // 'consumers' if only personal Microsoft accounts can be used
   @IsOptional()
   @IsString()
-  OAUTH2_MICROSOFT_TENANT_ID: string = 'consumers';
+  OAUTH2_MICROSOFT_TENANT_ID = 'consumers';
 
   // Should be set to true if this app is behind a reverse proxy AND the proxy
   // has been configured to set the X-Forwarded-For header
   @IsOptional()
   @IsBooleanString()
-  TRUST_PROXY: string = 'false';
+  TRUST_PROXY = 'false';
 
   // If set to true, users are sent a verification link to the email
   // address which they used when signing up.
   // If set to false, user accounts are created as soon as they sign up.
   @IsOptional()
   @IsBooleanString()
-  VERIFY_SIGNUP_EMAIL_ADDRESS: string = 'true';
+  VERIFY_SIGNUP_EMAIL_ADDRESS = 'true';
 
   // If both SMTP_HOST and MAILERSEND_API_KEY are unset, then all
   // email-related functionality will be disabled (including signup
@@ -272,9 +290,10 @@ export class EnvironmentVariables {
   // This is useful is using an SMTP relay service with a daily quota.
   // Set to 0 for no limit.
   @IsOptional()
+  @Transform(stringToNonNegativeNumber)
   @IsInt()
   @Min(0)
-  EMAIL_DAILY_LIMIT: number = 100;
+  EMAIL_DAILY_LIMIT = 100;
 
   // If unspecified, an in-memory cache will be used.
   // Redis must be used if multiple instances of the application are running
@@ -285,13 +304,13 @@ export class EnvironmentVariables {
 
   @IsOptional()
   @IsPort()
-  REDIS_PORT: string = '6379';
+  REDIS_PORT = '6379';
 
   @IsOptional()
   @IsInt()
   @Min(0)
   @Max(15)
-  REDIS_DATABASE: number = 0;
+  REDIS_DATABASE = 0;
 }
 
 export function validate(

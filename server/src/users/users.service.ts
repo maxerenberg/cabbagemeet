@@ -5,7 +5,10 @@ import { Repository } from 'typeorm';
 import ConfigService from '../config/config.service';
 import type { DatabaseType } from '../config/env.validation';
 import { normalizeDBError, UniqueConstraintFailed } from '../database.utils';
-import { oauth2ProviderNamesMap, oauth2TableNames } from '../oauth2/oauth2-common';
+import {
+  oauth2ProviderNamesMap,
+  oauth2TableNames,
+} from '../oauth2/oauth2-common';
 import OAuth2Service from '../oauth2/oauth2.service';
 import User from './user.entity';
 

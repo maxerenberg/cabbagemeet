@@ -49,7 +49,7 @@ export default class MeetingRespondent {
   // This is an array of the start times of the 30-minute intervals
   // during which the respondent is available (UTC).
   // e.g. ["2022-10-23T10:00:00Z", "2022-10-23T10:30:00Z"]
-  @Column({type: 'simple-json'})
+  @Column({ type: 'simple-json' })
   Availabilities: string[];
 
   @OneToMany(

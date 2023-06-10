@@ -20,10 +20,12 @@ import ConfigService from './config/config.service';
     ServeStaticModule.forRootAsync({
       imports: [ConfigModule],
       useFactory(configService: ConfigService) {
-        return [{
-          rootPath: configService.get('STATIC_ROOT'),
-          exclude: ['/api/*', '/redirect/*'],
-        }];
+        return [
+          {
+            rootPath: configService.get('STATIC_ROOT'),
+            exclude: ['/api/*', '/redirect/*'],
+          },
+        ];
       },
       inject: [ConfigService],
     }),

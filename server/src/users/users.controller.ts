@@ -8,7 +8,6 @@ import {
   HttpException,
   HttpStatus,
   NotFoundException,
-  ParseIntPipe,
   Patch,
   Post,
   Query,
@@ -22,7 +21,10 @@ import {
   ApiTags,
   ApiUnauthorizedResponse,
 } from '@nestjs/swagger';
-import { OAuth2CalendarEvent, oauth2ProviderNamesMap } from '../oauth2/oauth2-common';
+import {
+  OAuth2CalendarEvent,
+  oauth2ProviderNamesMap,
+} from '../oauth2/oauth2-common';
 import { AuthUser } from '../auth/auth-user.decorator';
 import JwtAuthGuard from '../auth/jwt-auth.guard';
 import {
@@ -31,16 +33,15 @@ import {
   CustomRedirectResponse,
 } from '../common-responses';
 import { meetingToMeetingShortResponse } from '../meetings/meetings.controller';
-import MeetingsService, {
-  NoSuchMeetingError,
-} from '../meetings/meetings.service';
+import MeetingsService from '../meetings/meetings.service';
+import { NoSuchMeetingError } from '../meetings/meetings.utils';
 import OAuth2Service from '../oauth2/oauth2.service';
 import {
   OAuth2ProviderType,
   OAuth2NotConfiguredError,
 } from '../oauth2/oauth2-common';
 import EditUserDto from './edit-user.dto';
-import LinkExternalCalendarDto from './link-external-calendar.dto'
+import LinkExternalCalendarDto from './link-external-calendar.dto';
 import OAuth2CalendarEventsResponse from './oauth2-calendar-events.response';
 import { MeetingsShortResponse } from '../meetings/meeting-short-response';
 import UserResponse from './user-response';
@@ -256,14 +257,14 @@ export class UsersController {
   private async getOAuth2CalendarEvents(
     providerType: OAuth2ProviderType,
     user: User,
-    meetingID: number,
+    meetingSlug: string,
   ): Promise<OAuth2CalendarEventsResponse> {
     let events: OAuth2CalendarEvent[];
     try {
       events = await this.oauth2Service.getEventsForMeeting(
         providerType,
         user.ID,
-        meetingID,
+        meetingSlug,
       );
     } catch (err: any) {
       if (err instanceof NoSuchMeetingError) {
@@ -295,12 +296,12 @@ export class UsersController {
   @Get('google-calendar-events')
   getGoogleCalendarEvents(
     @AuthUser() user: User,
-    @Query('meetingID', ParseIntPipe) meetingID: number,
+    @Query('meetingID') meetingSlug: string,
   ): Promise<OAuth2CalendarEventsResponse> {
     return this.getOAuth2CalendarEvents(
       OAuth2ProviderType.GOOGLE,
       user,
-      meetingID,
+      meetingSlug,
     );
   }
 
@@ -314,12 +315,12 @@ export class UsersController {
   @Get('microsoft-calendar-events')
   getMicrosoftCalendarEvents(
     @AuthUser() user: User,
-    @Query('meetingID', ParseIntPipe) meetingID: number,
+    @Query('meetingID') meetingSlug: string,
   ): Promise<OAuth2CalendarEventsResponse> {
     return this.getOAuth2CalendarEvents(
       OAuth2ProviderType.MICROSOFT,
       user,
-      meetingID,
+      meetingSlug,
     );
   }
 }

@@ -7,6 +7,7 @@ import {
   toISOStringUTCFromDateTimeStr,
 } from '../dates.utils';
 import type Meeting from '../meetings/meeting.entity';
+import { createPublicMeetingURL } from '../meetings/meetings.utils';
 import { encodeQueryParams } from '../misc.utils';
 import User from '../users/user.entity';
 import AbstractOAuth2CalendarCreatedEvent from './abstract-oauth2-calendar-created-event.entity';
@@ -94,10 +95,10 @@ function filterOutEventsWhichAreOutOfRange(
     ({ start, end }) =>
       // If an event doesn't have start/end info, then it's a deleted
       // event, so we need to keep it in our list
-      start === undefined || end === undefined || (
-        toISOStringUTCFromDateTimeStr(end.dateTime) > timeMin &&
-        toISOStringUTCFromDateTimeStr(start.dateTime) < timeMax
-      )
+      start === undefined ||
+      end === undefined ||
+      (toISOStringUTCFromDateTimeStr(end.dateTime) > timeMin &&
+        toISOStringUTCFromDateTimeStr(start.dateTime) < timeMax),
   );
 }
 
@@ -345,7 +346,8 @@ export default class GoogleOAuth2Provider implements IOAuth2Provider {
         SyncToken: nextSyncToken,
       });
     }
-    const createdEvent = creds.CreatedEvents.length > 0 ? creds.CreatedEvents[0] : null;
+    const createdEvent =
+      creds.CreatedEvents.length > 0 ? creds.CreatedEvents[0] : null;
     if (createdEvent) {
       events = events.filter(
         (event) => event.ID !== createdEvent.CreatedEventID,
@@ -375,7 +377,7 @@ export default class GoogleOAuth2Provider implements IOAuth2Provider {
       },
       summary: meeting.Name,
       source: {
-        url: `${this.publicURL}/m/${meeting.ID}`,
+        url: createPublicMeetingURL(this.publicURL, meeting),
       },
     };
     if (meeting.About) {

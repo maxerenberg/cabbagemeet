@@ -251,7 +251,7 @@ async function upsertMeeting_onQueryStarted(
 }
 
 async function deleteMeeting_onQueryStarted(
-  arg: number,
+  arg: string,
   {dispatch, queryFulfilled}: MutationLifecycleApi<unknown, any, DeleteMeetingApiResponse, 'api'>,
 ) {
   try {

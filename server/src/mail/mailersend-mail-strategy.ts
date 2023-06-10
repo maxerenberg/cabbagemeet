@@ -18,7 +18,7 @@ export default class MailerSendMailStrategy implements IMailStrategy {
     assert(this.smtpFrom, 'SMTP_FROM must be set');
   }
 
-  async sendNow({ recipient: {address, name}, subject, body }: SendParams) {
+  async sendNow({ recipient: { address, name }, subject, body }: SendParams) {
     const requestBody = {
       from: {
         email: this.smtpFrom,
@@ -38,7 +38,7 @@ export default class MailerSendMailStrategy implements IMailStrategy {
       method: 'POST',
       headers: {
         authorization: `Bearer ${this.apiKey}`,
-        "content-type": 'application/json',
+        'content-type': 'application/json',
       },
       body: JSON.stringify(requestBody),
     });
@@ -50,7 +50,9 @@ export default class MailerSendMailStrategy implements IMailStrategy {
       this.logger.debug('Status code: ' + response.statusCode);
       const { headers } = response;
       this.logger.debug(headers);
-      const contentType = Array.isArray(headers['content-type']) ? headers['content-type'][0] : headers['content-type'];
+      const contentType = Array.isArray(headers['content-type'])
+        ? headers['content-type'][0]
+        : headers['content-type'];
       if (contentType?.startsWith('application/json')) {
         this.logger.debug(await response.body.json());
       }

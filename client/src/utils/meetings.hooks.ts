@@ -13,7 +13,7 @@ import { TransformedMeetingResponse } from "./response-transforms";
 
 export function useGetCurrentMeeting() {
   const meetingID = useAppSelector(selectCurrentMeetingID);
-  const queryInfo = useGetMeetingQuery(meetingID || 0, {skip: meetingID === undefined});
+  const queryInfo = useGetMeetingQuery(meetingID ?? '', {skip: meetingID === undefined});
   return queryInfo;
 }
 
@@ -21,14 +21,14 @@ export function useGetCurrentMeetingWithSelector<T extends Record<string, any>>(
   select: ({data}: {data?: TransformedMeetingResponse}) => T,
 ) {
   const meetingID = useAppSelector(selectCurrentMeetingID);
-  const queryInfo = useGetMeetingQuery(meetingID ?? 0, {
+  const queryInfo = useGetMeetingQuery(meetingID ?? '', {
     skip: meetingID === undefined,
     selectFromResult: select,
   });
   return queryInfo;
 }
 
-export function useGetExternalCalendarEventsIfTokenIsPresent(meetingID: number) {
+export function useGetExternalCalendarEventsIfTokenIsPresent(meetingID: string) {
   const tokenIsPresent = useAppSelector(selectTokenIsPresent);
   const {data: userInfo} = useGetSelfInfoQuery(undefined, {skip: !tokenIsPresent});
   const hasLinkedGoogleAccount = userInfo?.hasLinkedGoogleAccount || false;

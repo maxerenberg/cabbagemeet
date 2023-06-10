@@ -34,8 +34,12 @@ export default abstract class AbstractOAuth2 {
   static getColumnNames(): string[] {
     // Needed for building a raw SQL query
     return [
-      'UserID', 'LinkedCalendar', 'Sub', 'AccessToken',
-      'AccessTokenExpiresAt', 'RefreshToken',
+      'UserID',
+      'LinkedCalendar',
+      'Sub',
+      'AccessToken',
+      'AccessTokenExpiresAt',
+      'RefreshToken',
     ];
   }
 }

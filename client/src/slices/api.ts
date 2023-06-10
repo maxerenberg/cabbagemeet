@@ -339,48 +339,48 @@ export type UnlinkMicrosoftCalendarApiResponse =
 export type UnlinkMicrosoftCalendarApiArg = void;
 export type GetGoogleCalendarEventsApiResponse =
   /** status 200  */ OAuth2CalendarEventsResponse;
-export type GetGoogleCalendarEventsApiArg = number;
+export type GetGoogleCalendarEventsApiArg = string;
 export type GetMicrosoftCalendarEventsApiResponse =
   /** status 200  */ OAuth2CalendarEventsResponse;
-export type GetMicrosoftCalendarEventsApiArg = number;
+export type GetMicrosoftCalendarEventsApiArg = string;
 export type CreateMeetingApiResponse = /** status 201  */ MeetingResponse;
 export type CreateMeetingApiArg = CreateMeetingDto;
 export type GetMeetingApiResponse = /** status 200  */ MeetingResponse;
-export type GetMeetingApiArg = number;
+export type GetMeetingApiArg = string;
 export type EditMeetingApiResponse = /** status 200  */ MeetingResponse;
 export type EditMeetingApiArg = {
-  id: number;
+  id: string;
   editMeetingDto: EditMeetingDto;
 };
 export type DeleteMeetingApiResponse = /** status 204  */ undefined;
-export type DeleteMeetingApiArg = number;
+export type DeleteMeetingApiArg = string;
 export type ScheduleMeetingApiResponse = /** status 200  */ MeetingResponse;
 export type ScheduleMeetingApiArg = {
-  id: number;
+  id: string;
   scheduleMeetingDto: ScheduleMeetingDto;
 };
 export type UnscheduleMeetingApiResponse = /** status 200  */ MeetingResponse;
-export type UnscheduleMeetingApiArg = number;
+export type UnscheduleMeetingApiArg = string;
 export type AddGuestRespondentApiResponse = /** status 201  */ MeetingResponse;
 export type AddGuestRespondentApiArg = {
-  id: number;
+  id: string;
   addGuestRespondentDto: AddGuestRespondentDto;
 };
 export type PutSelfRespondentApiResponse = /** status 200  */ MeetingResponse;
 export type PutSelfRespondentApiArg = {
-  id: number;
+  id: string;
   putRespondentDto: PutRespondentDto;
 };
 export type UpdateAvailabilitiesApiResponse =
   /** status 200  */ MeetingResponse;
 export type UpdateAvailabilitiesApiArg = {
-  id: number;
+  id: string;
   respondentId: number;
   putRespondentDto: PutRespondentDto;
 };
 export type DeleteRespondentApiResponse = /** status 200  */ MeetingResponse;
 export type DeleteRespondentApiArg = {
-  id: number;
+  id: string;
   respondentId: number;
 };
 export type GetServerInfoApiResponse = /** status 200  */ ServerInfoResponse;
@@ -463,7 +463,7 @@ export type EditUserDto = {
   subscribe_to_notifications?: boolean;
 };
 export type MeetingShortResponse = {
-  meetingID: number;
+  meetingID: string;
   name: string;
   about: string;
   timezone: string;
@@ -493,7 +493,7 @@ export type MeetingRespondent = {
   availabilities: string[];
 };
 export type MeetingResponse = {
-  meetingID: number;
+  meetingID: string;
   name: string;
   about: string;
   timezone: string;

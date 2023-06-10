@@ -50,8 +50,8 @@ export interface GoogleListEventsResponseItem {
   // The fields below may not be present if the event was deleted
   summary?: string;
   start?: {
-    dateTime: string;  // e.g. "2022-12-24T10:00:00-05:00"
-    timeZone?: string;  // e.g. "America/Toronto"
+    dateTime: string; // e.g. "2022-12-24T10:00:00-05:00"
+    timeZone?: string; // e.g. "America/Toronto"
   };
   end?: {
     dateTime: string;
