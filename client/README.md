@@ -134,5 +134,5 @@ which was printed earlier, then start the tests, e.g.
 ```bash
 export WS_ENDPOINT=ws://127.0.0.1:39671/1234567890abcdef
 # run test:e2e:ff for Firefox
-npm run test:e2e:cr
+npm run test:e2e:cr -- --workers 1
 ```

@@ -10,7 +10,7 @@
     "@types/node": "^18.11.18",
     "@types/react": "^18.0.17",
     "@types/react-dom": "^18.0.6",
-    "@types/react-router-bootstrap": "^0.24.5",
+    "@types/react-router-bootstrap": "^0.26.0",
     "@types/react-router-dom": "^5.3.3",
     "bootstrap": "^5.2.0",
     "luxon": "^3.2.1",
@@ -44,12 +44,13 @@
     "production": [
       ">0.2%",
       "not dead",
-      "not op_mini all"
+      "not op_mini all",
+      "iOS 12.5"
     ],
     "development": [
       "last 1 chrome version",
       "last 1 firefox version",
-      "last 1 safari version"
+      "iOS 12.5"
     ]
   },
   "devDependencies": {
