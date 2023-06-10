@@ -279,29 +279,66 @@ describe('MeetingsController (e2e)', () => {
   });
 
   it('/api/meetings/:id/respondents/me (PUT)', async () => {
-    const { token: token1 } = await createUser(app);
-    const { token: token2 } = await createUser(app);
-    const { meetingID } = await createMeeting(sampleCreateMeetingDto, app);
-    await putSelfRespondent({ availabilities: [] }, meetingID, app, token1);
-    await putSelfRespondent({ availabilities: [] }, meetingID, app, token2);
+    const { token: token1, name: name1 } = await createUser(app);
+    const { token: token2, name: name2 } = await createUser(app);
+    const meeting = await createMeeting(sampleCreateMeetingDto, app);
+    const { meetingID } = meeting;
+    const addFirstRespondentResponse = await putSelfRespondent(
+      { availabilities: [] }, meetingID, app, token1
+    );
+    expect(addFirstRespondentResponse.respondents).toHaveLength(1);
+    const firstRespondentID = addFirstRespondentResponse.respondents[0].respondentID;
+    expect(addFirstRespondentResponse).toEqual({
+      ...meeting,
+      respondents: [{availabilities: [], respondentID: firstRespondentID, name: name1}],
+      selfRespondentID: firstRespondentID,
+    });
+    const addSecondRespondentResponse = await putSelfRespondent(
+      { availabilities: [] }, meetingID, app, token2
+    );
+    expect(addSecondRespondentResponse.respondents).toHaveLength(2);
+    const secondRespondentID = addSecondRespondentResponse.respondents[1].respondentID;
     const meetingByFirstRespondent = await getMeeting(meetingID, app, token1);
-    expect(meetingByFirstRespondent.selfRespondentID).toStrictEqual(
-      meetingByFirstRespondent.respondents[0].respondentID,
-    );
+    expect(meetingByFirstRespondent).toEqual({
+      ...meeting,
+      respondents: [
+        {
+          availabilities: [],
+          respondentID: firstRespondentID,
+          name: name1,
+        },
+        {
+          availabilities: [],
+          respondentID: secondRespondentID,
+          name: name2,
+        },
+      ],
+      selfRespondentID: firstRespondentID,
+    });
     const meetingBySecondRespondent = await getMeeting(meetingID, app, token2);
-    expect(meetingBySecondRespondent.selfRespondentID).toStrictEqual(
-      meetingBySecondRespondent.respondents[1].respondentID,
-    );
+    expect(meetingBySecondRespondent.selfRespondentID).toStrictEqual(secondRespondentID);
     const newMeeting = await putSelfRespondent(
       { availabilities: ['2022-12-22T00:30:00Z'] },
       meetingID,
       app,
       token1,
     );
-    expect(newMeeting.respondents).toHaveLength(2);
-    expect(newMeeting.respondents[0].availabilities).toEqual([
-      '2022-12-22T00:30:00Z',
-    ]);
+    expect(newMeeting).toEqual({
+      ...meeting,
+      respondents: [
+        {
+          availabilities: ['2022-12-22T00:30:00Z'],
+          respondentID: firstRespondentID,
+          name: name1,
+        },
+        {
+          availabilities: [],
+          respondentID: secondRespondentID,
+          name: name2,
+        },
+      ],
+      selfRespondentID: firstRespondentID,
+    });
   });
 
   it('/api/meetings/:id/respondents/:respondentID (PUT)', async () => {

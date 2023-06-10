@@ -328,10 +328,12 @@ CabbageMeet | ${this.publicURL}
       throw new NoSuchMeetingError();
     }
     const respondent: Partial<MeetingRespondent> = {
+      Meeting: meeting,
       MeetingID: meeting.ID,
       Availabilities: availabilities,
     };
     if (user) {
+      respondent.User = user;
       respondent.UserID = user.ID;
     } else {
       assert(guestName, 'guestName should have been set');

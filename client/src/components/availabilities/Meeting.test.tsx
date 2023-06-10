@@ -4,6 +4,7 @@ import { Route, Routes } from 'react-router-dom';
 import { rest } from 'msw';
 import { AppStore, setupStore } from 'app/store';
 import { setToken } from 'slices/authentication';
+import type { MeetingResponse, OAuth2CalendarEventsResponse, PutRespondentDto, UserResponse } from 'slices/api';
 import {
   commonSetupsAndTeardowns,
   renderWithProviders,
@@ -45,10 +46,11 @@ test('renders the meeting times (logged in)', async () => {
 test('renders the external event boxes', async () => {
   server.use(
     rest.get('/api/me', (req, res, ctx) => {
-      return res(ctx.json({
+      const response: UserResponse = {
         ...sampleSelfInfoResponse,
         hasLinkedGoogleAccount: true,
-      }));
+      };
+      return res(ctx.json(response));
     }),
     rest.get('/api/me/google-calendar-events', (req, res, ctx) => {
       if (req.url.searchParams.get('meetingID') !== sampleMeetingSlug) {
@@ -60,7 +62,7 @@ test('renders the external event boxes', async () => {
           }),
         );
       }
-      return res(ctx.json({
+      const response: OAuth2CalendarEventsResponse = {
         events: [
           {
             summary: 'Google Event 1',
@@ -73,7 +75,8 @@ test('renders the external event boxes', async () => {
             endDateTime: '2022-12-25T16:00:00Z',
           },
         ],
-      }));
+      };
+      return res(ctx.json(response));
     }),
   );
 
@@ -89,4 +92,34 @@ test('renders the external event boxes', async () => {
 
   await waitFor(() => getByText('Google Event 1'));
   expect(getByText('Google Event 2'));
+});
+
+test('renders the respondent after adding availability (logged in)', async () => {
+  server.use(
+    rest.put(`/api/meetings/${sampleMeetingSlug}/respondents/me`, async (req, res, ctx) => {
+      const { availabilities } = await req.json<PutRespondentDto>();
+      const response: MeetingResponse = {
+        ...sampleMeetingResponse,
+        respondents: [{respondentID: 1, availabilities, name: sampleSelfInfoResponse.name}],
+        selfRespondentID: 1,
+      };
+      return res(ctx.json(response));
+    }),
+  );
+
+  const store = setupStore();
+  store.dispatch(setToken('token'));
+
+  const { getAllByText, getByText } = renderMeeting(store);
+  await waitFor(() => getByText(sampleMeetingResponse.name));
+
+  expect(getAllByText('Add availability').length).toBeGreaterThanOrEqual(1);
+  await userEvent.click(getAllByText('Add availability')[0]);
+
+  expect(getAllByText('Continue').length).toBeGreaterThanOrEqual(1);
+  await userEvent.click(getAllByText('Continue')[0]);
+
+  await waitFor(() => expect(getAllByText('Edit availability').length).toBeGreaterThanOrEqual(1));
+
+  expect(getByText(sampleSelfInfoResponse.name));
 });

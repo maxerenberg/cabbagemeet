@@ -42,18 +42,19 @@ import {
   NotFoundResponse,
   ForbiddenResponse,
 } from '../common-responses';
+import {
+  oneYearFromNowDateString,
+  SECONDS_PER_HOUR,
+} from '../dates.utils';
+import { assert } from '../misc.utils';
+import RateLimiterService, {
+  IRateLimiter,
+} from '../rate-limiter/rate-limiter.service';
 import PutRespondentDto from './put-respondent.dto';
 import AddGuestRespondentDto from './add-guest-respondent.dto';
 import EditMeetingDto from './edit-meeting.dto';
 import ScheduleMeetingDto from './schedule-meeting.dto';
 import type MeetingShortResponse from './meeting-short-response';
-import RateLimiterService, {
-  IRateLimiter,
-} from '../rate-limiter/rate-limiter.service';
-import {
-  oneYearFromNowDateString,
-  SECONDS_PER_HOUR,
-} from '../dates.utils';
 
 const modifyMeetingAuthzDoc =
   'If the meeting was created by a registed user, then ' +
@@ -84,12 +85,15 @@ function meetingToMeetingResponse(
 ): MeetingResponse {
   const response: MeetingResponse = {
     ...meetingToMeetingShortResponse(meeting),
-    // Make sure to use a left join
-    respondents: meeting.Respondents.map((respondent) => ({
-      respondentID: respondent.RespondentID,
-      name: respondent.User?.Name ?? respondent.GuestName!,
-      availabilities: respondent.Availabilities,
-    })),
+    respondents: meeting.Respondents.map((respondent) => {
+      const name = respondent.User?.Name ?? respondent.GuestName;
+      assert(name, 'respondent name was not filled');
+      return {
+        respondentID: respondent.RespondentID,
+        name,
+        availabilities: respondent.Availabilities,
+      };
+    }),
   };
   if (callingUser) {
     for (const respondent of meeting.Respondents) {

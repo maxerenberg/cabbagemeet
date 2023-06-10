@@ -6,6 +6,7 @@ import { Provider } from 'react-redux';
 import { MemoryRouter } from "react-router-dom";
 import { AppStore, setupStore } from 'app/store';
 import { ToastProvider } from "components/Toast";
+import type { MeetingResponse, UserResponse } from 'slices/api';
 import { getToday, setToday } from "utils/dates.utils";
 import { removeLocalToken } from "utils/auth.utils";
 
@@ -29,7 +30,7 @@ export function renderWithProviders(ui: React.ReactElement, {
 
 export const sampleMeetingSlug = 'abcdefghijkl';
 
-export const sampleMeetingResponse = {
+export const sampleMeetingResponse: MeetingResponse = {
   meetingID: sampleMeetingSlug,
   name: 'Meeting 1',
   about: '',
@@ -41,7 +42,7 @@ export const sampleMeetingResponse = {
 };
 Object.freeze(sampleMeetingResponse);
 
-export const sampleSelfInfoResponse = {
+export const sampleSelfInfoResponse: UserResponse = {
   userID: 1,
   name: 'Bob',
   email: 'bob@example.com',
