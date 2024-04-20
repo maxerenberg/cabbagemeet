@@ -258,7 +258,7 @@ export default class OAuth2Service {
   private async requestJSON<T>(
     ...args: Parameters<typeof request>
   ): Promise<T> {
-    return (await this.request(...args)).body.json();
+    return (await this.request(...args)).body.json() as T;
   }
 
   private allRequestedScopesArePresent(
@@ -676,7 +676,7 @@ export default class OAuth2Service {
         : headers['content-type'];
       // The content-type can be e.g. "application/json; charset=UTF-8"
       if (contentType?.startsWith('application/json')) {
-        return body.json();
+        return body.json() as T;
       } else {
         // Some API endpoints, like deleting an event, return no response body
         return null;
